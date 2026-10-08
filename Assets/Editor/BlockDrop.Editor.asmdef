@@ -1,0 +1,5 @@
+{
+  "name": "BlockDrop.Editor",
+  "includePlatforms": ["Editor"],
+  "references": []
+}

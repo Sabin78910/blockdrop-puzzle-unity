@@ -1,0 +1,5 @@
+{
+  "name": "BlockDrop.Game",
+  "references": ["BlockDrop.Core"],
+  "autoReferenced": true
+}

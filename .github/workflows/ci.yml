@@ -41,7 +41,7 @@ jobs:
           testMode: editmode
           githubToken: ${{ github.token }}
       - if: env.HAS_LICENSE == 'true'
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@v6
         with:
           unityVersion: 6000.6.5f1
           targetPlatform: Android

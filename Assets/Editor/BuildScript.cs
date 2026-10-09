@@ -46,6 +46,14 @@ namespace BlockDrop.EditorTools
             Debug.Log("ConfigureForPlay done: icon=" + (icon != null));
         }
 
+        /// <summary>Unity Build Automation "Pre-export method": output an Android App Bundle (.aab)
+        /// for Google Play instead of an APK. Set on the "Play Release" build target only.</summary>
+        public static void PreExportAppBundle()
+        {
+            EditorUserBuildSettings.buildAppBundle = true;
+            Debug.Log("PreExportAppBundle: building .aab for Google Play");
+        }
+
         public static void BuildAndroid()
         {
             EnsureScene();

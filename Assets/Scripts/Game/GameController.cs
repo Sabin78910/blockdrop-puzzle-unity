@@ -1091,16 +1091,16 @@ namespace BlockDrop.Game
         private void DrawChallenge(float w, float h)
         {
             Outlined(new Rect(0, h * 0.08f, w, h * 0.08f), "CHALLENGE", _h2, Visuals.Hex("7CF8FF"), 3);
-            Outlined(new Rect(w * 0.08f, h * 0.17f, w * 0.84f, h * 0.08f), "Start a new challenge and share its code, or enter a friend's code to play their exact pieces.", _body, Color.white, 1.5f);
-            if (Btn(Row(w, h * 0.27f, h * 0.08f), "NEW CHALLENGE", "4BE38A", "1FA45B")) StartMode(Mode.Challenge, ChallengeCode.NewSeed(_rng));
-            Outlined(new Rect(0, h * 0.39f, w, h * 0.04f), "FRIEND'S CODE", _body, Visuals.Hex("FFE27A"), 1.5f);
-            _codeInput = GUI.TextField(Row(w, h * 0.44f, h * 0.085f, 0.16f), _codeInput, ChallengeCode.Length, _field).ToUpperInvariant();
-            if (Btn(Row(w, h * 0.545f, h * 0.075f), "PLAY CODE", "6E8BFF", "3A4FE0"))
+            Outlined(new Rect(w * 0.08f, h * 0.165f, w * 0.84f, h * 0.11f), "Start a challenge and share its code, or enter a friend's code to play their exact pieces.", _body, Color.white, 1.5f);
+            if (Btn(Row(w, h * 0.30f, h * 0.08f), "NEW CHALLENGE", "4BE38A", "1FA45B")) StartMode(Mode.Challenge, ChallengeCode.NewSeed(_rng));
+            Outlined(new Rect(0, h * 0.415f, w, h * 0.04f), "FRIEND'S CODE", _body, Visuals.Hex("FFE27A"), 1.5f);
+            _codeInput = GUI.TextField(Row(w, h * 0.465f, h * 0.085f, 0.16f), _codeInput, ChallengeCode.Length, _field).ToUpperInvariant();
+            if (Btn(Row(w, h * 0.57f, h * 0.075f), "PLAY CODE", "6E8BFF", "3A4FE0"))
             {
                 if (ChallengeCode.TryDecode(_codeInput, out int seed)) StartMode(Mode.Challenge, seed);
                 else _codeError = $"Codes have {ChallengeCode.Length} letters/digits, e.g. K7Q2MX";
             }
-            if (_codeError != "") Outlined(new Rect(0, h * 0.63f, w, h * 0.05f), _codeError, _small, Visuals.Hex("FF8FA3"), 1.2f);
+            if (_codeError != "") Outlined(new Rect(0, h * 0.655f, w, h * 0.05f), _codeError, _small, Visuals.Hex("FF8FA3"), 1.2f);
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 

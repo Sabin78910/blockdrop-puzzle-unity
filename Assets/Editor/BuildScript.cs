@@ -30,7 +30,7 @@ namespace BlockDrop.EditorTools
         {
             var android = UnityEditor.Build.NamedBuildTarget.Android;
             PlayerSettings.companyName = "Sabin Khanal";
-            PlayerSettings.productName = "Block Drop Puzzle";
+            PlayerSettings.productName = "Block Drop"; // short launcher label; the store title carries the keywords
             PlayerSettings.SetApplicationIdentifier(android, "com.sabin.blockdrop");
             PlayerSettings.bundleVersion = "1.0.0";
             PlayerSettings.Android.bundleVersionCode = 1;
@@ -39,12 +39,32 @@ namespace BlockDrop.EditorTools
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.Android.forceInternetPermission = true; // online leaderboards (optional at runtime)
-            AssetDatabase.ImportAsset("Assets/Art/AppIcon.png");
-            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/AppIcon.png");
-            if (icon != null) PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+            bool icons = ConfigureIcons();
             EnsureScene();
             AssetDatabase.SaveAssets();
-            Debug.Log("ConfigureForPlay done: icon=" + (icon != null));
+            Debug.Log("ConfigureForPlay done: icons=" + icons);
+        }
+
+        /// <summary>Store/legacy icon plus Android adaptive layers (background + foreground),
+        /// so modern launchers show a full-bleed icon instead of shrinking it into a white circle.</summary>
+        private static bool ConfigureIcons()
+        {
+            const string dir = "Assets/Art/";
+            foreach (var f in new[] { "AppIcon.png", "AppIconBackground.png", "AppIconForeground.png" }) AssetDatabase.ImportAsset(dir + f);
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "AppIcon.png");
+            var bg = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "AppIconBackground.png");
+            var fg = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "AppIconForeground.png");
+            if (icon == null || bg == null || fg == null) return false;
+            PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+            var android = UnityEditor.Build.NamedBuildTarget.Android;
+            foreach (var kind in PlayerSettings.GetSupportedIconKinds(android))
+            {
+                var platformIcons = PlayerSettings.GetPlatformIcons(android, kind);
+                bool adaptive = kind.ToString().Contains("Adaptive");
+                foreach (var pi in platformIcons) pi.SetTextures(adaptive ? new[] { bg, fg } : new[] { icon });
+                PlayerSettings.SetPlatformIcons(android, kind, platformIcons);
+            }
+            return true;
         }
 
         /// <summary>Unity Build Automation "Pre-export method": output an Android App Bundle (.aab)

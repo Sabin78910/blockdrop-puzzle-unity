@@ -37,11 +37,13 @@ jobs:
       - if: env.HAS_LICENSE == 'true'
         uses: game-ci/unity-test-runner@v4
         with:
+          unityVersion: 6000.6.5f1  # GameCI has no image for 6000.6.2f1; patch-compatible
           testMode: editmode
           githubToken: ${{ github.token }}
       - if: env.HAS_LICENSE == 'true'
         uses: game-ci/unity-builder@v4
         with:
+          unityVersion: 6000.6.5f1
           targetPlatform: Android
           buildMethod: BlockDrop.EditorTools.BuildScript.BuildAndroid
       - if: env.HAS_LICENSE == 'true'

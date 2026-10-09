@@ -2,7 +2,6 @@
 
 8×8 block puzzle: drag pieces onto the board, clear rows and columns, chain combos. Also has a seeded **daily challenge** where everyone gets the same pieces.
 
-![Unity CI](https://github.com/Sabin78910/blockdrop-puzzle-unity/actions/workflows/ci.yml/badge.svg)
 
 Built with Unity 6 (6000.6.2f1). The game rules (`Assets/Scripts/Core`) are pure C# with no engine dependency, and they're covered by EditMode tests.
 
@@ -17,5 +16,7 @@ UNITY="/Applications/Unity/Hub/Editor/6000.6.2f1/Unity.app/Contents/MacOS/Unity"
 "$UNITY" -batchmode -nographics -quit -projectPath . -executeMethod BlockDrop.EditorTools.BuildScript.BuildAndroid
 ```
 
-## Cloud CI (no laptop needed)
-Add the repo secrets `UNITY_EMAIL`, `UNITY_PASSWORD`, and `UNITY_LICENSE` (Personal license file contents, see https://game.ci/docs/github/activation). After that, every push runs the tests and builds an Android APK artifact.
+## Cloud builds (no laptop needed)
+Builds run on **Unity Build Automation** (cloud.unity.com → Block Drop Puzzle → DevOps → Build Automation):
+target **Default Android**, Windows Micro builder (free tier), triggered from the `main` branch.
+Unity reads this repo through a read-only deploy key.

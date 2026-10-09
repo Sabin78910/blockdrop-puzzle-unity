@@ -13,9 +13,9 @@ namespace BlockDrop.Game
     /// the game itself never depends on it.</summary>
     public static class OnlineService
     {
-        // Leaderboard IDs must exist in the Unity Cloud dashboard (Leaderboards → Create).
-        public const string ClassicBoard = "classic";
-        public const string DailyBoard = "daily";
+        // Leaderboard IDs must match the Unity Cloud dashboard exactly (case-sensitive).
+        public const string ClassicBoard = "Classic";
+        public const string DailyBoard = "Daily";
 
         public struct Row { public int Rank; public string Name; public long Score; public bool IsMe; }
 

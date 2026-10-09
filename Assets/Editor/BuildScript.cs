@@ -23,6 +23,29 @@ namespace BlockDrop.EditorTools
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
         }
 
+        /// <summary>Google Play requirements: app id, API 36, 64-bit IL2CPP, icon, version.
+        /// Run once: -executeMethod BlockDrop.EditorTools.BuildScript.ConfigureForPlay</summary>
+        [MenuItem("Block Drop/Configure for Google Play")]
+        public static void ConfigureForPlay()
+        {
+            var android = UnityEditor.Build.NamedBuildTarget.Android;
+            PlayerSettings.companyName = "Sabin Khanal";
+            PlayerSettings.productName = "Block Drop Puzzle";
+            PlayerSettings.SetApplicationIdentifier(android, "com.sabin.blockdrop");
+            PlayerSettings.bundleVersion = "1.0.0";
+            PlayerSettings.Android.bundleVersionCode = 1;
+            PlayerSettings.Android.minSdkVersion = (AndroidSdkVersions)26;
+            PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)36;
+            PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            AssetDatabase.ImportAsset("Assets/Art/AppIcon.png");
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/AppIcon.png");
+            if (icon != null) PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+            EnsureScene();
+            AssetDatabase.SaveAssets();
+            Debug.Log("ConfigureForPlay done: icon=" + (icon != null));
+        }
+
         public static void BuildAndroid()
         {
             EnsureScene();

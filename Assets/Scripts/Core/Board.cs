@@ -33,6 +33,32 @@ namespace BlockDrop.Core
         /// <summary>Sets a cell directly (level obstacles). Does not score or clear lines.</summary>
         public void SetCell(int x, int y, int color) => _cells[x, y] = color;
 
+        /// <summary>Rows and columns that placing <paramref name="piece"/> at (ox, oy) would clear,
+        /// without changing the board (used for the glow preview and clear animations).</summary>
+        public (List<int> rows, List<int> cols) PreviewClears(Piece piece, int ox, int oy)
+        {
+            var rows = new List<int>();
+            var cols = new List<int>();
+            if (!CanPlace(piece, ox, oy)) return (rows, cols);
+            var filled = new bool[Size, Size];
+            for (int x = 0; x < Size; x++)
+                for (int y = 0; y < Size; y++)
+                    filled[x, y] = IsFilled(x, y);
+            foreach (var (cx, cy) in piece.Cells) filled[ox + cx, oy + cy] = true;
+            for (int i = 0; i < Size; i++)
+            {
+                bool row = true, col = true;
+                for (int j = 0; j < Size; j++)
+                {
+                    if (!filled[j, i]) row = false;
+                    if (!filled[i, j]) col = false;
+                }
+                if (row) rows.Add(i);
+                if (col) cols.Add(i);
+            }
+            return (rows, cols);
+        }
+
         public Board Clone()
         {
             var b = new Board(Size) { Score = Score, Combo = Combo };

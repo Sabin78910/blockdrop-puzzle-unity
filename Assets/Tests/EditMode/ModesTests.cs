@@ -117,3 +117,51 @@ public class ModesTests
         Assert.AreEqual(s0 == s1 ? -1 : (s0 > s1 ? 0 : 1), m.Winner);
     }
 }
+
+public class AiAndPreviewTests
+{
+    [Test] public void PreviewClearsMatchesActualClear()
+    {
+        var b = new Board(8);
+        var line4 = new Piece(new[] { (0, 0), (1, 0), (2, 0), (3, 0) }, 0);
+        b.Place(line4, 0, 2);
+        var (rows, cols) = b.PreviewClears(line4, 4, 2);
+        CollectionAssert.AreEqual(new[] { 2 }, rows);
+        Assert.IsEmpty(cols);
+        Assert.IsTrue(b.IsFilled(0, 2), "preview must not change the board");
+        Assert.AreEqual(1, b.Place(line4, 4, 2).LinesCleared);
+    }
+
+    [Test] public void EveryAiLevelMakesLegalMoves()
+    {
+        foreach (BotLevel level in System.Enum.GetValues(typeof(BotLevel)))
+        {
+            var seat = new Seat(5);
+            var rng = new System.Random(1);
+            for (int k = 0; k < 15 && !seat.Out; k++)
+            {
+                Assert.IsTrue(Bot.TryMove(seat.Board, seat.Dealer.Hand, level, rng, out int i, out int x, out int y), $"{level} found no move");
+                Assert.IsTrue(seat.TryPlace(i, x, y), $"{level} chose an illegal move");
+            }
+        }
+    }
+
+    [Test] public void HarderAiScoresAtLeastAsWellOnAverage()
+    {
+        int Total(BotLevel level)
+        {
+            int sum = 0;
+            for (int seed = 1; seed <= 6; seed++)
+            {
+                var seat = new Seat(seed * 31);
+                var rng = new System.Random(seed);
+                while (!seat.Out && seat.Moves < 40 && Bot.TryMove(seat.Board, seat.Dealer.Hand, level, rng, out int i, out int x, out int y))
+                    seat.TryPlace(i, x, y);
+                sum += seat.Board.Score;
+            }
+            return sum;
+        }
+        int easy = Total(BotLevel.Easy), hard = Total(BotLevel.Hard);
+        Assert.Greater(hard, easy, $"hard {hard} vs easy {easy}");
+    }
+}

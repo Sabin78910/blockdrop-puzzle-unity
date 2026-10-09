@@ -56,9 +56,72 @@ namespace BlockDrop.Core
         }
     }
 
+    public enum BotLevel { Easy, Medium, Hard }
+
     /// <summary>Greedy player: used to calibrate level targets (every level is beatable) and for hints.</summary>
     public static class Bot
     {
+        /// <summary>Easy: random legal move. Medium: greedy. Hard: two-move lookahead within the hand.</summary>
+        public static bool TryMove(Board board, Piece[] hand, BotLevel level, Random rng, out int handIndex, out int x, out int y)
+        {
+            switch (level)
+            {
+                case BotLevel.Easy: return TryRandomMove(board, hand, rng, out handIndex, out x, out y);
+                case BotLevel.Hard: return TryLookaheadMove(board, hand, out handIndex, out x, out y);
+                default: return TryBestMove(board, hand, out handIndex, out x, out y);
+            }
+        }
+
+        private static bool TryRandomMove(Board board, Piece[] hand, Random rng, out int handIndex, out int x, out int y)
+        {
+            var moves = new List<(int, int, int)>();
+            for (int i = 0; i < hand.Length; i++)
+            {
+                if (hand[i] == null) continue;
+                for (int px = 0; px < board.Size; px++)
+                    for (int py = 0; py < board.Size; py++)
+                        if (board.CanPlace(hand[i], px, py)) moves.Add((i, px, py));
+            }
+            handIndex = x = y = -1;
+            if (moves.Count == 0) return false;
+            (handIndex, x, y) = moves[rng.Next(moves.Count)];
+            return true;
+        }
+
+        private static bool TryLookaheadMove(Board board, Piece[] hand, out int handIndex, out int x, out int y)
+        {
+            handIndex = x = y = -1;
+            int best = int.MinValue;
+            for (int i = 0; i < hand.Length; i++)
+            {
+                var p = hand[i];
+                if (p == null) continue;
+                for (int px = 0; px < board.Size; px++)
+                    for (int py = 0; py < board.Size; py++)
+                    {
+                        if (!board.CanPlace(p, px, py)) continue;
+                        var sim = board.Clone();
+                        int score = sim.Place(p, px, py).Points * 100 - TrappedCells(sim) * 8 + Contacts(board, p, px, py);
+                        // best greedy follow-up with the rest of the hand
+                        var rest = (Piece[])hand.Clone();
+                        rest[i] = null;
+                        bool any = false;
+                        foreach (var q in rest) if (q != null) { any = true; break; }
+                        if (any)
+                        {
+                            if (TryBestMove(sim, rest, out int j, out int qx, out int qy))
+                            {
+                                var sim2 = sim.Clone();
+                                score += sim2.Place(rest[j], qx, qy).Points * 100 - TrappedCells(sim2) * 8;
+                            }
+                            else score -= 10000; // this move strands the rest of the hand
+                        }
+                        if (score > best) { best = score; handIndex = i; x = px; y = py; }
+                    }
+            }
+            return handIndex >= 0;
+        }
+
         public static bool TryBestMove(Board board, Piece[] hand, out int handIndex, out int x, out int y)
         {
             handIndex = x = y = -1;

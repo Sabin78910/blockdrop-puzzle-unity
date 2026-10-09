@@ -28,6 +28,7 @@ Block Drop is a colourful block puzzle that's easy to learn and hard to put down
 ★ REWARDS THAT RESPECT YOUR TIME
 • Daily streak bonus that grows each day you come back
 • Three new missions every day
+• Level up as you play and collect 12 trophies
 • Earn coins by playing well and unlock vivid colour themes: Jewel, Neon, Candy, Ocean and Sunset
 • No loot boxes and no pay-to-win – coins only unlock looks
 

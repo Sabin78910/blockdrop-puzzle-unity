@@ -68,4 +68,45 @@ public class MetaTests
         Assert.AreEqual(50, back.Coins);
         Assert.AreEqual(0, PlayerMeta.Parse("t=3").ThemeIndex, "can't select an unowned theme");
     }
+
+    [Test] public void XpLevelsUpAndGrantsCoins()
+    {
+        var m = new PlayerMeta();
+        Assert.AreEqual(0, m.AddXp(PlayerMeta.XpToNext(1) - 1));
+        Assert.AreEqual(1, m.Level);
+        Assert.AreEqual(1, m.AddXp(1));
+        Assert.AreEqual(2, m.Level);
+        Assert.AreEqual(0, m.Xp);
+        Assert.AreEqual(PlayerMeta.LevelReward(2), m.Coins);
+        Assert.AreEqual(2, m.AddXp(PlayerMeta.XpToNext(2) + PlayerMeta.XpToNext(3)), "big score can give several levels");
+        Assert.AreEqual(0, m.AddXp(-50));
+    }
+
+    [Test] public void AchievementsUnlockOnceAndPayCoins()
+    {
+        var m = new PlayerMeta();
+        var first = m.Record(Stat.LinesCleared, 1);
+        Assert.AreEqual("First Clear", first.Single().Name);
+        Assert.AreEqual(10, m.Coins);
+        Assert.IsEmpty(m.Record(Stat.LinesCleared, 1), "no repeat unlock");
+        Assert.AreEqual("Line Cleaner", m.Record(Stat.LinesCleared, 98).Single().Name);
+        Assert.IsEmpty(m.Record(Stat.BestCombo, 2));
+        m.Record(Stat.BestCombo, 1);
+        Assert.AreEqual(2, m.Stats[(int)Stat.BestCombo], "best stats keep the maximum");
+    }
+
+    [Test] public void LevelStatsAndAchievementsPersist()
+    {
+        var m = new PlayerMeta();
+        m.AddXp(1234);
+        m.Record(Stat.HardAiWins, 1);
+        m.Record(Stat.GamesPlayed, 3);
+        var back = PlayerMeta.Parse(m.Serialize());
+        Assert.AreEqual(m.Level, back.Level);
+        Assert.AreEqual(m.Xp, back.Xp);
+        Assert.AreEqual(m.Coins, back.Coins);
+        Assert.IsTrue(back.HasAchievement(10));
+        Assert.AreEqual(3, back.Stats[(int)Stat.GamesPlayed]);
+        Assert.AreEqual(1, PlayerMeta.Parse("c=5").Level, "old saves start at level 1");
+    }
 }

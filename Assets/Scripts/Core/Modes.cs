@@ -8,18 +8,39 @@ namespace BlockDrop.Core
     public sealed class Dealer
     {
         public const int HandSize = 3;
+        private const int FairRedraws = 12;
         private readonly PieceGenerator _gen;
+        private readonly Func<Piece, bool> _fits; // null = classic random dealing
         public readonly Piece[] Hand = new Piece[HandSize];
 
-        public Dealer(int seed)
+        /// <param name="fits">When given, every new hand contains at least one piece that fits ("every hand is playable").</param>
+        public Dealer(int seed, Func<Piece, bool> fits = null)
         {
             _gen = new PieceGenerator(seed);
+            _fits = fits;
             Deal();
         }
 
         private void Deal()
         {
             for (int i = 0; i < HandSize; i++) Hand[i] = _gen.Next();
+            if (_fits != null) EnsurePlayable(_fits);
+        }
+
+        /// <summary>Redraws until a piece fits; as a last resort the first piece becomes a single block, which
+        /// always fits because a completely full board would already have cleared its lines.</summary>
+        private void EnsurePlayable(Func<Piece, bool> fits)
+        {
+            for (int t = 0; t < FairRedraws && !Array.Exists(Hand, p => p != null && fits(p)); t++)
+                for (int i = 0; i < HandSize; i++) Hand[i] = _gen.Next();
+            if (!Array.Exists(Hand, p => p != null && fits(p))) Hand[0] = new Piece(Piece.Shapes[0], Hand[0]?.ColorIndex ?? 0);
+        }
+
+        /// <summary>A fresh hand guaranteed to be playable (used by "Second chance").</summary>
+        public void Redeal(Func<Piece, bool> fits)
+        {
+            for (int i = 0; i < HandSize; i++) Hand[i] = _gen.Next();
+            EnsurePlayable(fits);
         }
 
         public void Use(int index)
@@ -37,11 +58,22 @@ namespace BlockDrop.Core
         public readonly Dealer Dealer;
         public int Moves { get; private set; }
         public bool Out { get; private set; }
+        public int Revives { get; private set; }
 
-        public Seat(int seed, int size = 8)
+        public Seat(int seed, int size = 8, bool fairHands = false)
         {
             Board = new Board(size);
-            Dealer = new Dealer(seed);
+            Dealer = new Dealer(seed, fairHands ? p => Board.CanPlaceAnywhere(p) : (Func<Piece, bool>)null);
+        }
+
+        /// <summary>Second chance after running out of moves: a fresh hand that fits the current board.</summary>
+        public bool Revive()
+        {
+            if (!Out) return false;
+            Dealer.Redeal(p => Board.CanPlaceAnywhere(p));
+            Out = Board.IsGameOver(Dealer.Hand);
+            Revives++;
+            return !Out;
         }
 
         public bool TryPlace(int handIndex, int x, int y)

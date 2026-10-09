@@ -36,7 +36,9 @@ namespace BlockDrop.Game
         private int _tutorial; // 0 = drag, 1 = clear a line, 2 = combos, 3 = done
         private float _tutorialStepAt;
         private static string Today => PlayerMeta.Day(DateTime.Now);
-        private bool _bestCelebrated, _nameSynced, _paused;
+        private bool _bestCelebrated, _nameSynced, _paused, _offerRevive, _firstSession;
+        private readonly IAdProvider _ads = new BetaAdProvider();
+        private AdPolicy _adPolicy;
         private TouchScreenKeyboard _kb;
         private string _kbTarget; // "code" or "name"
         private float _nextOnlineTry;
@@ -93,6 +95,10 @@ namespace BlockDrop.Game
             _progress = Progress.Parse(PlayerPrefs.GetString("progress", ""));
             _localName = PlayerPrefs.GetString("name", "");
             _meta = PlayerMeta.Parse(PlayerPrefs.GetString("meta", ""));
+            _adPolicy = AdPolicy.Parse(PlayerPrefs.GetString("ads", ""));
+            int sessions = PlayerPrefs.GetInt("sessions", 0) + 1;
+            PlayerPrefs.SetInt("sessions", sessions);
+            _firstSession = sessions == 1;
             _welcomeReward = _meta.CheckIn(Today);
             Celebrate(_meta.Record(Stat.BestStreak, _meta.Streak));
             _tutorial = PlayerPrefs.GetInt("tutorial", 0);
@@ -284,10 +290,11 @@ namespace BlockDrop.Game
                 case Mode.VsAi: _versus = new VersusMatch(Environment.TickCount); break;
                 case Mode.Daily: _single = new Seat(PieceGenerator.DailySeed(DateTime.UtcNow)); break;
                 case Mode.Challenge: _challengeSeed = seed; _single = new Seat(seed); break;
-                default: _single = new Seat(Environment.TickCount); break;
+                default: _single = new Seat(Environment.TickCount, fairHands: true); break; // Classic: every hand is playable
             }
             _hintsLeft = Competitive ? 0 : 3;
-            _hint = null; _newBest = false; _aiThinking = false; _bestCelebrated = false;
+            MaybeInterstitial();
+            _hint = null; _newBest = false; _aiThinking = false; _bestCelebrated = false; _offerRevive = false;
             _shownScore = 0;
             _floaters.Clear();
             _screen = Screen.Playing;
@@ -336,6 +343,8 @@ namespace BlockDrop.Game
             }
             if (_mode == Mode.VsAi) good = _versus.Winner == 0;
             Track(MissionKind.PlayGames, 1);
+            _adPolicy.OnGameEnded(Today, _newBest);
+            PlayerPrefs.SetString("ads", _adPolicy.Serialize());
             if (_mode == Mode.Level && _level.State == LevelState.Won) Track(MissionKind.EarnStars, _level.Stars);
             if (Career)
             {
@@ -427,7 +436,8 @@ namespace BlockDrop.Game
             PollKeyboard();
             if (Input.GetKeyDown(KeyCode.Escape) && _screen != Screen.Menu)
             {
-                if (_screen == Screen.Playing) SetPaused(!_paused); // never throw a run away on an accidental back press
+                if (_screen == Screen.Playing && _offerRevive) DeclineRevive();
+                else if (_screen == Screen.Playing) SetPaused(!_paused); // never throw a run away on an accidental back press
                 else ShowMenu();
                 return;
             }
@@ -442,7 +452,7 @@ namespace BlockDrop.Game
             AnimateDecor();
             AnimateParticles();
             AnimateShake();
-            if (_screen != Screen.Playing || _paused) return;
+            if (_screen != Screen.Playing || _paused || _offerRevive) return;
             _playSeconds += Time.unscaledDeltaTime;
             if (!_breakShown && _playSeconds > 40 * 60) { _breakShown = true; _breakOpen = true; }
             if (_tutorial == 2 && Time.time - _tutorialStepAt > 3.5f) { _tutorial = 3; PlayerPrefs.SetInt("tutorial", 3); }
@@ -539,6 +549,7 @@ namespace BlockDrop.Game
                 if (Career) { Celebrate(_meta.Record(Stat.LinesCleared, lines)); Celebrate(_meta.Record(Stat.BestCombo, board.Combo)); }
                 if (_tutorial == 1) { _tutorial = 2; _tutorialStepAt = Time.time; }
                 if (lines >= 3) StartCoroutine(MegaClear());
+                else StartCoroutine(HitStop(0.035f + 0.02f * lines));
                 foreach (var (pos, col) in burst) Shatter(pos, col);
                 _shake = 0.12f + 0.08f * lines;
                 var mid = BoardCenter + new Vector3(0, 0.6f, 0);
@@ -570,7 +581,13 @@ namespace BlockDrop.Game
 
         private void AfterMove()
         {
-            if (IsFinished) { StartCoroutine(FinishSoon()); return; }
+            if (IsFinished)
+            {
+                // Classic offers one second chance (a fresh hand that fits) before the game ends.
+                if (_mode == Mode.Classic && _single.Revives == 0) { _offerRevive = true; RefreshBoard(); RebuildHand(); return; }
+                StartCoroutine(FinishSoon());
+                return;
+            }
             if (_mode == Mode.Versus) { _turnBannerUntil = Time.time + 1.1f; Array.Clear(_pop, 0, _pop.Length); }
             RefreshBoard(); RebuildHand();
             if (_mode == Mode.VsAi && _versus.Turn == 1) StartCoroutine(AiTurns());
@@ -852,7 +869,7 @@ namespace BlockDrop.Game
                 case Screen.Menu: GUI.enabled = _welcomeReward == 0; DrawMenu(w, h); break;
                 case Screen.LevelSelect: DrawLevelSelect(w, h); break;
                 case Screen.AiSelect: DrawAiSelect(w, h); break;
-                case Screen.Playing: GUI.enabled = !_breakOpen && !_paused; DrawHud(w, h); GUI.enabled = true; break;
+                case Screen.Playing: GUI.enabled = !_breakOpen && !_paused && !_offerRevive; DrawHud(w, h); GUI.enabled = true; break;
                 case Screen.Result: DrawResult(w, h); break;
                 case Screen.Challenge: DrawChallenge(w, h); break;
                 case Screen.Leaderboard: DrawLeaderboard(w, h); break;
@@ -864,7 +881,7 @@ namespace BlockDrop.Game
             GUI.enabled = true;
             DrawFloaters(h);
             DrawToasts(w, h);
-            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); DrawPause(w, h); }
+            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); DrawPause(w, h); DrawSecondChance(w, h); }
             if (Time.unscaledTime < _flashUntil)
             {
                 var old = GUI.color; GUI.color = new Color(1, 1, 1, 0.55f * (_flashUntil - Time.unscaledTime) / 0.14f);
@@ -904,6 +921,60 @@ namespace BlockDrop.Game
                 GUI.DrawTexture(new Rect(p.x - size / 2, h - p.y - size / 2, size, size), Visuals.Circle.texture);
                 GUI.color = old;
             }
+        }
+
+        private IEnumerator HitStop(float seconds)
+        {
+            if (_paused) yield break;
+            Time.timeScale = 0.05f; // a brief freeze-frame on impact: one of the strongest game-feel signals
+            yield return new WaitForSecondsRealtime(seconds);
+            Time.timeScale = _paused ? 0f : 1f;
+        }
+
+        private void MaybeInterstitial()
+        {
+            double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            bool removeAds = PlayerPrefs.GetInt("removeAds", 0) == 1;
+            if (!_adPolicy.ShouldShowInterstitial(Today, now, removeAds, _firstSession)) return;
+            _ads.Show(AdKind.Interstitial, shown =>
+            {
+                if (!shown) return;
+                _adPolicy.OnInterstitialShown(now);
+                PlayerPrefs.SetString("ads", _adPolicy.Serialize());
+            });
+        }
+
+        private void AcceptRevive()
+        {
+            _ads.Show(AdKind.Rewarded, ok =>
+            {
+                _offerRevive = false;
+                if (ok && _single.Revive())
+                {
+                    RefreshBoard(); RebuildHand();
+                    AddFloater("SECOND CHANCE!", BoardCenter + new Vector3(0, 2.8f, 0), Visuals.Hex("7CF8FF"), 1.4f);
+                    _fx.Star();
+                }
+                else StartCoroutine(FinishSoon());
+            });
+        }
+
+        private void DeclineRevive()
+        {
+            _offerRevive = false;
+            StartCoroutine(FinishSoon());
+        }
+
+        private void DrawSecondChance(float w, float h)
+        {
+            if (!_offerRevive) return;
+            var card = new Rect(w * 0.08f, h * 0.3f, w * 0.84f, h * 0.34f);
+            Modal(w, h, card);
+            Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.06f), "OUT OF MOVES", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.85f) }, Visuals.Hex("FF8FA3"), 3);
+            Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.085f, card.width - w * 0.1f, h * 0.065f), $"Score {Score}. Second chance: 3 new pieces that fit!", _small, Color.white, 1.2f);
+            float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
+            if (Btn(new Rect(bx, card.y + h * 0.165f, bw, h * 0.065f), _ads.RewardedIsFree ? "CONTINUE  (FREE)" : "WATCH VIDEO TO CONTINUE", "4BE38A", "1FA45B", 0.85f)) AcceptRevive();
+            if (Btn(new Rect(bx, card.y + h * 0.245f, bw, h * 0.06f), "NO THANKS", "5A4FA8", "3A2F80", 0.8f)) DeclineRevive();
         }
 
         private void SetPaused(bool paused)

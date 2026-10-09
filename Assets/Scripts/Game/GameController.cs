@@ -36,7 +36,10 @@ namespace BlockDrop.Game
         private int _tutorial; // 0 = drag, 1 = clear a line, 2 = combos, 3 = done
         private float _tutorialStepAt;
         private static string Today => PlayerMeta.Day(DateTime.Now);
-        private bool _bestCelebrated;
+        private bool _bestCelebrated, _nameSynced, _paused;
+        private TouchScreenKeyboard _kb;
+        private string _kbTarget; // "code" or "name"
+        private float _nextOnlineTry;
         private readonly List<(string text, Color color, float until)> _toasts = new List<(string, Color, float)>();
         private bool Career => _mode != Mode.Versus; // pass-and-play moves don't count toward one player's profile
         private int _best, _challengeSeed, _hintsLeft;
@@ -299,6 +302,7 @@ namespace BlockDrop.Game
 
         private void ShowMenu(Screen screen = Screen.Menu)
         {
+            SetPaused(false);
             _screen = screen;
             _boardRoot.SetActive(false);
             _miniRoot.SetActive(false);
@@ -420,12 +424,25 @@ namespace BlockDrop.Game
         private void Update()
         {
             if (UnityEngine.Screen.width != _fitW || UnityEngine.Screen.height != _fitH) FitCamera();
-            if (Input.GetKeyDown(KeyCode.Escape) && _screen != Screen.Menu) { ShowMenu(); return; }
+            PollKeyboard();
+            if (Input.GetKeyDown(KeyCode.Escape) && _screen != Screen.Menu)
+            {
+                if (_screen == Screen.Playing) SetPaused(!_paused); // never throw a run away on an accidental back press
+                else ShowMenu();
+                return;
+            }
+            // Keep trying to come online (slow or late network at startup); then push a name chosen offline.
+            if (!OnlineService.Ready && Time.unscaledTime >= _nextOnlineTry) { _nextOnlineTry = Time.unscaledTime + 5f; _ = OnlineService.EnsureReady(); }
+            else if (OnlineService.Ready && !_nameSynced)
+            {
+                _nameSynced = true;
+                if (_localName != "" && OnlineService.PlayerName.Split('#')[0] != _localName) _ = OnlineService.SetNameAsync(_localName);
+            }
 
             AnimateDecor();
             AnimateParticles();
             AnimateShake();
-            if (_screen != Screen.Playing) return;
+            if (_screen != Screen.Playing || _paused) return;
             _playSeconds += Time.unscaledDeltaTime;
             if (!_breakShown && _playSeconds > 40 * 60) { _breakShown = true; _breakOpen = true; }
             if (_tutorial == 2 && Time.time - _tutorialStepAt > 3.5f) { _tutorial = 3; PlayerPrefs.SetInt("tutorial", 3); }
@@ -542,7 +559,7 @@ namespace BlockDrop.Game
             Confetti(30);
             Time.timeScale = 0.35f;
             yield return new WaitForSecondsRealtime(0.22f);
-            Time.timeScale = 1f;
+            Time.timeScale = _paused ? 0f : 1f;
         }
 
         private static bool IsEmpty(Board b)
@@ -813,6 +830,19 @@ namespace BlockDrop.Game
 
         private bool Btn(Rect r, string text, string top, string bottom, float scale = 1f) => GUI.Button(r, text, ButtonStyle(top, bottom, scale));
 
+        /// <summary>Red notification bubble on a button's top-right corner.</summary>
+        private void Badge(Rect button, int count)
+        {
+            float d = button.height * 0.62f, pulse = 1f + 0.08f * Mathf.Sin(Time.time * 6f);
+            var r = new Rect(button.xMax - d * 0.75f, button.y - d * 0.3f, d * pulse, d * pulse);
+            if (Event.current.type == EventType.Repaint)
+            {
+                var old = GUI.color; GUI.color = Visuals.Hex("FF3D64");
+                GUI.DrawTexture(r, Visuals.Circle.texture); GUI.color = old;
+            }
+            Outlined(r, count.ToString(), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1f);
+        }
+
         private void OnGUI()
         {
             EnsureStyles();
@@ -822,7 +852,7 @@ namespace BlockDrop.Game
                 case Screen.Menu: GUI.enabled = _welcomeReward == 0; DrawMenu(w, h); break;
                 case Screen.LevelSelect: DrawLevelSelect(w, h); break;
                 case Screen.AiSelect: DrawAiSelect(w, h); break;
-                case Screen.Playing: GUI.enabled = !_breakOpen; DrawHud(w, h); GUI.enabled = true; break;
+                case Screen.Playing: GUI.enabled = !_breakOpen && !_paused; DrawHud(w, h); GUI.enabled = true; break;
                 case Screen.Result: DrawResult(w, h); break;
                 case Screen.Challenge: DrawChallenge(w, h); break;
                 case Screen.Leaderboard: DrawLeaderboard(w, h); break;
@@ -834,7 +864,7 @@ namespace BlockDrop.Game
             GUI.enabled = true;
             DrawFloaters(h);
             DrawToasts(w, h);
-            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); }
+            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); DrawPause(w, h); }
             if (Time.unscaledTime < _flashUntil)
             {
                 var old = GUI.color; GUI.color = new Color(1, 1, 1, 0.55f * (_flashUntil - Time.unscaledTime) / 0.14f);
@@ -874,6 +904,25 @@ namespace BlockDrop.Game
                 GUI.DrawTexture(new Rect(p.x - size / 2, h - p.y - size / 2, size, size), Visuals.Circle.texture);
                 GUI.color = old;
             }
+        }
+
+        private void SetPaused(bool paused)
+        {
+            _paused = paused;
+            Time.timeScale = paused ? 0f : 1f; // freezes animations and the AI's turn coroutine
+        }
+
+        private void DrawPause(float w, float h)
+        {
+            if (!_paused) return;
+            var card = new Rect(w * 0.1f, h * 0.3f, w * 0.8f, h * 0.36f);
+            Modal(w, h, card);
+            Outlined(new Rect(card.x, card.y + h * 0.025f, card.width, h * 0.06f), "PAUSED", _h2, Color.white, 3);
+            Outlined(new Rect(card.x, card.y + h * 0.085f, card.width, h * 0.04f), $"Score {Score}", _body, Visuals.Gold, 1.5f);
+            float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
+            if (Btn(new Rect(bx, card.y + h * 0.14f, bw, h * 0.065f), "RESUME", "4BE38A", "1FA45B")) SetPaused(false);
+            if (Btn(new Rect(bx, card.y + h * 0.22f, bw, h * 0.065f), "QUIT TO MENU", "FF7AB6", "E0347C", 0.85f)) ShowMenu();
+            Outlined(new Rect(card.x, card.y + h * 0.29f, card.width, h * 0.04f), "Quitting ends this game.", _small, new Color(1, 1, 1, 0.7f), 1f);
         }
 
         private void DrawBreak(float w, float h)
@@ -919,7 +968,9 @@ namespace BlockDrop.Game
             if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.85f)) { OnlineService.Refresh(_boardTab); ShowMenu(Screen.Leaderboard); }
             y += bh + gap;
             int ready = 0; for (int i = 0; i < 3; i++) if (_meta.IsComplete(i, Today) && !_meta.Claimed[i]) ready++;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), ready > 0 ? $"MISSIONS ({ready}!)" : "MISSIONS", "2EE59D", "13A86E", 0.85f)) ShowMenu(Screen.Missions);
+            var missionsRect = new Rect(w * 0.08f, y, half, bh);
+            if (Btn(missionsRect, "MISSIONS", "2EE59D", "13A86E", 0.85f)) ShowMenu(Screen.Missions);
+            if (ready > 0) Badge(missionsRect, ready);
             if (Btn(new Rect(x2, y, half, bh), "THEMES", "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Themes);
             y += bh + gap * 2;
             if (Btn(new Rect(w * 0.08f, y, half, bh * 0.7f), _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", "5A4FA8", "3A2F80", 0.66f))
@@ -1062,7 +1113,7 @@ namespace BlockDrop.Game
         private void DrawHud(float w, float h)
         {
             float top = h * 0.03f, bs = h * 0.06f;
-            if (Btn(new Rect(w * 0.04f, top, bs * 1.6f, bs), "MENU", "5A4FA8", "3A2F80", 0.7f)) { ShowMenu(); return; }
+            if (Btn(new Rect(w * 0.04f, top, bs * 1.6f, bs), "MENU", "5A4FA8", "3A2F80", 0.7f)) { SetPaused(true); return; }
             if (_hintsLeft > 0 && Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), $"HINT {_hintsLeft}", "FFC24B", "F08A1C", 0.7f)) UseHint();
 
             switch (_mode)
@@ -1187,18 +1238,49 @@ namespace BlockDrop.Game
             return 1 + c3 * Mathf.Pow(x - 1, 3) + c1 * Mathf.Pow(x - 1, 2);
         }
 
+        private void PlayCode()
+        {
+            if (ChallengeCode.TryDecode(_codeInput, out int seed)) StartMode(Mode.Challenge, seed);
+            else _codeError = $"Codes have {ChallengeCode.Length} letters/digits, e.g. K7Q2MX";
+        }
+
+        /// <summary>Text entry that works with the phone keyboard: taps on the game are blocked while the
+        /// keyboard is up, so the keyboard's Done key submits. Falls back to a normal field in the editor.</summary>
+        private string KeyboardField(Rect r, string value, string target, int limit, string placeholder)
+        {
+            if (!TouchScreenKeyboard.isSupported) return GUI.TextField(r, value, limit, _field);
+            var st = new GUIStyle(_field);
+            if (value == "") st.normal.textColor = st.hover.textColor = st.active.textColor = new Color(0.16f, 0.05f, 0.38f, 0.35f);
+            if (GUI.Button(r, value == "" ? placeholder : value, st))
+            {
+                _kb = TouchScreenKeyboard.Open(value, TouchScreenKeyboardType.ASCIICapable, false, false, false, false, placeholder, limit);
+                _kbTarget = target;
+            }
+            return value;
+        }
+
+        private void PollKeyboard()
+        {
+            if (_kb == null) return;
+            string t = _kb.text ?? "";
+            if (_kbTarget == "code") _codeInput = t.ToUpperInvariant(); else _nameInput = t;
+            var status = _kb.status;
+            if (status == TouchScreenKeyboard.Status.Visible) return;
+            string target = _kbTarget;
+            _kb = null;
+            if (status != TouchScreenKeyboard.Status.Done) return;
+            if (target == "code" && _screen == Screen.Challenge) PlayCode();
+            else if (target == "name" && _screen == Screen.Profile) SaveName();
+        }
+
         private void DrawChallenge(float w, float h)
         {
             Outlined(new Rect(0, h * 0.08f, w, h * 0.08f), "CHALLENGE", _h2, Visuals.Hex("7CF8FF"), 3);
             Outlined(new Rect(w * 0.08f, h * 0.165f, w * 0.84f, h * 0.11f), "Start a challenge and share its code, or enter a friend's code to play their exact pieces.", _body, Color.white, 1.5f);
             if (Btn(Row(w, h * 0.30f, h * 0.08f), "NEW CHALLENGE", "4BE38A", "1FA45B")) StartMode(Mode.Challenge, ChallengeCode.NewSeed(_rng));
             Outlined(new Rect(0, h * 0.415f, w, h * 0.04f), "FRIEND'S CODE", _body, Visuals.Hex("FFE27A"), 1.5f);
-            _codeInput = GUI.TextField(Row(w, h * 0.465f, h * 0.085f, 0.16f), _codeInput, ChallengeCode.Length, _field).ToUpperInvariant();
-            if (Btn(Row(w, h * 0.57f, h * 0.075f), "PLAY CODE", "6E8BFF", "3A4FE0"))
-            {
-                if (ChallengeCode.TryDecode(_codeInput, out int seed)) StartMode(Mode.Challenge, seed);
-                else _codeError = $"Codes have {ChallengeCode.Length} letters/digits, e.g. K7Q2MX";
-            }
+            _codeInput = KeyboardField(Row(w, h * 0.465f, h * 0.085f, 0.16f), _codeInput, "code", ChallengeCode.Length, "K7Q2MX").ToUpperInvariant();
+            if (Btn(Row(w, h * 0.57f, h * 0.075f), "PLAY CODE", "6E8BFF", "3A4FE0")) PlayCode();
             if (_codeError != "") Outlined(new Rect(0, h * 0.655f, w, h * 0.05f), _codeError, _small, Visuals.Hex("FF8FA3"), 1.2f);
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
@@ -1207,7 +1289,7 @@ namespace BlockDrop.Game
         {
             Outlined(new Rect(0, h * 0.1f, w, h * 0.08f), "YOUR NAME", _h2, Visuals.Gold, 3);
             Outlined(new Rect(w * 0.08f, h * 0.19f, w * 0.84f, h * 0.08f), "Shown on leaderboards. Letters, numbers and _ only (3–20).", _body, Color.white, 1.5f);
-            _nameInput = GUI.TextField(Row(w, h * 0.3f, h * 0.085f, 0.1f), _nameInput, 20, _field);
+            _nameInput = KeyboardField(Row(w, h * 0.3f, h * 0.085f, 0.1f), _nameInput, "name", 20, "Your name");
             if (Btn(Row(w, h * 0.41f, h * 0.075f), "SAVE", "4BE38A", "1FA45B")) SaveName();
             if (_nameMsg != "") Outlined(new Rect(w * 0.05f, h * 0.5f, w * 0.9f, h * 0.08f), _nameMsg, _small, Visuals.Hex("FFE27A"), 1.2f);
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();

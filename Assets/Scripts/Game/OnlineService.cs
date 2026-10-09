@@ -27,7 +27,13 @@ namespace BlockDrop.Game
 
         private static Task _init;
 
-        public static Task EnsureReady() => _init ??= InitAsync();
+        /// <summary>Starts (or retries) sign-in. A finished attempt that left us offline is retried,
+        /// so the game comes online by itself when the network returns.</summary>
+        public static Task EnsureReady()
+        {
+            if (_init == null || (_init.IsCompleted && !Ready)) _init = InitAsync();
+            return _init;
+        }
 
         private static async Task InitAsync()
         {
@@ -36,8 +42,8 @@ namespace BlockDrop.Game
                 if (Application.internetReachability == NetworkReachability.NotReachable)
                 {
                     Status = "Offline — playing without leaderboards";
-                    _init = null; // retry later
-                    return;
+                    return; // EnsureReady retries later
+
                 }
                 await UnityServices.InitializeAsync();
                 if (!AuthenticationService.Instance.IsSignedIn)
@@ -50,7 +56,6 @@ namespace BlockDrop.Game
             {
                 Status = "Offline — playing without leaderboards";
                 Debug.LogWarning("Online services unavailable: " + e.Message);
-                _init = null;
             }
         }
 

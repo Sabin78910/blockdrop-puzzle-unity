@@ -1,0 +1,15 @@
+Block Drop Puzzle is a relaxing 8×8 block game with a satisfying combo system.
+
+HOW TO PLAY
+• Drag one of three pieces onto the board
+• Fill a full row or column to clear it
+• Clear several lines in a row to build a combo multiplier
+• The game ends when none of your pieces fit
+
+FEATURES
+• Classic endless mode
+• Daily challenge: everyone gets the same pieces each day
+• Best score saved on your device
+• Plays offline, no account needed
+
+Privacy policy: https://sabin78910.github.io/privacy-policy/#block-drop

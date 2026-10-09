@@ -1,5 +1,10 @@
 {
   "name": "BlockDrop.Game",
-  "references": ["BlockDrop.Core"],
+  "references": [
+    "BlockDrop.Core",
+    "Unity.Services.Core",
+    "Unity.Services.Authentication",
+    "Unity.Services.Leaderboards"
+  ],
   "autoReferenced": true
 }

@@ -30,6 +30,16 @@ namespace BlockDrop.Core
         public int this[int x, int y] => _cells[x, y];
         public bool IsFilled(int x, int y) => _cells[x, y] != Empty;
 
+        /// <summary>Sets a cell directly (level obstacles). Does not score or clear lines.</summary>
+        public void SetCell(int x, int y, int color) => _cells[x, y] = color;
+
+        public Board Clone()
+        {
+            var b = new Board(Size) { Score = Score, Combo = Combo };
+            System.Array.Copy(_cells, b._cells, _cells.Length);
+            return b;
+        }
+
         public bool CanPlace(Piece piece, int ox, int oy)
         {
             foreach (var (cx, cy) in piece.Cells)

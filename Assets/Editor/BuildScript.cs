@@ -38,6 +38,7 @@ namespace BlockDrop.EditorTools
             PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)36;
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.forceInternetPermission = true; // online leaderboards (optional at runtime)
             AssetDatabase.ImportAsset("Assets/Art/AppIcon.png");
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Art/AppIcon.png");
             if (icon != null) PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
@@ -57,6 +58,7 @@ namespace BlockDrop.EditorTools
         public static void BuildAndroid()
         {
             EnsureScene();
+            EditorUserBuildSettings.buildAppBundle = false; // local/CI test build: installable APK
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.sabin.blockdrop");
             var report = BuildPipeline.BuildPlayer(new[] { ScenePath }, "build/Android/BlockDrop.apk", BuildTarget.Android, BuildOptions.None);
             if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded) EditorApplication.Exit(1);

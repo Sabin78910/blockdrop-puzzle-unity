@@ -94,6 +94,8 @@ namespace BlockDrop.Game
             _best = PlayerPrefs.GetInt("best", 0);
             _progress = Progress.Parse(PlayerPrefs.GetString("progress", ""));
             _localName = PlayerPrefs.GetString("name", "");
+            string sysLang = Application.systemLanguage == SystemLanguage.Spanish ? "es" : Application.systemLanguage == SystemLanguage.Portuguese ? "pt" : "en";
+            Loc.Current = Loc.FromCode(PlayerPrefs.GetString("lang", sysLang));
             _meta = PlayerMeta.Parse(PlayerPrefs.GetString("meta", ""));
             _adPolicy = AdPolicy.Parse(PlayerPrefs.GetString("ads", ""));
             int sessions = PlayerPrefs.GetInt("sessions", 0) + 1;
@@ -224,13 +226,14 @@ namespace BlockDrop.Game
 
         private void Toast(string text, Color color)
         {
+            text = Loc.L(text);
             float start = _toasts.Count > 0 ? Mathf.Max(Time.unscaledTime, _toasts[_toasts.Count - 1].until - 0.6f) : Time.unscaledTime;
             _toasts.Add((text, color, start + 2.4f));
         }
 
         private void Celebrate(List<Achievement> unlocked)
         {
-            foreach (var a in unlocked) { Toast($"★ {a.Name.ToUpperInvariant()}   +{a.Reward} ●", Visuals.Hex("7CF8FF")); _fx.Star(); }
+            foreach (var a in unlocked) { Toast($"★ {Loc.L(a.Name).ToUpperInvariant()}   +{a.Reward} ●", Visuals.Hex("7CF8FF")); _fx.Star(); }
             if (unlocked.Count > 0) SaveMeta();
         }
 
@@ -239,7 +242,7 @@ namespace BlockDrop.Game
             if (!Career) return;
             if (_meta.AddXp(amount) > 0)
             {
-                Toast($"LEVEL {_meta.Level}!   +{PlayerMeta.LevelReward(_meta.Level)} ●", Visuals.Gold);
+                Toast(Loc.F("LEVEL {0}!   +{1} ●", _meta.Level, PlayerMeta.LevelReward(_meta.Level)), Visuals.Gold);
                 SaveMeta();
                 _fx.Win();
                 Confetti(40);
@@ -556,7 +559,7 @@ namespace BlockDrop.Game
                 AddFloater("+" + gained, mid + new Vector3(0, -0.9f, 0), Visuals.Gold, 1.0f);
                 string praise = lines >= 5 ? "UNBELIEVABLE!" : lines == 4 ? "AMAZING!" : lines == 3 ? "EXCELLENT!" : lines == 2 ? "GREAT!" : board.Combo >= 2 ? "NICE!" : null;
                 if (praise != null) AddFloater(praise, mid + new Vector3(0, 0.5f, 0), Color.white, 1.6f);
-                if (board.Combo >= 2) AddFloater($"COMBO x{board.Combo}", mid + new Vector3(0, 1.8f, 0), Visuals.Hex("FF9BD2"), 1.1f);
+                if (board.Combo >= 2) AddFloater(Loc.F("COMBO x{0}", board.Combo), mid + new Vector3(0, 1.8f, 0), Visuals.Hex("FF9BD2"), 1.1f);
                 if (IsEmpty(board)) { AddFloater("PERFECT CLEAR!", mid + new Vector3(0, -2.2f, 0), Visuals.Hex("7CF8FF"), 1.4f); Confetti(40); }
             }
             else if (gained > 0) AddFloater("+" + gained, CellPos(ox, oy) + new Vector3(0.5f, 0.6f, 0), new Color(1, 1, 1, 0.9f), 0.7f);
@@ -612,7 +615,7 @@ namespace BlockDrop.Game
                 if (!Bot.TryMove(ai.Board, ai.Dealer.Hand, _aiLevel, _rng, out int i, out int x, out int y)) break;
                 int lines = ai.Board.PreviewClears(ai.Dealer.Hand[i], x, y).rows.Count + ai.Board.PreviewClears(ai.Dealer.Hand[i], x, y).cols.Count;
                 _versus.TryPlace(i, x, y);
-                if (lines > 0) AddFloater(lines > 1 ? $"AI x{lines}!" : "AI +line", MiniCenter + new Vector3(0, -1.6f, 0), Visuals.Hex("C9A7FF"), 0.8f);
+                if (lines > 0) AddFloater(lines > 1 ? Loc.F("AI x{0}!", lines) : "AI +line", MiniCenter + new Vector3(0, -1.6f, 0), Visuals.Hex("C9A7FF"), 0.8f);
                 RefreshBoard();
             }
             _aiThinking = false;
@@ -763,7 +766,7 @@ namespace BlockDrop.Game
 
         private void AddFloater(string text, Vector3 world, Color color, float size)
         {
-            _floaters.Add(new Floater { Text = text, World = world, Born = Time.time, Life = 1.1f, Size = size, Color = color });
+            _floaters.Add(new Floater { Text = Loc.L(text), World = world, Born = Time.time, Life = 1.1f, Size = size, Color = color });
         }
 
         // ================= UI (IMGUI with generated skin) =================
@@ -833,6 +836,12 @@ namespace BlockDrop.Game
 
         private static void Outlined(Rect r, string text, GUIStyle st, Color color, float thickness = 2f)
         {
+            text = Loc.L(text);
+            if (!st.wordWrap && !string.IsNullOrEmpty(text) && st.fontSize > 0)
+            {
+                float need = st.CalcSize(new GUIContent(text)).x; // longer translations shrink instead of overflowing
+                if (need > r.width * 0.96f) st = new GUIStyle(st) { fontSize = Mathf.Max(8, Mathf.FloorToInt(st.fontSize * r.width * 0.96f / need)) };
+            }
             var old = st.normal.textColor;
             st.normal.textColor = new Color(0.08f, 0.03f, 0.2f, color.a * 0.85f);
             for (int i = 0; i < 8; i++)
@@ -845,7 +854,14 @@ namespace BlockDrop.Game
             st.normal.textColor = old;
         }
 
-        private bool Btn(Rect r, string text, string top, string bottom, float scale = 1f) => GUI.Button(r, text, ButtonStyle(top, bottom, scale));
+        private bool Btn(Rect r, string text, string top, string bottom, float scale = 1f)
+        {
+            text = Loc.L(text);
+            var st = ButtonStyle(top, bottom, scale);
+            float need = st.CalcSize(new GUIContent(text)).x;
+            if (need > r.width * 0.92f && st.fontSize > 0) st = new GUIStyle(st) { fontSize = Mathf.Max(8, Mathf.FloorToInt(st.fontSize * r.width * 0.92f / need)) };
+            return GUI.Button(r, text, st);
+        }
 
         /// <summary>Red notification bubble on a button's top-right corner.</summary>
         private void Badge(Rect button, int count)
@@ -900,7 +916,7 @@ namespace BlockDrop.Game
             var r = new Rect(w * 0.3f, h * 0.205f, w * 0.4f, h * 0.045f);
             Panel(r, _cardStyle);
             var st = new GUIStyle(_body) { fontStyle = FontStyle.Bold, fontSize = Mathf.RoundToInt(_body.fontSize * pulse) };
-            Outlined(r, $"STREAK x{combo + 1}", st, c, 1.5f);
+            Outlined(r, Loc.F("STREAK x{0}", combo + 1), st, c, 1.5f);
         }
 
         private void DrawTutorial(float w, float h)
@@ -971,7 +987,7 @@ namespace BlockDrop.Game
             var card = new Rect(w * 0.08f, h * 0.3f, w * 0.84f, h * 0.34f);
             Modal(w, h, card);
             Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.06f), "OUT OF MOVES", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.85f) }, Visuals.Hex("FF8FA3"), 3);
-            Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.085f, card.width - w * 0.1f, h * 0.065f), $"Score {Score}. Second chance: 3 new pieces that fit!", _small, Color.white, 1.2f);
+            Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.085f, card.width - w * 0.1f, h * 0.065f), Loc.F("Score {0}. Second chance: 3 new pieces that fit!", Score), _small, Color.white, 1.2f);
             float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
             if (Btn(new Rect(bx, card.y + h * 0.165f, bw, h * 0.065f), _ads.RewardedIsFree ? "CONTINUE  (FREE)" : "WATCH VIDEO TO CONTINUE", "4BE38A", "1FA45B", 0.85f)) AcceptRevive();
             if (Btn(new Rect(bx, card.y + h * 0.245f, bw, h * 0.06f), "NO THANKS", "5A4FA8", "3A2F80", 0.8f)) DeclineRevive();
@@ -989,7 +1005,7 @@ namespace BlockDrop.Game
             var card = new Rect(w * 0.1f, h * 0.3f, w * 0.8f, h * 0.36f);
             Modal(w, h, card);
             Outlined(new Rect(card.x, card.y + h * 0.025f, card.width, h * 0.06f), "PAUSED", _h2, Color.white, 3);
-            Outlined(new Rect(card.x, card.y + h * 0.085f, card.width, h * 0.04f), $"Score {Score}", _body, Visuals.Gold, 1.5f);
+            Outlined(new Rect(card.x, card.y + h * 0.085f, card.width, h * 0.04f), Loc.F("Score {0}", Score), _body, Visuals.Gold, 1.5f);
             float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
             if (Btn(new Rect(bx, card.y + h * 0.14f, bw, h * 0.065f), "RESUME", "4BE38A", "1FA45B")) SetPaused(false);
             if (Btn(new Rect(bx, card.y + h * 0.22f, bw, h * 0.065f), "QUIT TO MENU", "FF7AB6", "E0347C", 0.85f)) ShowMenu();
@@ -1013,7 +1029,7 @@ namespace BlockDrop.Game
             float bob = Mathf.Sin(Time.time * 2f) * h * 0.006f;
             // coins + streak chip
             Panel(new Rect(w * 0.04f, h * 0.025f, w * 0.92f, h * 0.045f), _cardStyle);
-            Outlined(new Rect(w * 0.07f, h * 0.022f, w * 0.5f, h * 0.045f), $"LV {_meta.Level}   ·   STREAK {_meta.Streak}", new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold }, Visuals.Hex("FF9B5E"), 1.2f);
+            Outlined(new Rect(w * 0.07f, h * 0.022f, w * 0.5f, h * 0.045f), Loc.F("LV {0}   ·   STREAK {1}", _meta.Level, _meta.Streak), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, Visuals.Hex("FF9B5E"), 1.2f);
             if (Event.current.type == EventType.Repaint)
             {
                 var bar = new Rect(w * 0.07f, h * 0.06f, w * 0.86f, Mathf.Max(3f, h * 0.004f));
@@ -1029,7 +1045,7 @@ namespace BlockDrop.Game
             float half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
             if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) StartMode(Mode.Classic);
             y += bh * 1.2f + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), $"LEVELS {_progress.TotalStars}★", "FFC24B", "F08A1C", 0.85f)) ShowMenu(Screen.LevelSelect);
+            if (Btn(new Rect(w * 0.08f, y, half, bh), Loc.F("LEVELS {0}★", _progress.TotalStars), "FFC24B", "F08A1C", 0.85f)) ShowMenu(Screen.LevelSelect);
             if (Btn(new Rect(x2, y, half, bh), "DAILY", "4FD8FF", "1C8FE0", 0.85f)) StartMode(Mode.Daily);
             y += bh + gap;
             if (Btn(new Rect(w * 0.08f, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);
@@ -1049,20 +1065,20 @@ namespace BlockDrop.Game
             if (Btn(new Rect(x2, y, half, bh * 0.7f), _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", "5A4FA8", "3A2F80", 0.66f))
             { _fx.HapticsOn = !_fx.HapticsOn; PlayerPrefs.SetInt("haptics", _fx.HapticsOn ? 1 : 0); }
             y += bh * 0.7f + gap;
-            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : "Set your name";
+            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
             if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
-            if (Btn(Row(w, y, bh * 0.7f), $"PLAYER: {shown}", "2B2470", "1C1650", 0.66f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
+            if (Btn(Row(w, y, bh * 0.7f), Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.66f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
             y += bh * 0.7f + gap;
-            Outlined(new Rect(0, y, w, h * 0.035f), $"BEST {_best}   ·   {(OnlineService.Ready ? "ONLINE" : "OFFLINE")}", _small, new Color(1, 1, 1, 0.85f), 1.5f);
+            Outlined(new Rect(0, y, w, h * 0.035f), Loc.F("BEST {0}   ·   {1}", _best, Loc.L(OnlineService.Ready ? "ONLINE" : "OFFLINE")), _small, new Color(1, 1, 1, 0.85f), 1.5f);
 
             if (_welcomeReward > 0)
             {
                 GUI.enabled = true;
                 var card = new Rect(w * 0.08f, h * 0.32f, w * 0.84f, h * 0.3f);
                 Modal(w, h, card);
-                Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.06f), $"DAY {_meta.Streak} STREAK!", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.8f) }, Visuals.Hex("FF9B5E"), 3);
+                Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.06f), Loc.F("DAY {0} STREAK!", _meta.Streak), new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.8f) }, Visuals.Hex("FF9B5E"), 3);
                 Outlined(new Rect(card.x, card.y + h * 0.09f, card.width, h * 0.06f), $"+{_welcomeReward} ●", _h2, Visuals.Gold, 3);
-                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.15f, card.width - w * 0.08f, h * 0.05f), $"Come back tomorrow for +{PlayerMeta.StreakReward(_meta.Streak + 1)}", _small, Color.white, 1.2f);
+                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.15f, card.width - w * 0.08f, h * 0.05f), Loc.F("Come back tomorrow for +{0}", PlayerMeta.StreakReward(_meta.Streak + 1)), _small, Color.white, 1.2f);
                 if (Btn(new Rect(card.x + card.width * 0.2f, card.y + h * 0.21f, card.width * 0.6f, h * 0.065f), "COLLECT", "4BE38A", "1FA45B")) _welcomeReward = 0;
             }
         }
@@ -1070,7 +1086,7 @@ namespace BlockDrop.Game
         private void DrawMissions(float w, float h)
         {
             Outlined(new Rect(0, h * 0.06f, w, h * 0.08f), "DAILY MISSIONS", _h2, Visuals.Hex("7CF8FF"), 3);
-            Outlined(new Rect(0, h * 0.13f, w, h * 0.04f), $"● {_meta.Coins}   ·   STREAK {_meta.Streak}   ·   BEST STREAK {_meta.BestStreak}", _small, Visuals.Gold, 1.2f);
+            Outlined(new Rect(0, h * 0.13f, w, h * 0.04f), Loc.F("● {0}   ·   STREAK {1}   ·   BEST STREAK {2}", _meta.Coins, _meta.Streak, _meta.BestStreak), _small, Visuals.Gold, 1.2f);
             var ms = PlayerMeta.MissionsFor(Today);
             for (int i = 0; i < 3; i++)
             {
@@ -1091,14 +1107,14 @@ namespace BlockDrop.Game
             }
             Outlined(new Rect(w * 0.08f, h * 0.69f, w * 0.84f, h * 0.06f), "New missions every day. Coins unlock themes; they never buy an advantage.", _small, new Color(1, 1, 1, 0.75f), 1.2f);
             int got = 0; for (int i = 0; i < PlayerMeta.Achievements.Length; i++) if (_meta.HasAchievement(i)) got++;
-            if (Btn(Row(w, h * 0.765f, h * 0.065f), $"TROPHIES  {got}/{PlayerMeta.Achievements.Length}", "7CF8FF", "1C8FE0", 0.85f)) ShowMenu(Screen.Trophies);
+            if (Btn(Row(w, h * 0.765f, h * 0.065f), Loc.F("TROPHIES  {0}/{1}", got, PlayerMeta.Achievements.Length), "7CF8FF", "1C8FE0", 0.85f)) ShowMenu(Screen.Trophies);
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
         private void DrawTrophies(float w, float h)
         {
             Outlined(new Rect(0, h * 0.045f, w, h * 0.07f), "TROPHIES", _h2, Visuals.Hex("7CF8FF"), 3);
-            Outlined(new Rect(0, h * 0.11f, w, h * 0.035f), $"LEVEL {_meta.Level}   ·   {_meta.Xp}/{PlayerMeta.XpToNext(_meta.Level)} XP", _small, Visuals.Gold, 1.2f);
+            Outlined(new Rect(0, h * 0.11f, w, h * 0.035f), Loc.F("LEVEL {0}   ·   {1}/{2} XP", _meta.Level, _meta.Xp, PlayerMeta.XpToNext(_meta.Level)), _small, Visuals.Gold, 1.2f);
             var card = new Rect(w * 0.04f, h * 0.155f, w * 0.92f, h * 0.675f);
             Panel(card, _cardStyle);
             float rh = card.height / PlayerMeta.Achievements.Length;
@@ -1110,7 +1126,7 @@ namespace BlockDrop.Game
                 bool done = _meta.HasAchievement(i);
                 int have = Mathf.Min(_meta.Stats[(int)a.Stat], a.Target);
                 var row = new Rect(card.x + w * 0.05f, card.y + i * rh, card.width - w * 0.1f, rh);
-                Outlined(new Rect(row.x, row.y + rh * 0.05f, row.width * 0.7f, rh * 0.5f), (done ? "★ " : "☆ ") + a.Name, new GUIStyle(left) { fontStyle = FontStyle.Bold }, done ? Visuals.Gold : Color.white, 1.2f);
+                Outlined(new Rect(row.x, row.y + rh * 0.05f, row.width * 0.7f, rh * 0.5f), (done ? "★ " : "☆ ") + Loc.L(a.Name), new GUIStyle(left) { fontStyle = FontStyle.Bold }, done ? Visuals.Gold : Color.white, 1.2f);
                 Outlined(new Rect(row.x, row.y + rh * 0.48f, row.width * 0.75f, rh * 0.45f), a.Text, left, new Color(1, 1, 1, 0.7f), 1f);
                 Outlined(new Rect(row.x, row.y + rh * 0.05f, row.width, rh * 0.5f), done ? "DONE" : $"+{a.Reward} ●", right, done ? Visuals.Hex("2EE59D") : Visuals.Gold, 1.2f);
                 if (!done) Outlined(new Rect(row.x, row.y + rh * 0.48f, row.width, rh * 0.45f), $"{have}/{a.Target}", new GUIStyle(right) { fontStyle = FontStyle.Normal }, new Color(1, 1, 1, 0.7f), 1f);
@@ -1185,14 +1201,14 @@ namespace BlockDrop.Game
         {
             float top = h * 0.03f, bs = h * 0.06f;
             if (Btn(new Rect(w * 0.04f, top, bs * 1.6f, bs), "MENU", "5A4FA8", "3A2F80", 0.7f)) { SetPaused(true); return; }
-            if (_hintsLeft > 0 && Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), $"HINT {_hintsLeft}", "FFC24B", "F08A1C", 0.7f)) UseHint();
+            if (_hintsLeft > 0 && Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), Loc.F("HINT {0}", _hintsLeft), "FFC24B", "F08A1C", 0.7f)) UseHint();
 
             switch (_mode)
             {
                 case Mode.Level:
                 {
                     var d = _level.Definition;
-                    Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), $"LEVEL {d.Number}", _body, Visuals.Hex("FFE27A"), 1.5f);
+                    Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), Loc.F("LEVEL {0}", d.Number), _body, Visuals.Hex("FFE27A"), 1.5f);
                     Outlined(new Rect(0, h * 0.085f, w, h * 0.06f), Mathf.RoundToInt(_shownScore).ToString(), _h2, Color.white, 3);
                     var bar = new Rect(w * 0.12f, h * 0.178f, w * 0.76f, h * 0.022f);
                     Panel(bar, _barBackStyle);
@@ -1203,7 +1219,7 @@ namespace BlockDrop.Game
                         float sx = bar.x + bar.width * Mathf.Clamp01((float)s / Mathf.Max(1, d.ThreeStarScore));
                         Outlined(new Rect(sx - 20, bar.y - h * 0.03f, 40, h * 0.03f), "★", _small, Score >= s ? Visuals.Gold : new Color(1, 1, 1, 0.5f), 1);
                     }
-                    Outlined(new Rect(0, h * 0.205f, w, h * 0.04f), $"MOVES LEFT  {_level.MovesLeft}", _small, _level.MovesLeft <= 3 ? Visuals.Hex("FF8FA3") : Color.white, 1.5f);
+                    Outlined(new Rect(0, h * 0.205f, w, h * 0.04f), Loc.F("MOVES LEFT  {0}", _level.MovesLeft), _small, _level.MovesLeft <= 3 ? Visuals.Hex("FF8FA3") : Color.white, 1.5f);
                     break;
                 }
                 case Mode.Versus:
@@ -1211,21 +1227,21 @@ namespace BlockDrop.Game
                 {
                     bool ai = _mode == Mode.VsAi;
                     int me = ai ? 0 : _versus.Turn;
-                    string meName = ai ? "YOU" : $"PLAYER {me + 1}", them = ai ? $"AI ({_aiLevel})" : $"PLAYER {2 - me}";
+                    string meName = ai ? Loc.L("YOU") : Loc.F("PLAYER {0}", me + 1), them = ai ? Loc.F("AI ({0})", Loc.L(_aiLevel.ToString())) : Loc.F("PLAYER {0}", 2 - me);
                     Outlined(new Rect(w * 0.06f, h * 0.10f, w * 0.5f, h * 0.05f), meName, _body, Visuals.Hex("FFE27A"), 1.5f);
                     Outlined(new Rect(w * 0.06f, h * 0.14f, w * 0.5f, h * 0.07f), _versus.Seats[me].Board.Score.ToString(), _h2, Color.white, 2.5f);
-                    Outlined(new Rect(w * 0.55f, h * 0.025f + bs, w * 0.4f, h * 0.035f), $"{them}: {_versus.Seats[1 - me].Board.Score}{(_versus.Seats[1 - me].Out ? " (out)" : "")}", _small, Visuals.Hex("E6D9FF"), 1.2f);
-                    if (_aiThinking && ai) Outlined(new Rect(0, h * 0.205f, w, h * 0.035f), "AI is thinking" + new string('.', 1 + (int)(Time.time * 3) % 3), _small, Visuals.Hex("C9A7FF"), 1.2f);
+                    Outlined(new Rect(w * 0.55f, h * 0.025f + bs, w * 0.4f, h * 0.035f), $"{them}: {_versus.Seats[1 - me].Board.Score}{(_versus.Seats[1 - me].Out ? " " + Loc.L("(out)") : "")}", _small, Visuals.Hex("E6D9FF"), 1.2f);
+                    if (_aiThinking && ai) Outlined(new Rect(0, h * 0.205f, w, h * 0.035f), Loc.L("AI is thinking") + new string('.', 1 + (int)(Time.time * 3) % 3), _small, Visuals.Hex("C9A7FF"), 1.2f);
                     if (!ai && Time.time < _turnBannerUntil)
                     {
                         Panel(new Rect(w * 0.1f, h * 0.38f, w * 0.8f, h * 0.14f), _cardStyle);
-                        Outlined(new Rect(0, h * 0.38f, w, h * 0.14f), $"PLAYER {me + 1}\nYOUR TURN", _h2, Color.white, 2.5f);
+                        Outlined(new Rect(0, h * 0.38f, w, h * 0.14f), Loc.F("PLAYER {0}\nYOUR TURN", me + 1), _h2, Color.white, 2.5f);
                     }
                     break;
                 }
                 default:
                 {
-                    string label = _mode == Mode.Daily ? "DAILY" : _mode == Mode.Challenge ? ChallengeCode.Encode(_challengeSeed) : $"BEST {Mathf.Max(_best, Score)}";
+                    string label = _mode == Mode.Daily ? "DAILY" : _mode == Mode.Challenge ? ChallengeCode.Encode(_challengeSeed) : Loc.F("BEST {0}", Mathf.Max(_best, Score));
                     Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), label, _body, Visuals.Hex("FFE27A"), 1.5f);
                     float punch = 1f + Mathf.Clamp01((Score - _shownScore) / 60f) * 0.25f;
                     var st = new GUIStyle(_h1) { fontSize = Mathf.RoundToInt(_h1.fontSize * punch) };
@@ -1257,7 +1273,7 @@ namespace BlockDrop.Game
                             Outlined(new Rect(w * (0.2f + i * 0.2f) - w * 0.1f, y + h * 0.08f, w * 0.4f, h * 0.12f), earned ? "★" : "☆", st, earned ? Visuals.Gold : new Color(1, 1, 1, 0.35f), 3);
                         }
                     }
-                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? $"SCORE {_level.Seat.Board.Score}" : $"SCORE {_level.Seat.Board.Score} / {_level.Definition.TargetScore}", _body, Color.white, 1.5f);
+                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? Loc.F("SCORE {0}", _level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
                     float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
                     if (won && _level.Definition.Number < LevelLibrary.Count && Btn(Row(w, by, bh, 0.14f), "NEXT LEVEL", "4BE38A", "1FA45B")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); }
                     if (Btn(Row(w, by + bh + gap, bh, 0.14f), "RETRY", "FFC24B", "F08A1C")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number); }
@@ -1269,19 +1285,19 @@ namespace BlockDrop.Game
                 {
                     int win = _versus.Winner;
                     bool ai = _mode == Mode.VsAi;
-                    string title = win < 0 ? "IT'S A TIE!" : ai ? (win == 0 ? "YOU WIN!" : "AI WINS") : $"PLAYER {win + 1} WINS!";
+                    string title = win < 0 ? "IT'S A TIE!" : ai ? (win == 0 ? "YOU WIN!" : "AI WINS") : Loc.F("PLAYER {0} WINS!", win + 1);
                     Outlined(new Rect(0, y, w, h * 0.08f), title, _h2, win == 0 || !ai ? Visuals.Hex("FFE27A") : Visuals.Hex("FF8FA3"), 3);
-                    Outlined(new Rect(0, y + h * 0.1f, w, h * 0.1f), $"{(ai ? "YOU" : "P1")}  {_versus.Seats[0].Board.Score}\n{(ai ? "AI" : "P2")}  {_versus.Seats[1].Board.Score}", _h2, Color.white, 2);
+                    Outlined(new Rect(0, y + h * 0.1f, w, h * 0.1f), $"{(ai ? Loc.L("YOU") : "P1")}  {_versus.Seats[0].Board.Score}\n{(ai ? "AI" : "P2")}  {_versus.Seats[1].Board.Score}", _h2, Color.white, 2);
                     if (Btn(Row(w, y + h * 0.3f, h * 0.07f, 0.14f), "REMATCH", "4BE38A", "1FA45B")) StartMode(_mode);
                     break;
                 }
                 case Mode.Challenge:
                 {
                     string code = ChallengeCode.Encode(_challengeSeed);
-                    Outlined(new Rect(0, y, w, h * 0.08f), $"SCORE {_single.Board.Score}", _h2, Color.white, 3);
+                    Outlined(new Rect(0, y, w, h * 0.08f), Loc.F("SCORE {0}", _single.Board.Score), _h2, Color.white, 3);
                     Outlined(new Rect(0, y + h * 0.08f, w, h * 0.08f), code, _h1, Visuals.Hex("7CF8FF"), 3);
                     Outlined(new Rect(w * 0.1f, y + h * 0.16f, w * 0.8f, h * 0.1f), "Send this code to a friend. They get exactly your pieces. Highest score wins!", _small, Color.white, 1.2f);
-                    if (Btn(Row(w, y + h * 0.27f, h * 0.07f, 0.14f), "COPY CODE", "4FD8FF", "1C8FE0")) GUIUtility.systemCopyBuffer = $"Beat my {_single.Board.Score} in Block Drop! Code: {code}";
+                    if (Btn(Row(w, y + h * 0.27f, h * 0.07f, 0.14f), "COPY CODE", "4FD8FF", "1C8FE0")) GUIUtility.systemCopyBuffer = Loc.F("Beat my {0} in Block Drop! Code: {1}", _single.Board.Score, code);
                     if (Btn(Row(w, y + h * 0.355f, h * 0.07f, 0.14f), "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(Mode.Challenge, _challengeSeed);
                     break;
                 }
@@ -1290,9 +1306,9 @@ namespace BlockDrop.Game
                     Outlined(new Rect(0, y, w, h * 0.08f), _newBest ? "NEW BEST!" : "GAME OVER", _h2, _newBest ? Visuals.Hex("FFE27A") : Visuals.Hex("FF8FA3"), 3);
                     var st = new GUIStyle(_h1) { fontSize = Mathf.RoundToInt(_h1.fontSize * (1f + 0.3f * EaseOutBack(Mathf.Clamp01(t * 2f)) - 0.3f)) };
                     Outlined(new Rect(0, y + h * 0.1f, w, h * 0.12f), Score.ToString(), st, Color.white, 3);
-                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.05f), $"BEST {_best}", _body, Visuals.Gold, 1.5f);
+                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.05f), Loc.F("BEST {0}", _best), _body, Visuals.Gold, 1.5f);
                     if (!_newBest && _best > 0 && Score >= _best * 0.8f)
-                        Outlined(new Rect(0, y + h * 0.255f, w, h * 0.04f), $"So close! Only {_best - Score} points from your best.", _small, Visuals.Hex("7CF8FF"), 1.2f);
+                        Outlined(new Rect(0, y + h * 0.255f, w, h * 0.04f), Loc.F("So close! Only {0} points from your best.", _best - Score), _small, Visuals.Hex("7CF8FF"), 1.2f);
                     if (Btn(Row(w, y + h * 0.3f, h * 0.07f, 0.14f), "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(_mode);
                     break;
                 }
@@ -1312,7 +1328,7 @@ namespace BlockDrop.Game
         private void PlayCode()
         {
             if (ChallengeCode.TryDecode(_codeInput, out int seed)) StartMode(Mode.Challenge, seed);
-            else _codeError = $"Codes have {ChallengeCode.Length} letters/digits, e.g. K7Q2MX";
+            else _codeError = Loc.F("Codes have {0} letters/digits, e.g. K7Q2MX", ChallengeCode.Length);
         }
 
         /// <summary>Text entry that works with the phone keyboard: taps on the game are blocked while the
@@ -1322,7 +1338,7 @@ namespace BlockDrop.Game
             if (!TouchScreenKeyboard.isSupported) return GUI.TextField(r, value, limit, _field);
             var st = new GUIStyle(_field);
             if (value == "") st.normal.textColor = st.hover.textColor = st.active.textColor = new Color(0.16f, 0.05f, 0.38f, 0.35f);
-            if (GUI.Button(r, value == "" ? placeholder : value, st))
+            if (GUI.Button(r, value == "" ? Loc.L(placeholder) : value, st))
             {
                 _kb = TouchScreenKeyboard.Open(value, TouchScreenKeyboardType.ASCIICapable, false, false, false, false, placeholder, limit);
                 _kbTarget = target;
@@ -1363,6 +1379,12 @@ namespace BlockDrop.Game
             _nameInput = KeyboardField(Row(w, h * 0.3f, h * 0.085f, 0.1f), _nameInput, "name", 20, "Your name");
             if (Btn(Row(w, h * 0.41f, h * 0.075f), "SAVE", "4BE38A", "1FA45B")) SaveName();
             if (_nameMsg != "") Outlined(new Rect(w * 0.05f, h * 0.5f, w * 0.9f, h * 0.08f), _nameMsg, _small, Visuals.Hex("FFE27A"), 1.2f);
+            if (Btn(Row(w, h * 0.66f, h * 0.07f), Loc.F("LANGUAGE: {0}", Loc.Names[(int)Loc.Current]), "6E8BFF", "3A4FE0", 0.8f))
+            {
+                Loc.Current = (Lang)(((int)Loc.Current + 1) % Loc.Names.Length);
+                PlayerPrefs.SetString("lang", Loc.Code(Loc.Current));
+                PlayerPrefs.Save();
+            }
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
@@ -1373,7 +1395,7 @@ namespace BlockDrop.Game
             _localName = n; PlayerPrefs.SetString("name", n); PlayerPrefs.Save();
             _nameMsg = "Saving…";
             string err = await OnlineService.SetNameAsync(n);
-            _nameMsg = err ?? $"Saved! You are {OnlineService.PlayerName}";
+            _nameMsg = err ?? Loc.F("Saved! You are {0}", OnlineService.PlayerName);
         }
 
         private void DrawLeaderboard(float w, float h)
@@ -1396,7 +1418,7 @@ namespace BlockDrop.Game
                     var c = r.IsMe ? Visuals.Hex("7CF8FF") : r.Rank == 1 ? Visuals.Gold : Color.white;
                     var left = new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft };
                     var right = new GUIStyle(_body) { alignment = TextAnchor.MiddleRight };
-                    Outlined(new Rect(card.x + w * 0.05f, y, card.width * 0.65f, rh), $"{r.Rank}.  {r.Name}{(r.IsMe ? " (you)" : "")}", left, c, 1.2f);
+                    Outlined(new Rect(card.x + w * 0.05f, y, card.width * 0.65f, rh), $"{r.Rank}.  {r.Name}{(r.IsMe ? " " + Loc.L("(you)") : "")}", left, c, 1.2f);
                     Outlined(new Rect(card.x, y, card.width - w * 0.05f, rh), r.Score.ToString(), right, c, 1.2f);
                     y += rh;
                 }

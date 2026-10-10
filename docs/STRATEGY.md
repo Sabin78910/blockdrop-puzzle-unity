@@ -26,7 +26,7 @@
 ## Next (no accounts needed)
 - Picture collection "Journey" mode (like Block Blast Adventure, but with fair pieces).
 - Weekly events and seasonal themes.
-- Languages for the top growth markets: Spanish, Portuguese (Brazil, Mexico are Block Blast's growth engines), Hindi, Nepali.
+- ✅ Spanish and Portuguese done (Brazil and Mexico are Block Blast's growth engines). Hindi and Nepali need a Devanagari text-shaping solution (Unity IMGUI cannot shape conjuncts).
 
 ## Sources
 pocketgamer.biz (70m DAU) · businesswire.com 2026-01-08 (10,000 experiments) · eu.36kr.com (ad revenue) ·

@@ -14,12 +14,12 @@ namespace BlockDrop.Core
 
         public string Text => Kind switch
         {
-            MissionKind.ClearLines => $"Clear {Target} lines",
-            MissionKind.ScorePoints => $"Score {Target} points in total",
-            MissionKind.PlaceBlocks => $"Place {Target} pieces",
-            MissionKind.ComboReach => $"Reach a x{Target} combo",
-            MissionKind.PlayGames => $"Finish {Target} games",
-            _ => $"Earn {Target} level stars",
+            MissionKind.ClearLines => Loc.F("Clear {0} lines", Target),
+            MissionKind.ScorePoints => Loc.F("Score {0} points in total", Target),
+            MissionKind.PlaceBlocks => Loc.F("Place {0} pieces", Target),
+            MissionKind.ComboReach => Loc.F("Reach a x{0} combo", Target),
+            MissionKind.PlayGames => Loc.F("Finish {0} games", Target),
+            _ => Loc.F("Earn {0} level stars", Target),
         };
     }
 

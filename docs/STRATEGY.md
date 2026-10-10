@@ -24,7 +24,7 @@
 - Unity Analytics + Remote Config to run A/B tests (privacy policy and Data safety updated first).
 
 ## Next (no accounts needed)
-- Picture collection "Journey" mode (like Block Blast Adventure, but with fair pieces).
+- ✅ Picture collection "Journey": each level beaten reveals 1 of 10 pieces of a picture (Sunset, Rocket, Heart); +100 coins per completed picture. Fair levels, unlike reported rigged Adventure pieces.
 - Weekly events and seasonal themes.
 - ✅ Spanish and Portuguese done (Brazil and Mexico are Block Blast's growth engines). Hindi and Nepali need a Devanagari text-shaping solution (Unity IMGUI cannot shape conjuncts).
 

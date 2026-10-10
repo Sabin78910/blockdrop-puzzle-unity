@@ -65,6 +65,7 @@ namespace BlockDrop.Core
         };
 
         public int Coins { get; private set; }
+        public void AddCoins(int amount) { if (amount > 0) Coins += amount; }
         public int Streak { get; private set; }
         public int BestStreak { get; private set; }
         public string LastCheckIn { get; private set; } = "";

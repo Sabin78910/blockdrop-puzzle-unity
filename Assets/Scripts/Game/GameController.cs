@@ -12,7 +12,7 @@ namespace BlockDrop.Game
     /// vs-AI, 2-player, challenge codes and online leaderboards. Fully playable offline.</summary>
     public sealed class GameController : MonoBehaviour
     {
-        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies }
+        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection }
         private enum Mode { Classic, Daily, Level, Versus, VsAi, Challenge }
 
         private const int Size = 8;
@@ -40,6 +40,7 @@ namespace BlockDrop.Game
         private readonly IAdProvider _ads = new BetaAdProvider();
         private AdPolicy _adPolicy;
         private TouchScreenKeyboard _kb;
+        private string _pieceMsg = "";
         private string _kbTarget; // "code" or "name"
         private float _nextOnlineTry;
         private readonly List<(string text, Color color, float until)> _toasts = new List<(string, Color, float)>();
@@ -336,7 +337,21 @@ namespace BlockDrop.Game
             if (_mode == Mode.Level)
             {
                 good = _level.State == LevelState.Won;
-                if (good) { _progress.Record(_level.Definition.Number, _level.Stars); PlayerPrefs.SetString("progress", _progress.Serialize()); }
+                _pieceMsg = "";
+                if (good)
+                {
+                    var (pic, tile) = Collection.ForLevel(_level.Definition.Number);
+                    bool newPiece = !Collection.Revealed(_progress, pic, tile), wasComplete = Collection.Complete(_progress, pic);
+                    _progress.Record(_level.Definition.Number, _level.Stars);
+                    PlayerPrefs.SetString("progress", _progress.Serialize());
+                    if (newPiece) _pieceMsg = Loc.F("PICTURE PIECE!  {0} {1}/{2}", Loc.L(Collection.Pictures[pic].Name), Collection.RevealedCount(_progress, pic), Collection.TilesPerPicture);
+                    if (!wasComplete && Collection.Complete(_progress, pic))
+                    {
+                        _meta.AddCoins(Collection.CompletionReward);
+                        Toast(Loc.F("PICTURE COMPLETE!  +{0} ●", Collection.CompletionReward), Visuals.Gold);
+                        Confetti(60);
+                    }
+                }
             }
             if (_mode == Mode.Classic || _mode == Mode.Daily)
             {
@@ -893,6 +908,7 @@ namespace BlockDrop.Game
                 case Screen.Missions: DrawMissions(w, h); break;
                 case Screen.Themes: DrawThemes(w, h); break;
                 case Screen.Trophies: DrawTrophies(w, h); break;
+                case Screen.Collection: DrawCollection(w, h); break;
             }
             GUI.enabled = true;
             DrawFloaters(h);
@@ -1183,7 +1199,36 @@ namespace BlockDrop.Game
                 if (Btn(r, label, top, bottom, 0.8f)) StartMode(Mode.Level, level: n);
                 GUI.enabled = true;
             }
+            if (Btn(Row(w, h * 0.745f, h * 0.065f), Loc.F("COLLECTION  {0}/{1}", Collection.CompletedPictures(_progress), Collection.Pictures.Length), "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Collection);
             if (Btn(Row(w, h * 0.88f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+        }
+
+        private void DrawCollection(float w, float h)
+        {
+            Outlined(new Rect(0, h * 0.045f, w, h * 0.07f), "COLLECTION", _h2, Visuals.Hex("FF8FAB"), 3);
+            Outlined(new Rect(0, h * 0.11f, w, h * 0.035f), "Beat levels to reveal each picture.", _small, Color.white, 1.2f);
+            float pw = w * 0.56f, px = (w - pw) / 2f, ph = pw * Collection.Height / Collection.Width, cellPx = pw / Collection.Width;
+            for (int i = 0; i < Collection.Pictures.Length; i++)
+            {
+                var pic = Collection.Pictures[i];
+                float top = h * 0.16f + i * (ph + h * 0.07f);
+                int got = Collection.RevealedCount(_progress, i);
+                Outlined(new Rect(0, top, w, h * 0.035f), Loc.F("{0}  {1}/{2}", Loc.L(pic.Name).ToUpperInvariant(), got, Collection.TilesPerPicture),
+                    new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, got == Collection.TilesPerPicture ? Visuals.Gold : Color.white, 1.2f);
+                var frame = new Rect(px - 6, top + h * 0.04f - 6, pw + 12, ph + 12);
+                Panel(frame, _cardStyle);
+                if (Event.current.type != EventType.Repaint) continue;
+                var old = GUI.color;
+                for (int y = 0; y < Collection.Height; y++)
+                    for (int x = 0; x < Collection.Width; x++)
+                    {
+                        bool shown = Collection.Revealed(_progress, i, Collection.TileAt(x, y));
+                        GUI.color = shown ? Visuals.Hex(pic.Colors[pic.Rows[y][x]]) : (((x / Collection.TileW + y / Collection.TileH) % 2 == 0) ? new Color(1, 1, 1, 0.10f) : new Color(1, 1, 1, 0.05f));
+                        GUI.DrawTexture(new Rect(px + x * cellPx, top + h * 0.04f + y * cellPx, cellPx + 0.5f, cellPx + 0.5f), Texture2D.whiteTexture);
+                    }
+                GUI.color = old;
+            }
+            if (Btn(Row(w, h * 0.88f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.LevelSelect);
         }
 
         private void DrawAiSelect(float w, float h)
@@ -1274,6 +1319,7 @@ namespace BlockDrop.Game
                         }
                     }
                     Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? Loc.F("SCORE {0}", _level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
+                    if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
                     float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
                     if (won && _level.Definition.Number < LevelLibrary.Count && Btn(Row(w, by, bh, 0.14f), "NEXT LEVEL", "4BE38A", "1FA45B")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); }
                     if (Btn(Row(w, by + bh + gap, bh, 0.14f), "RETRY", "FFC24B", "F08A1C")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number); }

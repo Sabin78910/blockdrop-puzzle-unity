@@ -82,6 +82,12 @@ namespace BlockDrop.Core
             ["Saving…"] = ("Guardando…", "Salvando…"),
             ["You're offline. Your name will be saved locally."] = ("Sin conexión. Tu nombre se guardará en el teléfono.", "Você está offline. Seu nome será salvo no celular."),
             ["Couldn't save the name online. Try another name."] = ("No se pudo guardar el nombre. Prueba otro.", "Não foi possível salvar o nome. Tente outro."),
+            ["COLLECTION"] = ("COLECCIÓN", "COLEÇÃO"), ["COLLECTION  {0}/{1}"] = ("COLECCIÓN  {0}/{1}", "COLEÇÃO  {0}/{1}"),
+            ["Sunset"] = ("Atardecer", "Pôr do sol"), ["Rocket"] = ("Cohete", "Foguete"), ["Heart"] = ("Corazón", "Coração"),
+            ["Beat levels to reveal each picture."] = ("Supera niveles para revelar cada imagen.", "Vença níveis para revelar cada imagem."),
+            ["PICTURE PIECE!  {0} {1}/{2}"] = ("¡PIEZA DE IMAGEN!  {0} {1}/{2}", "PEÇA DA IMAGEM!  {0} {1}/{2}"),
+            ["PICTURE COMPLETE!  +{0} ●"] = ("¡IMAGEN COMPLETA!  +{0} ●", "IMAGEM COMPLETA!  +{0} ●"),
+            ["{0}  {1}/{2}"] = ("{0}  {1}/{2}", "{0}  {1}/{2}"),
             ["LANGUAGE"] = ("IDIOMA", "IDIOMA"),
             // missions, themes, trophies
             ["DAILY MISSIONS"] = ("MISIONES DIARIAS", "MISSÕES DIÁRIAS"), ["DONE"] = ("HECHO", "FEITO"), ["DONE ✓"] = ("HECHO ✓", "FEITO ✓"),

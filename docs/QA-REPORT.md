@@ -47,7 +47,7 @@
 | ID | Severity | Finding | Status / recommendation |
 |---|---|---|---|
 | V1 | Medium | Leaderboard scores are sent by the app itself, so a modified app could post fake scores. | Open. Before scaling: validate scores server-side with Unity Cloud Code (plausibility limits per game) and block direct client writes. |
-| V2 | Low | Players can choose public nicknames; there is no profanity filter or report option. | Open. Add a word filter on save and a way to report or hide names. |
+| V2 | Low | Players can choose public nicknames; there is no profanity filter or report option. | **Fixed 11 Oct 2026:** `NameFilter` blocks offensive names on save (English, Spanish, Portuguese, romanised Nepali; sees through leetspeak and separators) and the leaderboard shows other players' offensive names as `Player#1234`. 10 new EditMode tests. A report button is still open. |
 | V3 | Low | Coins, XP and trophies are stored unencrypted on the phone and can be edited on a rooted device. | Accepted: cosmetic only, no purchases and no effect on other players. |
 | V4 | Info | Android Auto Backup is on, so progress can be restored to a new phone via Google backup (`adb backup` is blocked for target API 36). | Accepted: this is a benefit. |
 | V5 | Info | HawkScan (DAST) is for web apps and needs a StackHawk API key. The game has no server of its own. | Not applicable; can be run later against the Render APIs. |

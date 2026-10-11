@@ -123,7 +123,7 @@ namespace BlockDrop.Core
             ["Beat my {0} in Block Drop! Code: {1}"] = ("¡Supera mis {0} puntos en Block Drop! Código: {1}", "Supere meus {0} pontos no Block Drop! Código: {1}"),
             ["So close! Only {0} points from your best."] = ("¡Casi! Solo {0} puntos para tu récord.", "Quase! Só {0} pontos do seu recorde."),
             ["Codes have {0} letters/digits, e.g. K7Q2MX"] = ("Los códigos tienen {0} letras/números, p. ej. K7Q2MX", "Os códigos têm {0} letras/números, ex. K7Q2MX"),
-            ["Saved! You are {0}"] = ("¡Guardado! Eres {0}", "Salvo! Você é {0}"), ["LANGUAGE: {0}"] = ("IDIOMA: {0}", "IDIOMA: {0}"),
+            ["Saved! You are {0}"] = ("¡Guardado! Eres {0}", "Salvo! Você é {0}"), ["Please choose a different name."] = ("Elige otro nombre, por favor.", "Escolha outro nome, por favor."), ["LANGUAGE: {0}"] = ("IDIOMA: {0}", "IDIOMA: {0}"),
             ["Clear {0} lines"] = ("Borra {0} líneas", "Limpe {0} linhas"), ["Score {0} points in total"] = ("Haz {0} puntos en total", "Faça {0} pontos no total"),
             ["Place {0} pieces"] = ("Coloca {0} piezas", "Coloque {0} peças"), ["Reach a x{0} combo"] = ("Logra un combo x{0}", "Faça um combo x{0}"),
             ["Finish {0} games"] = ("Termina {0} partidas", "Termine {0} partidas"), ["Earn {0} level stars"] = ("Gana {0} estrellas de nivel", "Ganhe {0} estrelas de nível"),

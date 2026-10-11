@@ -1438,6 +1438,7 @@ namespace BlockDrop.Game
         {
             string n = _nameInput.Trim();
             if (!System.Text.RegularExpressions.Regex.IsMatch(n, "^[A-Za-z0-9_]{3,20}$")) { _nameMsg = "Use 3–20 letters, numbers or _ (no spaces)."; return; }
+            if (!NameFilter.IsAllowed(n)) { _nameMsg = Loc.L("Please choose a different name."); return; }
             _localName = n; PlayerPrefs.SetString("name", n); PlayerPrefs.Save();
             _nameMsg = "Saving…";
             string err = await OnlineService.SetNameAsync(n);

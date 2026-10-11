@@ -31,4 +31,4 @@ Set `UNITY=/Applications/Unity/Hub/Editor/6000.6.2f1/Unity.app/Contents/MacOS/Un
 - Branch protection expects a `test-and-build` check that no longer runs; merge with `--admin` after local tests pass.
 
 ## Done when
-Tests pass locally (60/60), short summary, PR opened.
+Tests pass locally (60/60), short summary, PR opened. User facing work follows `docs/FEEL.md`.

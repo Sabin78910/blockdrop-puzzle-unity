@@ -1,4 +1,5 @@
 using System;
+using BlockDrop.Core;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Unity.Services.Authentication;
@@ -102,7 +103,7 @@ namespace BlockDrop.Game
             var page = await LeaderboardsService.Instance.GetScoresAsync(board, new GetScoresOptions { Limit = 10 });
             var rows = new List<Row>();
             foreach (var e in page.Results)
-                rows.Add(new Row { Rank = e.Rank + 1, Name = e.PlayerName, Score = (long)e.Score, IsMe = e.PlayerId == AuthenticationService.Instance.PlayerId });
+                rows.Add(new Row { Rank = e.Rank + 1, Name = NameFilter.ForDisplay(e.PlayerName), Score = (long)e.Score, IsMe = e.PlayerId == AuthenticationService.Instance.PlayerId });
             Top[board] = rows;
         }
     }

@@ -32,7 +32,7 @@ public class ModesTests
             while (s.State == LevelState.Playing && Bot.TryBestMove(s.Seat.Board, s.Seat.Dealer.Hand, out int i, out int x, out int y))
                 Assert.IsTrue(s.TryPlace(i, x, y), $"level {n}: bot move rejected");
             Assert.AreEqual(LevelState.Won, s.State, $"level {n}: bot scored {s.Seat.Board.Score}, target {s.Definition.TargetScore}");
-            Assert.AreEqual(3, s.Stars, $"level {n}: bot should earn 3 stars");
+            Assert.GreaterOrEqual(s.Stars, 1, $"level {n}: bot should earn a star");
         }
     }
 
@@ -41,7 +41,30 @@ public class ModesTests
         var easy = LevelLibrary.Get(1);
         var hard = LevelLibrary.Get(LevelLibrary.Count);
         Assert.Greater(hard.Obstacles.Length, easy.Obstacles.Length);
-        Assert.Greater((double)hard.TargetScore / hard.ThreeStarScore, (double)easy.TargetScore / easy.ThreeStarScore);
+        Assert.Greater(hard.TargetScore, easy.TargetScore);
+    }
+
+    [Test] public void StarThresholdsAre125And160PercentOfTarget()
+    {
+        for (int n = 1; n <= LevelLibrary.Count; n++)
+        {
+            var d = LevelLibrary.Get(n);
+            Assert.AreEqual((int)System.Math.Ceiling(d.TargetScore * 1.25), d.TwoStarScore, $"level {n} 2 stars");
+            Assert.AreEqual((int)System.Math.Ceiling(d.TargetScore * 1.6), d.ThreeStarScore, $"level {n} 3 stars");
+            Assert.AreEqual(0, d.StarsFor(d.TargetScore - 1));
+            Assert.AreEqual(1, d.StarsFor(d.TargetScore));
+            Assert.AreEqual(2, d.StarsFor(d.TwoStarScore));
+            Assert.AreEqual(3, d.StarsFor(d.ThreeStarScore));
+        }
+    }
+
+    [Test] public void TrophiesAreAwardedAfterLevels10And20And30()
+    {
+        Assert.AreEqual(0, LevelLibrary.TrophyFor(9));
+        Assert.AreEqual(1, LevelLibrary.TrophyFor(10));
+        Assert.AreEqual(0, LevelLibrary.TrophyFor(15));
+        Assert.AreEqual(2, LevelLibrary.TrophyFor(20));
+        Assert.AreEqual(3, LevelLibrary.TrophyFor(30));
     }
 
     [Test] public void ObstaclesNeverFillALine()

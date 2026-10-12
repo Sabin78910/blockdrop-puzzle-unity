@@ -344,6 +344,11 @@ namespace BlockDrop.Game
                     bool newPiece = !Collection.Revealed(_progress, pic, tile), wasComplete = Collection.Complete(_progress, pic);
                     _progress.Record(_level.Definition.Number, _level.Stars);
                     PlayerPrefs.SetString("progress", _progress.Serialize());
+                    if (LevelLibrary.TrophyFor(_level.Definition.Number) > 0)
+                    {
+                        Toast(Loc.F("TROPHY {0}/3!", LevelLibrary.TrophyFor(_level.Definition.Number)), Visuals.Gold);
+                        Confetti(80);
+                    }
                     if (newPiece) _pieceMsg = Loc.F("PICTURE PIECE!  {0} {1}/{2}", Loc.L(Collection.Pictures[pic].Name), Collection.RevealedCount(_progress, pic), Collection.TilesPerPicture);
                     if (!wasComplete && Collection.Complete(_progress, pic))
                     {

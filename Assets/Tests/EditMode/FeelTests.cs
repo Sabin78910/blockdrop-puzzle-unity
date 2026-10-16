@@ -65,6 +65,18 @@ public class FeelTests
         Assert.IsFalse(Look.NewLook(0));
     }
 
+    [Test] public void PatternsAreOptInAndDistinctPerColour()
+    {
+        Assert.IsFalse(Look.Patterns(-1));
+        Assert.IsFalse(Look.Patterns(0));
+        Assert.IsTrue(Look.Patterns(1));
+        var shapes = Enumerable.Range(0, 5).Select(Look.PatternFor).ToArray();
+        CollectionAssert.AllItemsAreUnique(shapes);
+        CollectionAssert.DoesNotContain(shapes, BlockPattern.None);
+        Assert.AreEqual(BlockPattern.None, Look.PatternFor(LevelLibrary.ObstacleColor));
+        Assert.IsTrue(Loc.Table.ContainsKey("PATTERNS: ON") && Loc.Table.ContainsKey("PATTERNS: OFF"));
+    }
+
     [Test] public void NearMissFindsTheCellThatWouldClearMost()
     {
         var b = new Board(8);

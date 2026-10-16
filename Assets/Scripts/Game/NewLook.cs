@@ -61,6 +61,52 @@ namespace BlockDrop.Game
             _body = Resources.Load<Font>("Fonts/Nunito-ExtraBold");
         }
 
+        // ---------- block patterns: a shape on each colour, opt in ----------
+
+        private const string PatternPref = "patterns";
+        private static readonly Sprite[] _patterns = new Sprite[6];
+
+        public static bool PatternsOn => Look.Patterns(PlayerPrefs.GetInt(PatternPref, -1));
+
+        public static void TogglePatterns() { PlayerPrefs.SetInt(PatternPref, PatternsOn ? 0 : 1); PlayerPrefs.Save(); }
+
+        /// <summary>The mark drawn over a block of this colour, or null when it gets none. Dark and untinted,
+        /// so it reads on every theme.</summary>
+        public static Sprite Pattern(int colorIndex)
+        {
+            var kind = Look.PatternFor(colorIndex);
+            if (kind == BlockPattern.None) return null;
+            int k = (int)kind;
+            return _patterns[k] ??= Make(BuildPattern(kind, 128), 128);
+        }
+
+        private static Texture2D BuildPattern(BlockPattern kind, int n)
+        {
+            var t = NewTex(n, n);
+            var px = new Color[n * n];
+            float aa = 1.5f / n;
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float u = (x + 0.5f) / n - 0.5f, v = (y + 0.5f) / n - 0.5f;
+                    float d;   // signed distance to the shape, negative inside
+                    switch (kind)
+                    {
+                        case BlockPattern.Dot: d = new Vector2(u, v).magnitude - 0.13f; break;
+                        case BlockPattern.Ring: d = Mathf.Abs(new Vector2(u, v).magnitude - 0.16f) - 0.045f; break;
+                        case BlockPattern.Cross: d = Mathf.Min(Mathf.Max(Mathf.Abs(u) - 0.05f, Mathf.Abs(v) - 0.2f), Mathf.Max(Mathf.Abs(u) - 0.2f, Mathf.Abs(v) - 0.05f)); break;
+                        case BlockPattern.Diamond: d = (Mathf.Abs(u) + Mathf.Abs(v) - 0.2f) * 0.7071f; break;
+                        default:   // diagonal stripes inside the block face
+                            float s = (u + v) / 0.1414f;
+                            d = Mathf.Max((Mathf.Abs(s - Mathf.Round(s)) - 0.25f) * 0.1414f, Sdf(u + 0.5f, v + 0.5f, 0.22f) + 0.14f);
+                            break;
+                    }
+                    px[y * n + x] = new Color(0f, 0f, 0f, 0.38f * Mathf.Clamp01(0.5f - d / aa));
+                }
+            t.SetPixels(px); t.Apply(true);
+            return t;
+        }
+
         // ---------- board pulse: the board dips and springs back on a clear ----------
 
         private static Spring _pulse = new Spring(1f);

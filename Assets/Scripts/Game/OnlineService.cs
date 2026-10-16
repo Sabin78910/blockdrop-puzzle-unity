@@ -3,6 +3,7 @@ using BlockDrop.Core;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Unity.Services.Authentication;
+using Unity.Services.CloudCode;
 using Unity.Services.Core;
 using Unity.Services.Leaderboards;
 using UnityEngine;
@@ -60,17 +61,27 @@ namespace BlockDrop.Game
             }
         }
 
-        public static async void SubmitScore(string board, int score)
+        /// <summary>Submits through the SubmitScore Cloud Code script (CloudCode/SubmitScore.js), which checks
+        /// the score against the placements and lines before writing it; players cannot write leaderboards directly.</summary>
+        public static async void SubmitScore(string board, Board result)
         {
             try
             {
                 await EnsureReady();
-                if (!Ready || score <= 0) return;
-                await LeaderboardsService.Instance.AddPlayerScoreAsync(board, score);
+                if (!Ready || result.Score <= 0) return;
+                var args = new Dictionary<string, object>
+                {
+                    ["leaderboardId"] = board, ["score"] = result.Score,
+                    ["placements"] = result.Placements, ["lines"] = result.LinesCleared,
+                };
+                var reply = await CloudCodeService.Instance.CallEndpointAsync<SubmitReply>("SubmitScore", args);
+                if (!reply.accepted) Debug.LogWarning($"Score rejected ({board}): {reply.reason}");
                 await RefreshAsync(board);
             }
             catch (Exception e) { Debug.LogWarning($"Score submit failed ({board}): {e.Message}"); }
         }
+
+        [Serializable] private class SubmitReply { public bool accepted; public string reason; }
 
         public static async void Refresh(string board)
         {

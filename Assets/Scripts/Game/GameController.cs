@@ -115,6 +115,7 @@ namespace BlockDrop.Game
             BuildScene();
             FitCamera();
             ApplyTheme();
+            NewLook.Apply(_world, _cam);
             ShowMenu();
             if (_welcomeReward > 0) { _fx.Win(); Confetti(40); }
             ResumeRun();
@@ -559,6 +560,7 @@ namespace BlockDrop.Game
             AnimateDecor();
             AnimateParticles();
             AnimateShake();
+            NewLook.Tick(_boardRoot.transform);
             if (_screen != Screen.Playing || _paused || _offerRevive) return;
             _playSeconds += Time.unscaledDeltaTime;
             if (!_breakShown && _playSeconds > 40 * 60) { _breakShown = true; _breakOpen = true; }
@@ -655,6 +657,7 @@ namespace BlockDrop.Game
                 Track(MissionKind.ComboReach, board.Combo);
                 if (Career) { Celebrate(_meta.Record(Stat.LinesCleared, lines)); Celebrate(_meta.Record(Stat.BestCombo, board.Combo)); }
                 if (_tutorial == 1) { _tutorial = 2; _tutorialStepAt = Time.time; }
+                if (NewLook.On) { NewLookClear(lines, board, gained, burst); AfterMove(); return; }
                 if (lines >= 3) StartCoroutine(MegaClear());
                 else StartCoroutine(HitStop(0.035f + 0.02f * lines));
                 foreach (var (pos, col) in burst) Shatter(pos, col);
@@ -669,6 +672,34 @@ namespace BlockDrop.Game
             else if (gained > 0) AddFloater("+" + gained, CellPos(ox, oy) + new Vector3(0.5f, 0.6f, 0), new Color(1, 1, 1, 0.9f), 0.7f);
 
             AfterMove();
+        }
+
+        /// <summary>The feedback ladder (Core/Feel.cs): celebration scales with the clear, a single line gets
+        /// no praise word, only 3+ lines shake, and reduced motion keeps the words and drops the movement.</summary>
+        private void NewLookClear(int lines, Board board, int gained, List<(Vector3 pos, Color col)> burst)
+        {
+            bool reduced = NewLook.ReducedMotion;
+            var tier = Feel.TierFor(lines, board.Combo, Feel.IsEmpty(board));
+            if (Feel.SlowMotion(tier, reduced)) StartCoroutine(SlowMotion());
+            else if (Feel.HitStop(lines, reduced) > 0f) StartCoroutine(HitStop(Feel.HitStop(lines, reduced)));
+            if (!reduced) foreach (var (pos, col) in burst) Shatter(pos, col);
+            _shake = Feel.Shake(tier, lines, reduced);
+            NewLook.Pulse(tier);
+            var mid = BoardCenter + new Vector3(0, 0.6f, 0);
+            AddFloater("+" + gained, mid + new Vector3(0, -0.9f, 0), Visuals.Gold, 1.0f);
+            string praise = Feel.Praise(tier);
+            if (praise != null) AddFloater(praise, mid + new Vector3(0, 0.5f, 0), tier == FeedbackTier.BoardClear ? Visuals.Hex("7CF8FF") : Color.white, 1.2f + 0.12f * (int)tier);
+            if (board.Combo >= 2) AddFloater(Loc.F("COMBO x{0}", board.Combo), mid + new Vector3(0, 1.8f, 0), Visuals.Hex("FF9BD2"), 1.1f);
+            int confetti = Feel.Confetti(tier, reduced);
+            if (confetti > 0) Confetti(confetti);
+        }
+
+        private IEnumerator SlowMotion()
+        {
+            _flashUntil = Time.unscaledTime + 0.14f;
+            Time.timeScale = 0.35f;
+            yield return new WaitForSecondsRealtime(0.22f);
+            Time.timeScale = _paused ? 0f : 1f;
         }
 
         private IEnumerator MegaClear()
@@ -894,6 +925,7 @@ namespace BlockDrop.Game
             _h2 = new GUIStyle(_h1) { fontSize = Mathf.RoundToInt(fs * 1.7f) };
             _body = new GUIStyle(GUI.skin.label) { fontSize = fs, alignment = TextAnchor.MiddleCenter, wordWrap = true };
             _small = new GUIStyle(_body) { fontSize = Mathf.RoundToInt(fs * 0.8f) };
+            if (NewLook.On && NewLook.Display != null) { _h1.font = _h2.font = NewLook.Display; _h1.fontStyle = _h2.fontStyle = FontStyle.Normal; }
             _field = new GUIStyle(GUI.skin.textField) { fontSize = fs * 2, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             _field.normal.background = _field.focused.background = Visuals.RoundedRect(96, 96, 28, Visuals.Hex("F4F1FF"), Visuals.Hex("D9D2FF"), 0f);
             _field.normal.textColor = _field.focused.textColor = Visuals.Hex("2A0E61");
@@ -985,8 +1017,18 @@ namespace BlockDrop.Game
             Outlined(r, count.ToString(), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1f);
         }
 
+        private bool _lookFont;
+        private Font _skinFont;
+
         private void OnGUI()
         {
+            if (NewLook.On != _lookFont)
+            {
+                if (!_lookFont) _skinFont = GUI.skin.font;
+                _lookFont = NewLook.On;
+                GUI.skin.font = _lookFont && NewLook.Body != null ? NewLook.Body : _skinFont;
+                _styleFor = 0;
+            }
             EnsureStyles();
             // Lay the UI out inside the safe area so notches and rounded corners never cover buttons or the score.
             float w = _fitSafe.width, h = _fitSafe.height;
@@ -1155,6 +1197,9 @@ namespace BlockDrop.Game
             Outlined(new Rect(w * 0.43f, h * 0.025f, w * 0.5f, h * 0.045f), $"● {_meta.Coins}", new GUIStyle(_body) { alignment = TextAnchor.MiddleRight }, Visuals.Gold, 1.5f);
             Outlined(new Rect(0, h * 0.075f + bob, w, h * 0.08f), "BLOCK", _h1, Visuals.Hex("FFE27A"), 3);
             Outlined(new Rect(0, h * 0.145f + bob, w, h * 0.08f), "DROP", _h1, Color.white, 3);
+            if (NewLook.On) Outlined(new Rect(0, h * 0.216f + bob, w, h * 0.03f), "Fair hands. Every game.", _small, Visuals.Hex("B9B8E8"), 1f);
+            // Five quick taps on the logo switch the new look on or off (for testing on a device before it ships on).
+            if (GUI.Button(new Rect(w * 0.2f, h * 0.075f, w * 0.6f, h * 0.15f), GUIContent.none, GUIStyle.none)) LogoTapped();
             float y = h * 0.245f, bh = h * 0.064f, gap = h * 0.011f;
             float half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
             if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) StartMode(Mode.Classic);
@@ -1174,10 +1219,13 @@ namespace BlockDrop.Game
             if (ready > 0) Badge(missionsRect, ready);
             if (Btn(new Rect(x2, y, half, bh), "THEMES", "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Themes);
             y += bh + gap * 2;
-            if (Btn(new Rect(w * 0.08f, y, half, bh * 0.7f), _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", "5A4FA8", "3A2F80", 0.66f))
+            float third = (w * 0.84f - gap * 2) / 3f, sw = NewLook.On ? third : half, ts = NewLook.On ? 0.5f : 0.66f;
+            if (Btn(new Rect(w * 0.08f, y, sw, bh * 0.7f), _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", "5A4FA8", "3A2F80", ts))
             { _fx.SoundOn = !_fx.SoundOn; PlayerPrefs.SetInt("sound", _fx.SoundOn ? 1 : 0); }
-            if (Btn(new Rect(x2, y, half, bh * 0.7f), _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", "5A4FA8", "3A2F80", 0.66f))
+            if (Btn(new Rect(w * 0.08f + sw + gap, y, sw, bh * 0.7f), _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", "5A4FA8", "3A2F80", ts))
             { _fx.HapticsOn = !_fx.HapticsOn; PlayerPrefs.SetInt("haptics", _fx.HapticsOn ? 1 : 0); }
+            if (NewLook.On && Btn(new Rect(w * 0.08f + (third + gap) * 2, y, third, bh * 0.7f), NewLook.ReducedMotion ? "MOTION: REDUCED" : "MOTION: FULL", "5A4FA8", "3A2F80", ts))
+                NewLook.ToggleMotion();
             y += bh * 0.7f + gap;
             string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
             if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
@@ -1453,6 +1501,8 @@ namespace BlockDrop.Game
                     Outlined(new Rect(0, y + h * 0.21f, w, h * 0.05f), Loc.F("BEST {0}", _best), _body, Visuals.Gold, 1.5f);
                     if (!_newBest && _best > 0 && Score >= _best * 0.8f)
                         Outlined(new Rect(0, y + h * 0.255f, w, h * 0.04f), Loc.F("So close! Only {0} points from your best.", _best - Score), _small, Visuals.Hex("7CF8FF"), 1.2f);
+                    else if (NewLook.On && !_newBest && NearMiss.Find(MainSeat.Board).Message() is string miss)
+                        Outlined(new Rect(0, y + h * 0.255f, w, h * 0.04f), miss, _small, Visuals.Hex("7CF8FF"), 1.2f);
                     if (Btn(Row(w, y + h * 0.3f, h * 0.07f, 0.14f), "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(_mode);
                     break;
                 }
@@ -1462,6 +1512,20 @@ namespace BlockDrop.Game
 
         private readonly bool[] _starPlayed = new bool[3];
         private void ResetStars() { for (int i = 0; i < 3; i++) _starPlayed[i] = false; }
+
+        private int _logoTaps;
+        private float _logoTapAt;
+
+        private void LogoTapped()
+        {
+            _logoTaps = Time.unscaledTime - _logoTapAt < 0.6f ? _logoTaps + 1 : 1;
+            _logoTapAt = Time.unscaledTime;
+            if (_logoTaps < 5) return;
+            _logoTaps = 0;
+            NewLook.Toggle();
+            NewLook.Apply(_world, _cam);
+            Toast(NewLook.On ? "NEW LOOK ON" : "NEW LOOK OFF", Visuals.Hex("7CF8FF"));
+        }
 
         private static float EaseOutBack(float x)
         {

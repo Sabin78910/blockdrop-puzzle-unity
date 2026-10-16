@@ -356,7 +356,7 @@ namespace BlockDrop.Game
             if (_mode == Mode.Classic || _mode == Mode.Daily)
             {
                 if (Score > _best) { _best = Score; _newBest = true; PlayerPrefs.SetInt("best", _best); }
-                OnlineService.SubmitScore(_mode == Mode.Classic ? OnlineService.ClassicBoard : OnlineService.DailyBoard, Score);
+                OnlineService.SubmitScore(_mode == Mode.Classic ? OnlineService.ClassicBoard : OnlineService.DailyBoard, MainSeat.Board);
                 good = _newBest;
             }
             if (_mode == Mode.VsAi) good = _versus.Winner == 0;

@@ -9,7 +9,7 @@ namespace BlockDrop.Core
     {
         public const int HandSize = 3;
         private const int FairRedraws = 12;
-        private readonly PieceGenerator _gen;
+        private PieceGenerator _gen;
         private readonly Func<Piece, bool> _fits; // null = classic random dealing
         public readonly Piece[] Hand = new Piece[HandSize];
 
@@ -43,6 +43,17 @@ namespace BlockDrop.Core
             EnsurePlayable(fits);
         }
 
+        public int Seed => _gen.Seed;
+        public int Draws => _gen.Draws;
+
+        /// <summary>Resumes a saved game: the same piece sequence continues after <paramref name="draws"/> pieces.</summary>
+        public void Restore(int draws, Piece[] hand)
+        {
+            if (hand == null || hand.Length != HandSize) throw new ArgumentException("Hand needs " + HandSize + " slots");
+            _gen = PieceGenerator.Resume(_gen.Seed, draws);
+            Array.Copy(hand, Hand, HandSize);
+        }
+
         public void Use(int index)
         {
             Hand[index] = null;
@@ -74,6 +85,14 @@ namespace BlockDrop.Core
             Out = Board.IsGameOver(Dealer.Hand);
             Revives++;
             return !Out;
+        }
+
+        /// <summary>Resumes a saved game's counters; board and hand are restored separately.</summary>
+        public void RestoreCounters(int moves, int revives)
+        {
+            Moves = moves;
+            Revives = revives;
+            Out = Board.IsGameOver(Dealer.Hand);
         }
 
         public bool TryPlace(int handIndex, int x, int y)

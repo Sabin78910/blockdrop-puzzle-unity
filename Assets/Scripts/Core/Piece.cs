@@ -19,6 +19,23 @@ namespace BlockDrop.Core
         public int Width { get { int w = 0; foreach (var c in Cells) w = Math.Max(w, c.x + 1); return w; } }
         public int Height { get { int h = 0; foreach (var c in Cells) h = Math.Max(h, c.y + 1); return h; } }
 
+        /// <summary>Index into <see cref="Shapes"/> with the same cells, or -1.</summary>
+        public int ShapeIndex
+        {
+            get
+            {
+                for (int i = 0; i < Shapes.Count; i++)
+                {
+                    var s = Shapes[i];
+                    if (s.Length != Cells.Length) continue;
+                    bool same = true;
+                    for (int k = 0; k < s.Length && same; k++) same = s[k] == Cells[k];
+                    if (same) return i;
+                }
+                return -1;
+            }
+        }
+
         public static readonly IReadOnlyList<(int x, int y)[]> Shapes = new[]
         {
             new[] { (0, 0) },
@@ -41,10 +58,23 @@ namespace BlockDrop.Core
     public sealed class PieceGenerator
     {
         private readonly Random _rng;
-        public PieceGenerator(int seed) { _rng = new Random(seed); }
+        public readonly int Seed;
+        /// <summary>Pieces drawn so far. A saved game stores this so the same sequence can resume.</summary>
+        public int Draws { get; private set; }
+
+        public PieceGenerator(int seed) { Seed = seed; _rng = new Random(seed); }
+
+        /// <summary>A generator with the same seed, advanced past <paramref name="draws"/> pieces.</summary>
+        public static PieceGenerator Resume(int seed, int draws)
+        {
+            var g = new PieceGenerator(seed);
+            for (int i = 0; i < draws; i++) g.Next();
+            return g;
+        }
 
         public Piece Next()
         {
+            Draws++;
             int i = _rng.Next(Piece.Shapes.Count);
             return new Piece(Piece.Shapes[i], _rng.Next(5));
         }

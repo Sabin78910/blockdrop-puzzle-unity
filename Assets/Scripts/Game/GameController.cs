@@ -58,7 +58,7 @@ namespace BlockDrop.Game
         private Transform _world;
         private SpriteRenderer _background;
         private GameObject _boardRoot, _miniRoot, _menuDeco;
-        private SpriteRenderer[,] _tiles, _gloss, _ghosts, _miniTiles;
+        private SpriteRenderer[,] _tiles, _gloss, _ghosts, _miniTiles, _marks;
         private float[,] _pop;
         private readonly GameObject[] _handViews = new GameObject[Dealer.HandSize];
         private int _dragging = -1;
@@ -151,6 +151,7 @@ namespace BlockDrop.Game
             _tiles = new SpriteRenderer[Size, Size];
             _gloss = new SpriteRenderer[Size, Size];
             _ghosts = new SpriteRenderer[Size, Size];
+            _marks = new SpriteRenderer[Size, Size];
             _pop = new float[Size, Size];
             for (int x = 0; x < Size; x++)
                 for (int y = 0; y < Size; y++)
@@ -159,6 +160,7 @@ namespace BlockDrop.Game
                     NewSprite("slot", Visuals.Slot, _boardRoot.transform, p, 0.94f, -5, Visuals.EmptySlot);
                     _tiles[x, y] = NewSprite("tile", Visuals.Tile, _boardRoot.transform, p, 0.94f, 0, Color.white);
                     _gloss[x, y] = NewSprite("gloss", Visuals.Gloss, _tiles[x, y].transform, Vector3.zero, 1f, 1, Color.white);
+                    _marks[x, y] = NewSprite("mark", null, _tiles[x, y].transform, Vector3.zero, 1f, 1, Color.white);
                     _ghosts[x, y] = NewSprite("ghost", Visuals.Tile, _boardRoot.transform, p, 0.94f, 2, Color.clear);
                 }
 
@@ -480,6 +482,7 @@ namespace BlockDrop.Game
                     _tiles[x, y].enabled = filled;
                     if (filled) _tiles[x, y].color = Visuals.BlockColors[b[x, y]];
                     _gloss[x, y].enabled = filled && b[x, y] != LevelLibrary.ObstacleColor;
+                    _marks[x, y].sprite = filled && NewLook.PatternsOn ? NewLook.Pattern(b[x, y]) : null;
                 }
             var mini = MiniSeat;
             if (mini != null)
@@ -509,6 +512,7 @@ namespace BlockDrop.Game
                     var pos = new Vector3(cx - (p.Width - 1) / 2f, (p.Height - 1) / 2f - cy, 0);
                     var t = NewSprite("t", Visuals.Tile, root.transform, pos, 0.94f, 10, col);
                     NewSprite("g", Visuals.Gloss, t.transform, Vector3.zero, 1f, 11, new Color(1, 1, 1, fits ? 1 : 0.3f));
+                    if (NewLook.PatternsOn) NewSprite("m", NewLook.Pattern(p.ColorIndex), t.transform, Vector3.zero, 1f, 11, new Color(1, 1, 1, fits ? 1 : 0.4f));
                 }
                 root.transform.position = HandSlot(i);
                 root.transform.localScale = Vector3.one * HandScale;
@@ -1229,7 +1233,11 @@ namespace BlockDrop.Game
             y += bh * 0.7f + gap;
             string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
             if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
-            if (Btn(Row(w, y, bh * 0.7f), Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.66f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
+            var playerRow = NewLook.On ? new Rect(w * 0.08f, y, half, bh * 0.7f) : Row(w, y, bh * 0.7f);
+            if (Btn(playerRow, Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.66f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
+            // Block patterns (a shape on each colour) sit beside the name in the new look.
+            if (NewLook.On && Btn(new Rect(x2, y, half, bh * 0.7f), NewLook.PatternsOn ? "PATTERNS: ON" : "PATTERNS: OFF", "2B2470", "1C1650", 0.66f))
+                NewLook.TogglePatterns();
             y += bh * 0.7f + gap;
             Outlined(new Rect(0, y, w, h * 0.035f), Loc.F("BEST {0}   ·   {1}", _best, Loc.L(OnlineService.Ready ? "ONLINE" : "OFFLINE")), _small, new Color(1, 1, 1, 0.85f), 1.5f);
 

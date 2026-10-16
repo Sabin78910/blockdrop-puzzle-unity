@@ -69,7 +69,23 @@ namespace BlockDrop.Core
 
         /// <param name="playerChoice">-1 no choice yet, 0 off, 1 on.</param>
         public static bool NewLook(int playerChoice) => playerChoice < 0 ? NewLookDefault : playerChoice == 1;
+
+        /// <summary>Block patterns are opt in: a shape on each colour so colour is never the only cue (docs/FEEL.md).</summary>
+        public static bool Patterns(int playerChoice) => playerChoice == 1;
+
+        /// <summary>One distinct shape per block colour (0-4). Level obstacles (stone) and anything else get none.</summary>
+        public static BlockPattern PatternFor(int colorIndex) => colorIndex switch
+        {
+            0 => BlockPattern.Dot,
+            1 => BlockPattern.Stripes,
+            2 => BlockPattern.Ring,
+            3 => BlockPattern.Cross,
+            4 => BlockPattern.Diamond,
+            _ => BlockPattern.None,
+        };
     }
+
+    public enum BlockPattern { None, Dot, Stripes, Ring, Cross, Diamond }
 
     public readonly struct NearMiss
     {

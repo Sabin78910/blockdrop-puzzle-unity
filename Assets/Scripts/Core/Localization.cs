@@ -132,6 +132,7 @@ namespace BlockDrop.Core
             ["One cell away from a {0}-line clear!"] = ("¡A una casilla de borrar {0} líneas!", "A uma casa de limpar {0} linhas!"),
             ["One cell away from a clear!"] = ("¡A una casilla de borrar una línea!", "A uma casa de limpar uma linha!"),
             ["MOTION: FULL"] = ("MOVIMIENTO: COMPLETO", "MOVIMENTO: COMPLETO"), ["MOTION: REDUCED"] = ("MOVIMIENTO: REDUCIDO", "MOVIMENTO: REDUZIDO"),
+            ["PATTERNS: ON"] = ("PATRONES: SÍ", "PADRÕES: SIM"), ["PATTERNS: OFF"] = ("PATRONES: NO", "PADRÕES: NÃO"),
             ["NEW LOOK ON"] = ("NUEVO ESTILO ACTIVADO", "NOVO VISUAL LIGADO"), ["NEW LOOK OFF"] = ("NUEVO ESTILO DESACTIVADO", "NOVO VISUAL DESLIGADO"),
         };
     }

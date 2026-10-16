@@ -379,7 +379,7 @@ PlayerSettings:
   editorGfxJobOverride: 1
   enableInternalProfiler: 0
   logObjCUncaughtExceptions: 1
-  enableCrashReportAPI: 0
+  enableCrashReportAPI: 1
   cameraUsageDescription: 
   locationUsageDescription: 
   microphoneUsageDescription: 
@@ -747,7 +747,7 @@ PlayerSettings:
   qualitySettingsNames: []
   projectName: blockdrop-puzzle-unity
   organizationId: sabinkhanal13
-  cloudEnabled: 0
+  cloudEnabled: 1
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
   platformRequiresReadableAssets: 0

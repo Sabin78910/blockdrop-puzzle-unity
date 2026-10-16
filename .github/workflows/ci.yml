@@ -22,6 +22,8 @@ concurrency:
 
 jobs:
   test-and-build:
+    # Secrets never reach pull requests from forks (the repo is public); those PRs are skipped.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -33,7 +35,7 @@ jobs:
 
       - name: Cloud Code rule tests
         if: hashFiles('CloudCode/*.test.js') != ''
-        run: node --test CloudCode/
+        run: node --test CloudCode/*.test.js
 
       - name: Check Unity secrets
         run: |

@@ -17,6 +17,7 @@ namespace BlockDrop.Core
         public void Step(float target, float dt, float frequency, float damping)
         {
             if (dt <= 0f) return;
+            dt = Math.Min(dt, 0.25f); // back from the background after minutes: settle, don't loop for hours
             float omega = 2f * (float)Math.PI * Math.Max(0.01f, frequency);
             float zeta = Math.Max(0f, damping);
             int steps = Math.Max(1, (int)Math.Ceiling(dt / (1f / 240f)));

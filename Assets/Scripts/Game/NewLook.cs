@@ -207,6 +207,7 @@ namespace BlockDrop.Game
             Sprite tile = on ? Tile : Visuals.OldTile, gloss = on ? Gloss : Visuals.OldGloss, bg = on ? Background : Visuals.OldBackground;
             foreach (var sr in world.GetComponentsInChildren<SpriteRenderer>(true))
             {
+                if (sr.sprite == null) continue; // empty overlays (marks) must not match a look not built yet
                 if (sr.sprite == Visuals.OldTile || sr.sprite == _tile) sr.sprite = tile;
                 else if (sr.sprite == Visuals.OldGloss || sr.sprite == _gloss) sr.sprite = gloss;
                 else if (sr.sprite == Visuals.OldBackground || sr.sprite == _background) sr.sprite = bg;

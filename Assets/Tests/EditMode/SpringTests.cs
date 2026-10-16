@@ -32,6 +32,16 @@ public class SpringTests
         Assert.Less(System.Math.Abs(s.Value), 2f);
     }
 
+    [Test] public void HoursInTheBackgroundAreCappedLikeAShortHitch()
+    {
+        var capped = new Spring(0f); capped.Step(1f, 0.25f, 6f, 0.55f);
+        var s = new Spring(0f);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        s.Step(1f, 3600f, 6f, 0.55f);   // back after an hour away
+        Assert.Less(watch.ElapsedMilliseconds, 50);
+        Assert.AreEqual(capped.Value, s.Value, 1e-6f);
+    }
+
     [Test] public void ZeroTimeAndSnapAreStable()
     {
         var s = new Spring(3f);

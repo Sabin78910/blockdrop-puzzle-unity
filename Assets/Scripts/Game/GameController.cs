@@ -160,7 +160,7 @@ namespace BlockDrop.Game
                     NewSprite("slot", Visuals.Slot, _boardRoot.transform, p, 0.94f, -5, Visuals.EmptySlot);
                     _tiles[x, y] = NewSprite("tile", Visuals.Tile, _boardRoot.transform, p, 0.94f, 0, Color.white);
                     _gloss[x, y] = NewSprite("gloss", Visuals.Gloss, _tiles[x, y].transform, Vector3.zero, 1f, 1, Color.white);
-                    _marks[x, y] = NewSprite("mark", null, _tiles[x, y].transform, Vector3.zero, 1f, 1, Color.white);
+                    _marks[x, y] = NewSprite("mark", null, _tiles[x, y].transform, Vector3.zero, 1f, 2, Color.white); // above the gloss
                     _ghosts[x, y] = NewSprite("ghost", Visuals.Tile, _boardRoot.transform, p, 0.94f, 2, Color.clear);
                 }
 
@@ -389,7 +389,7 @@ namespace BlockDrop.Game
         {
             _mode = mode;
             _runId++;
-            _hint = null; _newBest = false; _aiThinking = false; _bestCelebrated = false; _offerRevive = false;
+            _hint = null; _newBest = false; _aiThinking = false; _finishing = false; _bestCelebrated = false; _offerRevive = false;
             _shownScore = 0;
             _floaters.Clear();
             _screen = Screen.Playing;
@@ -512,7 +512,7 @@ namespace BlockDrop.Game
                     var pos = new Vector3(cx - (p.Width - 1) / 2f, (p.Height - 1) / 2f - cy, 0);
                     var t = NewSprite("t", Visuals.Tile, root.transform, pos, 0.94f, 10, col);
                     NewSprite("g", Visuals.Gloss, t.transform, Vector3.zero, 1f, 11, new Color(1, 1, 1, fits ? 1 : 0.3f));
-                    if (NewLook.PatternsOn) NewSprite("m", NewLook.Pattern(p.ColorIndex), t.transform, Vector3.zero, 1f, 11, new Color(1, 1, 1, fits ? 1 : 0.4f));
+                    if (NewLook.PatternsOn) NewSprite("m", NewLook.Pattern(p.ColorIndex), t.transform, Vector3.zero, 1f, 12, new Color(1, 1, 1, fits ? 1 : 0.4f));
                 }
                 root.transform.position = HandSlot(i);
                 root.transform.localScale = Vector3.one * HandScale;
@@ -523,7 +523,7 @@ namespace BlockDrop.Game
         private void SetHandOrder(GameObject root, int baseOrder)
         {
             foreach (var sr in root.GetComponentsInChildren<SpriteRenderer>())
-                sr.sortingOrder = sr.sprite == Visuals.Gloss ? baseOrder + 1 : baseOrder;
+                sr.sortingOrder = baseOrder + (sr.name == "m" ? 2 : sr.sprite == Visuals.Gloss ? 1 : 0); // tile, gloss, pattern
         }
 
         // ================= input & game loop =================
@@ -737,14 +737,17 @@ namespace BlockDrop.Game
         }
 
         private int _runId;
+        private bool _finishing;
 
         private IEnumerator FinishSoon()
         {
             int run = _runId;
+            _finishing = true;
             RefreshBoard(); RebuildHand();
             _aiThinking = true;
-            yield return new WaitForSeconds(0.9f);
-            if (run != _runId || _screen != Screen.Playing) yield break; // quit from the pause card meanwhile
+            yield return new WaitForSecondsRealtime(0.9f);
+            if (run != _runId || _screen != Screen.Playing) yield break; // a new run started meanwhile
+            _finishing = false;
             _aiThinking = false;
             Finish();
         }
@@ -1155,6 +1158,9 @@ namespace BlockDrop.Game
 
         private void SetPaused(bool paused)
         {
+            // A finished game can't be paused (or quit from the pause card) during the short wait before its
+            // result screen, so the best score, leaderboard submit and missions always get recorded.
+            if (paused && _finishing) return;
             _paused = paused;
             Time.timeScale = paused ? 0f : 1f; // freezes animations and the AI's turn coroutine
         }

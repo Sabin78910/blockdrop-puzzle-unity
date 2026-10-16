@@ -62,6 +62,12 @@ namespace BlockDrop.Core
             return (rows, cols);
         }
 
+        /// <summary>Puts back a saved score and counters (resuming a game). Cells are restored with <see cref="SetCell"/>.</summary>
+        public void RestoreScore(int score, int combo, int placements, int linesCleared)
+        {
+            Score = score; Combo = combo; Placements = placements; LinesCleared = linesCleared;
+        }
+
         public Board Clone()
         {
             var b = new Board(Size) { Score = Score, Combo = Combo, Placements = Placements, LinesCleared = LinesCleared };

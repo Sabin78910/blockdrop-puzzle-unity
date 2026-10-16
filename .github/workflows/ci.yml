@@ -21,6 +21,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Needs no secrets: compiles the pure C# rules and their EditMode tests with .NET and runs them.
+  core-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Core rules tests
+        run: dotnet test tools/CoreTests
+      - name: Cloud Code rule tests
+        if: hashFiles('CloudCode/*.test.js') != ''
+        run: node --test CloudCode/*.test.js
+
   test-and-build:
     # Secrets never reach pull requests from forks (the repo is public); those PRs are skipped.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository

@@ -65,7 +65,7 @@ namespace BlockDrop.Core
     /// choose; the release build flips this one constant to turn it on for everyone.</summary>
     public static class Look
     {
-        public const bool NewLookDefault = false;
+        public const bool NewLookDefault = true;
 
         /// <param name="playerChoice">-1 no choice yet, 0 off, 1 on.</param>
         public static bool NewLook(int playerChoice) => playerChoice < 0 ? NewLookDefault : playerChoice == 1;

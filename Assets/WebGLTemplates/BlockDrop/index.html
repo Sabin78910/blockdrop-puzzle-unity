@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <!-- GitHub Pages can't send headers, so the policy lives here. Unity needs blob: (decompressed code) and
+       wasm-unsafe-eval; connect-src lists only Unity Gaming Services (sign-in, leaderboards, Cloud Code, diagnostics). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' blob: data: https://*.services.api.unity.com https://*.unity3d.com; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Block Drop: Block Puzzle Game</title>
+  <meta name="description" content="Drag, drop and clear lines! A free block puzzle with combos, a daily challenge, levels and a vs AI mode. Plays offline.">
+  <meta name="theme-color" content="#1A1150">
+  <meta name="color-scheme" content="dark">
+  <meta property="og:title" content="Block Drop: Block Puzzle Game">
+  <meta property="og:description" content="Drag, drop and clear lines. Free, no sign-up, plays offline.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="icons/icon-512.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Block Drop">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body
+  data-loader="Build/{{{ LOADER_FILENAME }}}"
+  data-data="Build/{{{ DATA_FILENAME }}}"
+  data-framework="Build/{{{ FRAMEWORK_FILENAME }}}"
+  data-code="Build/{{{ CODE_FILENAME }}}"
+  data-company="{{{ COMPANY_NAME }}}"
+  data-product="{{{ PRODUCT_NAME }}}"
+  data-version="{{{ PRODUCT_VERSION }}}">
+  <main id="stage">
+    <canvas id="game" tabindex="-1" aria-label="Block Drop game"></canvas>
+    <section id="splash" aria-live="polite">
+      <img class="logo" src="icons/icon-192.png" alt="" width="112" height="112">
+      <h1>Block Drop</h1>
+      <div class="bar" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="fill"></span></div>
+      <p id="status">Loading…</p>
+    </section>
+  </main>
+  <div id="toolbar" hidden>
+    <button id="install" type="button" hidden>Install</button>
+    <button id="fullscreen" type="button" aria-label="Full screen">⛶</button>
+  </div>
+  <div id="toast" role="status" hidden></div>
+  <noscript><p class="noscript">Block Drop needs JavaScript to run.</p></noscript>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -16,6 +16,10 @@ namespace BlockDrop.Game
         public bool SoundOn { get; set; } = true;
         public bool HapticsOn { get; set; } = true;
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")] private static extern void BlockDropVibrate(int ms);
+#endif
+
         private static bool _neverTrue; // keeps Handheld.Vibrate referenced so Unity adds the VIBRATE permission
         private AndroidJavaObject _vibrator;
 
@@ -70,6 +74,9 @@ namespace BlockDrop.Game
 
         private void Haptic(long ms, int amplitude)
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (HapticsOn) BlockDropVibrate((int)ms); // Android browsers buzz; others ignore it
+#else
             if (!HapticsOn || _vibrator == null) return;
             try
             {
@@ -78,6 +85,7 @@ namespace BlockDrop.Game
                 _vibrator.Call("vibrate", oneShot);
             }
             catch { /* device without vibrator or API mismatch: ignore */ }
+#endif
         }
 
         // ---------- synthesis ----------

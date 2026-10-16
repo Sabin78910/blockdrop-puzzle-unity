@@ -1,0 +1,155 @@
+:root {
+  --bg: #1A1150;
+  --bg-deep: #0E0832;
+  --panel: #2B2470;
+  --text: #F4F1FF;
+  --muted: #B9B0F0;
+  --accent: #FFC24B;
+  --accent-2: #F08A1C;
+  --cyan: #7CF8FF;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(120% 90% at 50% 0%, #3A2A9A 0%, var(--bg) 45%, var(--bg-deep) 100%) fixed;
+  color: var(--text);
+  font: 500 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The game is laid out for a phone held upright. On wide screens it stays a centred portrait column
+   instead of stretching its buttons across a monitor. */
+#stage {
+  position: fixed;
+  inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  margin: 0 auto;
+  width: min(100%, calc((100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 0.62));
+  width: min(100%, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 0.62));
+  touch-action: none;
+}
+
+@media (min-aspect-ratio: 3/4) {
+  #stage {
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .06);
+    top: max(12px, env(safe-area-inset-top));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: min(100%, calc((100vh - 24px) * 0.62));
+    width: min(100%, calc((100dvh - 24px) * 0.62));
+  }
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  outline: none;
+  touch-action: none;
+}
+
+#splash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--bg);
+  transition: opacity .35s ease;
+}
+#splash.done { opacity: 0; pointer-events: none; }
+
+.logo {
+  border-radius: 26px;
+  box-shadow: 0 12px 40px rgba(124, 92, 255, .55);
+  animation: bob 1.6s cubic-bezier(.34, 1.56, .64, 1) infinite alternate;
+}
+@keyframes bob { from { transform: translateY(0) scale(1); } to { transform: translateY(-8px) scale(1.04); } }
+
+h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: .5px;
+  background: linear-gradient(180deg, #FFFFFF, #FFE27A);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bar {
+  width: min(260px, 70%);
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .1);
+  overflow: hidden;
+}
+.bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width .2s ease-out;
+}
+
+#status { margin: 0; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; min-height: 1.4em; text-align: center; padding: 0 16px; }
+#status.error { color: #FF9BB0; }
+
+#toolbar {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  display: flex;
+  gap: 8px;
+  z-index: 5;
+}
+#toolbar[hidden] { display: none; }
+#toolbar button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: 700 14px system-ui, sans-serif;
+  color: #2A0E61;
+  background: linear-gradient(180deg, #FFE27A, var(--accent));
+  box-shadow: 0 4px 0 var(--accent-2);
+  cursor: pointer;
+}
+#toolbar button:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent-2); }
+#toolbar button[hidden] { display: none; }
+#fullscreen { background: rgba(255, 255, 255, .14) !important; color: var(--text) !important; box-shadow: none !important; }
+
+/* Phones already fill the screen; the toolbar only helps on desktop. */
+@media (max-aspect-ratio: 3/4) { #fullscreen { display: none; } }
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .4);
+  z-index: 6;
+}
+#toast[hidden] { display: none; }
+
+.noscript { position: fixed; inset: 0; display: grid; place-items: center; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .logo { animation: none; }
+  #splash, .bar span { transition: none; }
+}

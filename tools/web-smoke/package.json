@@ -1,0 +1,9 @@
+{
+  "name": "blockdrop-web-smoke",
+  "private": true,
+  "type": "module",
+  "description": "Checks the WebGL build starts, keeps its CSP clean and plays offline, in headless Chrome.",
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

@@ -43,4 +43,33 @@ public class LevelMapTests
         Assert.AreEqual(0.5f, LevelMap.ClampBottom(-20, 6.3f));
         Assert.LessOrEqual(LevelMap.ClampBottom(2e6f, 6.3f), LevelLibrary.Count);
     }
+
+    [Test] public void EveryChapterHasATheme()
+    {
+        Assert.AreEqual(LevelMap.ThemeNames.Length, LevelMap.ThemeColors.Length);
+        Assert.AreEqual(0, LevelMap.ThemeOf(1));
+        Assert.AreEqual(1, LevelMap.ThemeOf(2));
+        Assert.AreEqual(0, LevelMap.ThemeOf(1 + LevelMap.ThemeNames.Length));
+        foreach (var n in LevelMap.ThemeNames) Assert.IsTrue(Loc.Table.ContainsKey(n), n);
+        var (a, b, t) = LevelMap.Blend(1f);
+        Assert.AreEqual((0, 1, 0f), (a, b, t));
+        Assert.AreEqual(1, LevelMap.Blend(11f).from);
+        Assert.That(LevelMap.Blend(5f).t, Is.InRange(0.1f, 0.9f));
+    }
+
+    [Test] public void ScenerySitsOppositeTheNodeAndIsStable()
+    {
+        int shown = 0;
+        for (int n = 1; n <= 300; n++)
+        {
+            var (kind, x) = LevelMap.PropFor(n);
+            Assert.AreEqual((kind, x), LevelMap.PropFor(n));
+            if (kind < 0) continue;
+            shown++;
+            Assert.That(kind, Is.InRange(0, 2));
+            Assert.That(x, Is.InRange(0.05f, 0.95f));
+            Assert.Greater(System.Math.Abs(x - LevelMap.NodeX(n)), 0.25f, "level " + n);
+        }
+        Assert.That(shown, Is.InRange(100, 250));
+    }
 }

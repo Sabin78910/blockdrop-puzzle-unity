@@ -135,6 +135,8 @@ namespace BlockDrop.Core
             ["PATTERNS: ON"] = ("PATRONES: SÍ", "PADRÕES: SIM"), ["PATTERNS: OFF"] = ("PATRONES: NO", "PADRÕES: NÃO"),
             ["HARD LEVEL"] = ("NIVEL DIFÍCIL", "NÍVEL DIFÍCIL"), ["SUPER HARD LEVEL"] = ("NIVEL SÚPER DIFÍCIL", "NÍVEL SUPERDIFÍCIL"),
             ["CHAPTER {0}"] = ("CAPÍTULO {0}", "CAPÍTULO {0}"), ["GO TO {0}"] = ("IR A {0}", "IR PARA {0}"),
+            ["Sunny Meadow"] = ("Prado Soleado", "Prado Ensolarado"), ["Pink Dusk"] = ("Atardecer Rosa", "Crepúsculo Rosa"), ["Blue Lagoon"] = ("Laguna Azul", "Lagoa Azul"),
+            ["Violet Night"] = ("Noche Violeta", "Noite Violeta"), ["Golden Dunes"] = ("Dunas Doradas", "Dunas Douradas"), ["Mint Frost"] = ("Escarcha de Menta", "Gelo de Menta"),
             ["NEW LOOK ON"] = ("NUEVO ESTILO ACTIVADO", "NOVO VISUAL LIGADO"), ["NEW LOOK OFF"] = ("NUEVO ESTILO DESACTIVADO", "NOVO VISUAL DESLIGADO"),
         };
     }

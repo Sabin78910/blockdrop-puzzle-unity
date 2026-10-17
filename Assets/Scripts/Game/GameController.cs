@@ -1383,6 +1383,48 @@ namespace BlockDrop.Game
             _mapBottom = LevelMap.ClampBottom(_mapBottom, MapSteps);
         }
 
+        /// <summary>Small scenery beside the path, drawn from plain shapes: a tree, a house or a lamp post.</summary>
+        private void DrawMapProp(int n, float nodeX, float nodeY, float w, float step)
+        {
+            var (kind, px) = LevelMap.PropFor(n);
+            if (kind < 0) return;
+            var c = Visuals.Hex(LevelMap.ThemeColors[LevelMap.ThemeOf(LevelMap.ChapterOf(n))]);
+            float x = w * px, y = nodeY - step * 0.1f, u = step * 0.5f;
+            var dark = c * 0.55f; dark.a = 0.9f;
+            var light = Color.Lerp(c, Color.white, 0.5f); light.a = 0.95f;
+            var wood = new Color(0.36f, 0.24f, 0.2f, 0.9f);
+            var tex = Texture2D.whiteTexture;
+            if (kind == 0)        // tree
+            {
+                GUI.color = wood; GUI.DrawTexture(new Rect(x - u * 0.08f, y, u * 0.16f, u * 0.5f), tex);
+                GUI.color = dark; GUI.DrawTexture(new Rect(x - u * 0.38f, y - u * 0.55f, u * 0.76f, u * 0.76f), Visuals.Circle.texture);
+                GUI.color = light; GUI.DrawTexture(new Rect(x - u * 0.2f, y - u * 0.42f, u * 0.3f, u * 0.3f), Visuals.Circle.texture);
+            }
+            else if (kind == 1)   // house
+            {
+                GUI.color = light; GUI.DrawTexture(new Rect(x - u * 0.4f, y - u * 0.1f, u * 0.8f, u * 0.55f), tex);
+                GUI.color = dark; GUI.DrawTexture(new Rect(x - u * 0.5f, y - u * 0.3f, u, u * 0.22f), tex);
+                GUI.color = wood; GUI.DrawTexture(new Rect(x - u * 0.09f, y + u * 0.17f, u * 0.18f, u * 0.28f), tex);
+            }
+            else                  // lamp post
+            {
+                GUI.color = dark; GUI.DrawTexture(new Rect(x - u * 0.04f, y - u * 0.3f, u * 0.08f, u * 0.75f), tex);
+                GUI.color = new Color(1f, 0.92f, 0.5f, 0.95f); GUI.DrawTexture(new Rect(x - u * 0.16f, y - u * 0.5f, u * 0.32f, u * 0.32f), Visuals.Circle.texture);
+            }
+            GUI.color = Color.white;
+        }
+
+        /// <summary>A gold crown marks the first level.</summary>
+        private static void DrawCrown(Rect r)
+        {
+            var tex = Texture2D.whiteTexture;
+            GUI.color = Visuals.Gold;
+            GUI.DrawTexture(new Rect(r.x, r.y + r.height * 0.5f, r.width, r.height * 0.5f), tex);
+            for (int i = 0; i < 3; i++) GUI.DrawTexture(new Rect(r.x + i * r.width * 0.36f, r.y + (i == 1 ? 0 : r.height * 0.15f), r.width * 0.28f, r.height * 0.55f), tex);
+            GUI.color = Visuals.Hex("FF4D6D");
+            GUI.DrawTexture(new Rect(r.x + r.width * 0.42f, r.y + r.height * 0.62f, r.width * 0.16f, r.width * 0.16f), Visuals.Circle.texture);
+        }
+
         private void DrawLevelSelect(float w, float h)
         {
             Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "LEVELS", _h2, Visuals.Hex("FFE27A"), 3);
@@ -1402,6 +1444,13 @@ namespace BlockDrop.Game
             var old = GUI.color;
             if (repaint)
             {
+                for (float sy = 0; sy < mapH; sy += 6f) // backdrop: sky colour blends from chapter to chapter
+                {
+                    var (ta, tb, tt) = LevelMap.Blend(_mapBottom + (baseY - sy) / step);
+                    GUI.color = Color.Lerp(Visuals.Hex(LevelMap.ThemeColors[ta]), Visuals.Hex(LevelMap.ThemeColors[tb]), tt) * new Color(1, 1, 1, 0.55f);
+                    GUI.DrawTexture(new Rect(0, sy, w, 6.5f), Texture2D.whiteTexture);
+                }
+                for (int n = first; n <= last; n++) DrawMapProp(n, X(n), Y(n), w, step);
                 for (int n = first; n < last; n++) // the path between neighbouring nodes
                 {
                     var a = new Vector2(X(n), Y(n)); var b = new Vector2(X(n + 1), Y(n + 1));
@@ -1419,7 +1468,7 @@ namespace BlockDrop.Game
                 if (!LevelMap.StartsChapter(n)) continue;
                 var banner = new Rect(w * 0.25f, Y(n) + step * 0.5f - step * 0.19f, w * 0.5f, step * 0.38f);
                 Panel(banner, _cardStyle);
-                Outlined(banner, Loc.F("CHAPTER {0}", LevelMap.ChapterOf(n)), _small, Visuals.Hex("FFE27A"), 1.2f);
+                Outlined(banner, Loc.F("CHAPTER {0}", LevelMap.ChapterOf(n)) + "  ·  " + Loc.L(LevelMap.ThemeNames[LevelMap.ThemeOf(LevelMap.ChapterOf(n))]), _small, Visuals.Hex("FFE27A"), 1.2f);
             }
             for (int n = first; n <= last; n++)
             {
@@ -1435,6 +1484,7 @@ namespace BlockDrop.Game
                     if (n == frontier) { float pulse = 1.18f + 0.06f * Mathf.Sin(Time.time * 5f); GUI.color = new Color(1, 1, 1, 0.55f); GUI.DrawTexture(new Rect(cx - node * pulse / 2, cy - node * pulse / 2, node * pulse, node * pulse), Visuals.Circle.texture); }
                     GUI.color = c * 0.55f; GUI.DrawTexture(new Rect(r.x, r.y + node * 0.07f, node, node), Visuals.Circle.texture); // thick edge
                     GUI.color = c; GUI.DrawTexture(r, Visuals.Circle.texture);
+                    if (n == 1) DrawCrown(new Rect(r.x - node * 0.12f, r.y - node * 0.3f, node * 0.55f, node * 0.4f));
                     GUI.color = old;
                 }
                 Outlined(r, n.ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, open ? Color.white : new Color(1, 1, 1, 0.45f), 1.5f);

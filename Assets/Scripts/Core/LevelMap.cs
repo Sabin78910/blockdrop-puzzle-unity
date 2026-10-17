@@ -11,6 +11,34 @@ namespace BlockDrop.Core
         /// <summary>Horizontal position of a level's node, 0..1 across the screen. Same for every player.</summary>
         public static float NodeX(int level) => 0.5f + 0.34f * (float)Math.Sin(level * 0.8);
 
+        /// <summary>Each chapter has its own look; the sky colour blends from one to the next as you climb.</summary>
+        public static readonly string[] ThemeNames = { "Sunny Meadow", "Pink Dusk", "Blue Lagoon", "Violet Night", "Golden Dunes", "Mint Frost" };
+        public static readonly string[] ThemeColors = { "7FD66B", "FF9EC4", "49C6E5", "5B3FB8", "F2C46B", "A8E6D9" };
+
+        public static int ThemeOf(int chapter) => (chapter - 1) % ThemeNames.Length;
+
+        /// <summary>0..1 position between chapter themes for a (fractional) level, used to blend the backdrop.</summary>
+        public static (int from, int to, float t) Blend(float level)
+        {
+            float f = Math.Max(0f, (level - 1f) / ChapterSize);
+            int a = (int)Math.Floor(f);
+            float t = f - a;
+            return (ThemeOf(a + 1), ThemeOf(a + 2), t * t * (3f - 2f * t));
+        }
+
+        /// <summary>Scenery beside a level's node: kind 0 tree, 1 house, 2 lamp, -1 none; x is 0..1 on the side
+        /// away from the node. Same for every player.</summary>
+        public static (int kind, float x) PropFor(int level)
+        {
+            unchecked
+            {
+                uint z = (uint)level * 0x9E3779B9u; z = (z ^ (z >> 15)) * 0x85EBCA6Bu; z ^= z >> 13;
+                int kind = z % 3 == 0 ? -1 : (int)((z >> 4) % 3);
+                float side = NodeX(level) < 0.5f ? 1f : -1f;
+                return (kind, 0.5f + side * (0.3f + (z >> 8) % 10 * 0.01f));
+            }
+        }
+
         public static int ChapterOf(int level) => (level - 1) / ChapterSize + 1;
 
         public static bool StartsChapter(int level) => level >= 1 && (level - 1) % ChapterSize == 0;

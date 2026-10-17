@@ -29,6 +29,7 @@ namespace BlockDrop.Game
         private LevelSession _level;
         private VersusMatch _versus;
         private Progress _progress;
+        private FailTracker _fails;
         private PlayerMeta _meta;
         private int _welcomeReward;
         private float _flashUntil, _playSeconds;
@@ -99,6 +100,7 @@ namespace BlockDrop.Game
             _fx.HapticsOn = PlayerPrefs.GetInt("haptics", 1) == 1;
             _best = PlayerPrefs.GetInt("best", 0);
             _progress = Progress.Parse(PlayerPrefs.GetString("progress", ""));
+            _fails = FailTracker.Parse(PlayerPrefs.GetString("fails", ""));
             _localName = PlayerPrefs.GetString("name", "");
             string sysLang = Application.systemLanguage == SystemLanguage.Spanish ? "es" : Application.systemLanguage == SystemLanguage.Portuguese ? "pt" : "en";
             Loc.Current = Loc.FromCode(PlayerPrefs.GetString("lang", sysLang));
@@ -263,7 +265,7 @@ namespace BlockDrop.Game
                 switch (mode)
                 {
                     case Mode.Level:
-                        _level = new LevelSession(save.Level);
+                        _level = new LevelSession(save.Level, _fails.FailsFor(save.Level));
                         save.ApplyTo(_level.Seat);
                         break;
                     case Mode.Challenge: _challengeSeed = save.Seed; _single = save.NewSeat(); break;
@@ -372,7 +374,10 @@ namespace BlockDrop.Game
             _mode = mode;
             switch (mode)
             {
-                case Mode.Level: _level = new LevelSession(level); break;
+                case Mode.Level:
+                    _level = new LevelSession(level, _fails.FailsFor(level));
+                    if (_fails.FailsFor(level) > 0) Toast(Loc.L("A little help: the target is lower"), Visuals.Gold);
+                    break;
                 case Mode.Versus:
                 case Mode.VsAi: _versus = new VersusMatch(Environment.TickCount); break;
                 case Mode.Daily: _single = new Seat(PieceGenerator.DailySeed(DateTime.UtcNow)); break;
@@ -431,6 +436,9 @@ namespace BlockDrop.Game
             {
                 good = _level.State == LevelState.Won;
                 _pieceMsg = "";
+                int num = _level.Definition.Number, starsBefore = _progress.StarsFor(num);
+                _fails.Record(num, good);
+                PlayerPrefs.SetString("fails", _fails.Serialize());
                 if (good && !Collection.Covers(_level.Definition.Number))
                 {
                     _progress.Record(_level.Definition.Number, _level.Stars);
@@ -450,6 +458,8 @@ namespace BlockDrop.Game
                         Confetti(60);
                     }
                 }
+                int coins = good ? LevelAssist.Coins(starsBefore, _level.Stars) : 0;
+                if (coins > 0) { _meta.AddCoins(coins); Toast(Loc.F("+{0} ●", coins), Visuals.Gold); }
             }
             if (_mode == Mode.Classic || _mode == Mode.Daily)
             {

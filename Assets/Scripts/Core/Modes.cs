@@ -261,7 +261,7 @@ namespace BlockDrop.Core
 
             var def = number <= Handmade ? Launch(number) : Generated(number);
             int bot = Bot.Play(NewSeat(def), def.MaxMoves);
-            double difficulty = number <= Handmade ? 0.55 + 0.35 * (number - 1) / (Handmade - 1) : TargetRatio(number);
+            double difficulty = number <= Handmade ? LaunchRatio(number) : TargetRatio(number);
             def.TargetScore = Math.Max(1, Math.Min(bot, (int)(bot * difficulty)));
             def.TwoStarScore = Math.Max(def.TargetScore, (def.TargetScore + bot) / 2);
             def.ThreeStarScore = Math.Max(def.TwoStarScore, bot);
@@ -272,7 +272,7 @@ namespace BlockDrop.Core
 
         public static LevelTier TierOf(int number)
         {
-            if (number <= Handmade) return LevelTier.Normal;
+            if (number <= ChapterSize) return LevelTier.Normal; // the first chapter is a warm-up
             int p = (number - 1) % ChapterSize;
             return p == ChapterSize - 1 ? LevelTier.SuperHard : p == 4 ? LevelTier.Hard : LevelTier.Normal;
         }
@@ -284,13 +284,20 @@ namespace BlockDrop.Core
             return seat;
         }
 
+        /// <summary>The first levels are a warm-up: no obstacles for three levels, then one more every other level or so,
+        /// and a target of only 30% of what the bot scores, creeping up to 60% by level 30 so it joins level 31 smoothly.
+        /// From level 11 the chapter sawtooth (hard 5th, super hard 10th) starts, once players have the hang of it.</summary>
         private static LevelDefinition Launch(int number) => new LevelDefinition
         {
             Number = number,
             Seed = 1000 + number * 7919,
-            MaxMoves = 20 + number / 2,
+            MaxMoves = 30 - number / 10,
+            Tier = TierOf(number),
             Obstacles = MakeObstacles(number),
         };
+
+        private static double LaunchRatio(int number) =>
+            0.30 + 0.30 * (number - 1) / (Handmade - 1) + (number > ChapterSize ? 0.05 * Saw[(number - 1) % ChapterSize] : 0);
 
         // position inside a chapter of 10: 0 = breather ... 4 = hard, 5 = dip ... 9 = super hard
         private static readonly double[] Saw = { 0.0, 0.25, 0.45, 0.6, 1.0, 0.3, 0.5, 0.65, 0.8, 1.3 };
@@ -335,7 +342,7 @@ namespace BlockDrop.Core
         private static (int, int)[] MakeObstacles(int number)
         {
             var rng = new Random(number * 104729);
-            int count = Math.Min(2 + number * 2 / 3, 22);
+            int count = number <= 3 ? 0 : Math.Min((number - 3) * 2 / 3, 22);
             var set = new HashSet<(int, int)>();
             var rows = new int[8];
             var cols = new int[8];
@@ -392,6 +399,56 @@ namespace BlockDrop.Core
         }
     }
 
+    /// <summary>Gentle rubber band: each lost try on a level lowers its target by 10% (up to 30%), so a stuck player
+    /// gets a win soon instead of quitting. Resets on a win. Stars still need the full-strength scores.</summary>
+    public static class LevelAssist
+    {
+        public const int MaxFails = 3;
+        private const double PerFail = 0.10;
+
+        public static LevelDefinition Apply(LevelDefinition def, int fails)
+        {
+            fails = Math.Min(Math.Max(fails, 0), MaxFails);
+            if (fails == 0) return def;
+            int target = Math.Max(1, (int)(def.TargetScore * (1 - PerFail * fails)));
+            return new LevelDefinition
+            {
+                Number = def.Number, Seed = def.Seed, MaxMoves = def.MaxMoves, Tier = def.Tier, Obstacles = def.Obstacles,
+                TargetScore = target, TwoStarScore = Math.Max(def.TwoStarScore, target), ThreeStarScore = Math.Max(def.ThreeStarScore, target),
+            };
+        }
+
+        /// <summary>Coins for a clear: 5 per new star, plus 5 for the first time through a level.</summary>
+        public static int Coins(int oldStars, int newStars) => newStars > oldStars ? 5 * (newStars - oldStars) + (oldStars == 0 ? 5 : 0) : 0;
+    }
+
+    /// <summary>Remembers the last level the player lost and how many times in a row (one short string).</summary>
+    public sealed class FailTracker
+    {
+        public int Level { get; private set; }
+        public int Fails { get; private set; }
+
+        public int FailsFor(int level) => level == Level ? Fails : 0;
+
+        public void Record(int level, bool won)
+        {
+            if (won) { if (level == Level) { Level = 0; Fails = 0; } return; }
+            Fails = level == Level ? Math.Min(Fails + 1, LevelAssist.MaxFails) : 1;
+            Level = level;
+        }
+
+        public string Serialize() => Level + "," + Fails;
+
+        public static FailTracker Parse(string data)
+        {
+            var t = new FailTracker();
+            var f = (data ?? "").Split(',');
+            if (f.Length == 2 && int.TryParse(f[0], out int l) && int.TryParse(f[1], out int n) && l >= 0 && l <= LevelLibrary.Count && n >= 0 && n <= LevelAssist.MaxFails)
+            { t.Level = l; t.Fails = l == 0 ? 0 : n; }
+            return t;
+        }
+    }
+
     public enum LevelState { Playing, Won, Lost }
 
     public sealed class LevelSession
@@ -399,9 +456,9 @@ namespace BlockDrop.Core
         public readonly LevelDefinition Definition;
         public readonly Seat Seat;
 
-        public LevelSession(int number)
+        public LevelSession(int number, int fails = 0)
         {
-            Definition = LevelLibrary.Get(number);
+            Definition = LevelAssist.Apply(LevelLibrary.Get(number), fails);
             Seat = LevelLibrary.NewSeat(Definition);
         }
 

@@ -407,7 +407,7 @@ namespace BlockDrop.Game
             if (_screen == Screen.Playing) ClearRun(); // finished or quit: nothing to resume
             SetPaused(false);
             _screen = screen;
-            if (screen == Screen.LevelSelect) _levelPage = -1; // reopen on the player's current page
+            if (screen == Screen.LevelSelect) { _mapBottom = -1; _mapVel = 0; _mapDown = _mapTapped = false; } // reopen the map on the player's current level
             _boardRoot.SetActive(false);
             _miniRoot.SetActive(false);
             _menuDeco.SetActive(true);
@@ -552,6 +552,7 @@ namespace BlockDrop.Game
         {
             if (UnityEngine.Screen.width != _fitW || UnityEngine.Screen.height != _fitH || SafeArea() != _fitSafe) FitCamera();
             PollKeyboard();
+            if (_screen == Screen.LevelSelect) UpdateMap();
             if (Input.GetKeyDown(KeyCode.Escape) && _screen != Screen.Menu)
             {
                 if (_screen == Screen.Playing && _offerRevive) DeclineRevive();
@@ -1347,35 +1348,158 @@ namespace BlockDrop.Game
             if (Btn(Row(w, h * 0.82f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
-        private int _levelPage = -1;
+        // ---- level map: a scrolling winding path, one node per level, a banner at each chapter start ----
+        private float _mapBottom = -1, _mapVel, _mapTravel;
+        private bool _mapDown, _mapTapped;
+        private Vector2 _mapLast, _mapTap;
+        private static readonly string[] MapColors = { "6E8BFF", "B56EFF", "FF8FAB", "3DC9E0" };
+
+        private float MapTop => _fitSafe.height * 0.17f;
+        private float MapBottomEdge => _fitSafe.height * 0.80f;
+        private float MapStep => _fitSafe.height * 0.1f;
+        private float MapSteps => (MapBottomEdge - MapTop) / MapStep;
+
+        /// <summary>Drag or fling to scroll, tap a node to play it. Runs in Update so it works with touch and mouse alike.</summary>
+        private void UpdateMap()
+        {
+            if (_mapBottom < 0) _mapBottom = LevelMap.StartBottom(_progress.Frontier);
+            float dt = Mathf.Max(Time.unscaledDeltaTime, 0.001f);
+            var m = ToGui(Input.mousePosition);
+            if (Input.GetMouseButtonDown(0) && m.y > MapTop && m.y < MapBottomEdge) { _mapDown = true; _mapTravel = 0; _mapVel = 0; _mapLast = m; }
+            else if (_mapDown && Input.GetMouseButton(0))
+            {
+                var d = m - _mapLast; _mapLast = m; _mapTravel += d.magnitude;
+                if (_mapTravel > 14f) { _mapBottom += d.y / MapStep; _mapVel = d.y / MapStep / dt; }
+            }
+            else
+            {
+                if (_mapDown && _mapTravel <= 14f) { _mapTapped = true; _mapTap = m; }
+                _mapDown = false;
+                _mapBottom += _mapVel * dt;
+                _mapVel *= Mathf.Exp(-4f * dt);
+                if (Mathf.Abs(_mapVel) < 0.05f) _mapVel = 0;
+            }
+            _mapBottom += Input.mouseScrollDelta.y * 1.5f;
+            _mapBottom = LevelMap.ClampBottom(_mapBottom, MapSteps);
+        }
+
+        /// <summary>Small scenery beside the path, drawn from plain shapes: a tree, a house or a lamp post.</summary>
+        private void DrawMapProp(int n, float nodeX, float nodeY, float w, float step)
+        {
+            var (kind, px) = LevelMap.PropFor(n);
+            if (kind < 0) return;
+            var c = Visuals.Hex(LevelMap.ThemeColors[LevelMap.ThemeOf(LevelMap.ChapterOf(n))]);
+            float x = w * px, y = nodeY - step * 0.1f, u = step * 0.5f;
+            var dark = c * 0.55f; dark.a = 0.9f;
+            var light = Color.Lerp(c, Color.white, 0.5f); light.a = 0.95f;
+            var wood = new Color(0.36f, 0.24f, 0.2f, 0.9f);
+            var tex = Texture2D.whiteTexture;
+            if (kind == 0)        // tree
+            {
+                GUI.color = wood; GUI.DrawTexture(new Rect(x - u * 0.08f, y, u * 0.16f, u * 0.5f), tex);
+                GUI.color = dark; GUI.DrawTexture(new Rect(x - u * 0.38f, y - u * 0.55f, u * 0.76f, u * 0.76f), Visuals.Circle.texture);
+                GUI.color = light; GUI.DrawTexture(new Rect(x - u * 0.2f, y - u * 0.42f, u * 0.3f, u * 0.3f), Visuals.Circle.texture);
+            }
+            else if (kind == 1)   // house
+            {
+                GUI.color = light; GUI.DrawTexture(new Rect(x - u * 0.4f, y - u * 0.1f, u * 0.8f, u * 0.55f), tex);
+                GUI.color = dark; GUI.DrawTexture(new Rect(x - u * 0.5f, y - u * 0.3f, u, u * 0.22f), tex);
+                GUI.color = wood; GUI.DrawTexture(new Rect(x - u * 0.09f, y + u * 0.17f, u * 0.18f, u * 0.28f), tex);
+            }
+            else                  // lamp post
+            {
+                GUI.color = dark; GUI.DrawTexture(new Rect(x - u * 0.04f, y - u * 0.3f, u * 0.08f, u * 0.75f), tex);
+                GUI.color = new Color(1f, 0.92f, 0.5f, 0.95f); GUI.DrawTexture(new Rect(x - u * 0.16f, y - u * 0.5f, u * 0.32f, u * 0.32f), Visuals.Circle.texture);
+            }
+            GUI.color = Color.white;
+        }
+
+        /// <summary>A gold crown marks the first level.</summary>
+        private static void DrawCrown(Rect r)
+        {
+            var tex = Texture2D.whiteTexture;
+            GUI.color = Visuals.Gold;
+            GUI.DrawTexture(new Rect(r.x, r.y + r.height * 0.5f, r.width, r.height * 0.5f), tex);
+            for (int i = 0; i < 3; i++) GUI.DrawTexture(new Rect(r.x + i * r.width * 0.36f, r.y + (i == 1 ? 0 : r.height * 0.15f), r.width * 0.28f, r.height * 0.55f), tex);
+            GUI.color = Visuals.Hex("FF4D6D");
+            GUI.DrawTexture(new Rect(r.x + r.width * 0.42f, r.y + r.height * 0.62f, r.width * 0.16f, r.width * 0.16f), Visuals.Circle.texture);
+        }
 
         private void DrawLevelSelect(float w, float h)
         {
-            const int perRow = 5, perPage = 30;
-            int lastPage = (LevelLibrary.Count - 1) / perPage;
-            if (_levelPage < 0) _levelPage = (_progress.Frontier - 1) / perPage;
-            int first = _levelPage * perPage + 1, last = Mathf.Min(LevelLibrary.Count, first + perPage - 1);
             Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "LEVELS", _h2, Visuals.Hex("FFE27A"), 3);
-            Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"{_progress.TotalStars} ★   ·   {first}-{last}", _body, Color.white, 1.5f);
-            float nav = h * 0.045f;
-            if (_levelPage > 0 && Btn(new Rect(w * 0.07f, h * 0.117f, nav * 1.4f, nav), "<", "5A4FA8", "3A2F80", 0.8f)) _levelPage--;
-            if (_levelPage < lastPage && Btn(new Rect(w * 0.93f - nav * 1.4f, h * 0.117f, nav * 1.4f, nav), ">", "5A4FA8", "3A2F80", 0.8f)) _levelPage++;
-            float gap = w * 0.025f, cell = (w * 0.86f - gap * (perRow - 1)) / perRow, y0 = h * 0.18f;
+            Outlined(new Rect(0, h * 0.115f, w, h * 0.04f), $"{_progress.TotalStars} ★", _body, Color.white, 1.5f);
+            int frontier = _progress.Frontier;
+            var (first, last) = LevelMap.Visible(_mapBottom, MapSteps);
+            if ((frontier < first || frontier > last) && Btn(new Rect(w * 0.7f, h * 0.115f, w * 0.26f, h * 0.045f), Loc.F("GO TO {0}", frontier), "FFC24B", "F08A1C", 0.7f))
+                _mapBottom = LevelMap.ClampBottom(LevelMap.StartBottom(frontier), MapSteps);
+
+            float step = MapStep, mapH = MapBottomEdge - MapTop, baseY = mapH - step * 0.5f, node = step * 0.78f;
+            float X(int n) => w * LevelMap.NodeX(n);
+            float Y(int n) => baseY - (n - _mapBottom) * step;
+            int tapped = -1;
+            var tap = _mapTap - new Vector2(0, MapTop);
+            GUI.BeginClip(new Rect(0, MapTop, w, mapH));
+            bool repaint = Event.current.type == EventType.Repaint;
+            var old = GUI.color;
+            if (repaint)
+            {
+                for (float sy = 0; sy < mapH; sy += 6f) // backdrop: sky colour blends from chapter to chapter
+                {
+                    var (ta, tb, tt) = LevelMap.Blend(_mapBottom + (baseY - sy) / step);
+                    GUI.color = Color.Lerp(Visuals.Hex(LevelMap.ThemeColors[ta]), Visuals.Hex(LevelMap.ThemeColors[tb]), tt) * new Color(1, 1, 1, 0.55f);
+                    GUI.DrawTexture(new Rect(0, sy, w, 6.5f), Texture2D.whiteTexture);
+                }
+                for (int n = first; n <= last; n++) DrawMapProp(n, X(n), Y(n), w, step);
+                for (int n = first; n < last; n++) // the path between neighbouring nodes
+                {
+                    var a = new Vector2(X(n), Y(n)); var b = new Vector2(X(n + 1), Y(n + 1));
+                    GUI.color = _progress.StarsFor(n) > 0 ? new Color(1f, 0.85f, 0.3f, 0.95f) : new Color(1, 1, 1, 0.35f);
+                    for (int k = 1; k < 8; k++)
+                    {
+                        var p = Vector2.Lerp(a, b, k / 8f); float ds = step * 0.1f;
+                        GUI.DrawTexture(new Rect(p.x - ds / 2, p.y - ds / 2, ds, ds), Visuals.Circle.texture);
+                    }
+                }
+                GUI.color = old;
+            }
             for (int n = first; n <= last; n++)
             {
-                int row = (n - first) / perRow, col = (n - first) % perRow;
-                var r = new Rect(w * 0.07f + col * (cell + gap), y0 + row * (cell * 1.08f + gap), cell, cell * 1.08f);
+                if (!LevelMap.StartsChapter(n)) continue;
+                var banner = new Rect(w * 0.25f, Y(n) + step * 0.5f - step * 0.19f, w * 0.5f, step * 0.38f);
+                Panel(banner, _cardStyle);
+                Outlined(banner, Loc.F("CHAPTER {0}", LevelMap.ChapterOf(n)) + "  ·  " + Loc.L(LevelMap.ThemeNames[LevelMap.ThemeOf(LevelMap.ChapterOf(n))]), _small, Visuals.Hex("FFE27A"), 1.2f);
+            }
+            for (int n = first; n <= last; n++)
+            {
+                float cx = X(n), cy = Y(n);
+                var r = new Rect(cx - node / 2, cy - node / 2, node, node);
                 bool open = _progress.IsUnlocked(n);
                 int stars = _progress.StarsFor(n);
-                string label = open ? $"{n}\n{new string('★', stars)}{new string('☆', 3 - stars)}" : $"{n}";
-                GUI.enabled = open;
                 var tier = LevelLibrary.TierOf(n);
-                var (top, bottom) = !open ? ("4A4370", "2E2850") : stars == 0 && tier != LevelTier.Normal ? (tier == LevelTier.SuperHard ? ("C04BFF", "7A1FB8") : ("FF6B6B", "D93A3A")) : stars == 3 ? ("FFD54A", "D99A00") : stars > 0 ? ("4BE38A", "1FA45B") : ("6E8BFF", "3A4FE0");
-                if (Btn(r, label, top, bottom, 0.8f)) StartMode(Mode.Level, level: n);
-                GUI.enabled = true;
+                if (repaint)
+                {
+                    Color c = !open ? Visuals.Hex("4A4370") : stars == 3 ? Visuals.Hex("FFD54A") : stars > 0 ? Visuals.Hex("4BE38A")
+                        : tier == LevelTier.SuperHard ? Visuals.Hex("C04BFF") : tier == LevelTier.Hard ? Visuals.Hex("FF6B6B") : Visuals.Hex(MapColors[LevelMap.ChapterOf(n) % MapColors.Length]);
+                    if (n == frontier) { float pulse = 1.18f + 0.06f * Mathf.Sin(Time.time * 5f); GUI.color = new Color(1, 1, 1, 0.55f); GUI.DrawTexture(new Rect(cx - node * pulse / 2, cy - node * pulse / 2, node * pulse, node * pulse), Visuals.Circle.texture); }
+                    GUI.color = c * 0.55f; GUI.DrawTexture(new Rect(r.x, r.y + node * 0.07f, node, node), Visuals.Circle.texture); // thick edge
+                    GUI.color = c; GUI.DrawTexture(r, Visuals.Circle.texture);
+                    if (n == 1) DrawCrown(new Rect(r.x - node * 0.12f, r.y - node * 0.3f, node * 0.55f, node * 0.4f));
+                    GUI.color = old;
+                }
+                Outlined(r, n.ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, open ? Color.white : new Color(1, 1, 1, 0.45f), 1.5f);
+                if (open) Outlined(new Rect(cx - node / 2, cy + node * 0.42f, node, node * 0.34f), new string('★', stars) + new string('☆', 3 - stars), new GUIStyle(_small) { wordWrap = false }, Visuals.Gold, 1f);
+                if (tier != LevelTier.Normal && open) Outlined(new Rect(r.xMax - node * 0.28f, r.y - node * 0.08f, node * 0.36f, node * 0.36f), "!", new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, tier == LevelTier.SuperHard ? Visuals.Hex("E7A6FF") : Visuals.Hex("FFB0B0"), 1.2f);
+                if (n == frontier) Outlined(new Rect(cx - node / 2, cy - node * 1.0f + Mathf.Sin(Time.time * 4f) * node * 0.06f, node, node * 0.4f), "▼", new GUIStyle(_body) { wordWrap = false }, Color.white, 1.2f);
+                if (_mapTapped && open && (new Vector2(cx, cy) - tap).sqrMagnitude < node * node * 0.3f) tapped = n;
             }
-            if (Btn(Row(w, h * 0.745f, h * 0.065f), Loc.F("COLLECTION  {0}/{1}", Collection.CompletedPictures(_progress), Collection.Pictures.Length), "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Collection);
-            if (Btn(Row(w, h * 0.88f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            GUI.EndClip();
+            _mapTapped = false;
+            if (tapped > 0) { StartMode(Mode.Level, level: tapped); return; }
+
+            var left = new Rect(w * 0.06f, h * 0.835f, w * 0.52f, h * 0.075f);
+            if (Btn(left, Loc.F("COLLECTION  {0}/{1}", Collection.CompletedPictures(_progress), Collection.Pictures.Length), "FF8FAB", "D9466F", 0.75f)) ShowMenu(Screen.Collection);
+            if (Btn(new Rect(w * 0.62f, h * 0.835f, w * 0.32f, h * 0.075f), "BACK", "5A4FA8", "3A2F80", 0.85f)) ShowMenu();
         }
 
         private void DrawCollection(float w, float h)

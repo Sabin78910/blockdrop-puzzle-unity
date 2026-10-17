@@ -133,6 +133,12 @@ namespace BlockDrop.Core
             ["One cell away from a clear!"] = ("¡A una casilla de borrar una línea!", "A uma casa de limpar uma linha!"),
             ["MOTION: FULL"] = ("MOVIMIENTO: COMPLETO", "MOVIMENTO: COMPLETO"), ["MOTION: REDUCED"] = ("MOVIMIENTO: REDUCIDO", "MOVIMENTO: REDUZIDO"),
             ["PATTERNS: ON"] = ("PATRONES: SÍ", "PADRÕES: SIM"), ["PATTERNS: OFF"] = ("PATRONES: NO", "PADRÕES: NÃO"),
+            ["HARD LEVEL"] = ("NIVEL DIFÍCIL", "NÍVEL DIFÍCIL"), ["SUPER HARD LEVEL"] = ("NIVEL SÚPER DIFÍCIL", "NÍVEL SUPERDIFÍCIL"),
+            ["CHAPTER {0}"] = ("CAPÍTULO {0}", "CAPÍTULO {0}"), ["GO TO {0}"] = ("IR A {0}", "IR PARA {0}"),
+            ["Sunny Meadow"] = ("Prado Soleado", "Prado Ensolarado"), ["Pink Dusk"] = ("Atardecer Rosa", "Crepúsculo Rosa"), ["Blue Lagoon"] = ("Laguna Azul", "Lagoa Azul"),
+            ["Violet Night"] = ("Noche Violeta", "Noite Violeta"), ["Golden Dunes"] = ("Dunas Doradas", "Dunas Douradas"), ["Mint Frost"] = ("Escarcha de Menta", "Gelo de Menta"),
+            ["A little help: the target is lower"] = ("Un poco de ayuda: la meta es menor", "Uma ajudinha: a meta está menor"), ["+{0} ●"] = ("+{0} ●", "+{0} ●"),
+            ["Reach {0} points"] = ("Llega a {0} puntos", "Chegue a {0} pontos"), ["{0} moves"] = ("{0} movimientos", "{0} jogadas"),
             ["NEW LOOK ON"] = ("NUEVO ESTILO ACTIVADO", "NOVO VISUAL LIGADO"), ["NEW LOOK OFF"] = ("NUEVO ESTILO DESACTIVADO", "NOVO VISUAL DESLIGADO"),
         };
     }

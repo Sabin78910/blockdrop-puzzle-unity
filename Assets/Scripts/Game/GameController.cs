@@ -10,9 +10,9 @@ namespace BlockDrop.Game
     /// <summary>Builds the whole game at runtime: responsive portrait layout, glossy board, drag & drop
     /// with landing preview and line glow, particles, praise pop-ups, sounds, haptics, menus, levels,
     /// vs-AI, 2-player, challenge codes and online leaderboards. Fully playable offline.</summary>
-    public sealed class GameController : MonoBehaviour
+    public sealed partial class GameController : MonoBehaviour
     {
-        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection }
+        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection, Settings }
         private enum Mode { Classic, Daily, Level, Versus, VsAi, Challenge }
 
         private const int Size = 8;
@@ -29,6 +29,7 @@ namespace BlockDrop.Game
         private LevelSession _level;
         private VersusMatch _versus;
         private Progress _progress;
+        private FailTracker _fails;
         private PlayerMeta _meta;
         private int _welcomeReward;
         private float _flashUntil, _playSeconds;
@@ -99,6 +100,7 @@ namespace BlockDrop.Game
             _fx.HapticsOn = PlayerPrefs.GetInt("haptics", 1) == 1;
             _best = PlayerPrefs.GetInt("best", 0);
             _progress = Progress.Parse(PlayerPrefs.GetString("progress", ""));
+            _fails = FailTracker.Parse(PlayerPrefs.GetString("fails", ""));
             _localName = PlayerPrefs.GetString("name", "");
             string sysLang = Application.systemLanguage == SystemLanguage.Spanish ? "es" : Application.systemLanguage == SystemLanguage.Portuguese ? "pt" : "en";
             Loc.Current = Loc.FromCode(PlayerPrefs.GetString("lang", sysLang));
@@ -263,7 +265,7 @@ namespace BlockDrop.Game
                 switch (mode)
                 {
                     case Mode.Level:
-                        _level = new LevelSession(save.Level);
+                        _level = new LevelSession(save.Level, _fails.FailsFor(save.Level));
                         save.ApplyTo(_level.Seat);
                         break;
                     case Mode.Challenge: _challengeSeed = save.Seed; _single = save.NewSeat(); break;
@@ -372,7 +374,10 @@ namespace BlockDrop.Game
             _mode = mode;
             switch (mode)
             {
-                case Mode.Level: _level = new LevelSession(level); break;
+                case Mode.Level:
+                    _level = new LevelSession(level, _fails.FailsFor(level));
+                    if (_fails.FailsFor(level) > 0) Toast(Loc.L("A little help: the target is lower"), Visuals.Gold);
+                    break;
                 case Mode.Versus:
                 case Mode.VsAi: _versus = new VersusMatch(Environment.TickCount); break;
                 case Mode.Daily: _single = new Seat(PieceGenerator.DailySeed(DateTime.UtcNow)); break;
@@ -407,6 +412,7 @@ namespace BlockDrop.Game
             if (_screen == Screen.Playing) ClearRun(); // finished or quit: nothing to resume
             SetPaused(false);
             _screen = screen;
+            if (screen == Screen.LevelSelect) { _mapBottom = -1; _mapVel = 0; _mapDown = _mapTapped = false; _mapPick = 0; } // reopen the map on the player's current level
             _boardRoot.SetActive(false);
             _miniRoot.SetActive(false);
             _menuDeco.SetActive(true);
@@ -430,7 +436,15 @@ namespace BlockDrop.Game
             {
                 good = _level.State == LevelState.Won;
                 _pieceMsg = "";
-                if (good)
+                int num = _level.Definition.Number, starsBefore = _progress.StarsFor(num);
+                _fails.Record(num, good);
+                PlayerPrefs.SetString("fails", _fails.Serialize());
+                if (good && !Collection.Covers(_level.Definition.Number))
+                {
+                    _progress.Record(_level.Definition.Number, _level.Stars);
+                    PlayerPrefs.SetString("progress", _progress.Serialize());
+                }
+                else if (good)
                 {
                     var (pic, tile) = Collection.ForLevel(_level.Definition.Number);
                     bool newPiece = !Collection.Revealed(_progress, pic, tile), wasComplete = Collection.Complete(_progress, pic);
@@ -444,6 +458,9 @@ namespace BlockDrop.Game
                         Confetti(60);
                     }
                 }
+                int coins = good ? LevelAssist.Coins(starsBefore, _level.Stars) : 0;
+                if (coins > 0) { _meta.AddCoins(coins); Toast(Loc.F("+{0} ●", coins), Visuals.Gold); }
+                _levelCoins = coins; _levelStarsBefore = starsBefore;
             }
             if (_mode == Mode.Classic || _mode == Mode.Daily)
             {
@@ -465,7 +482,7 @@ namespace BlockDrop.Game
             }
             SaveMeta();
             PlayerPrefs.Save();
-            if (good) { _fx.Win(); Confetti(60); } else _fx.GameOver();
+            if (good) { _fx.Win(); if (_mode == Mode.Level) StartLevelCelebration(); else Confetti(60); } else _fx.GameOver();
             _resultTime = Time.time;
             ShowMenu(Screen.Result);
         }
@@ -546,6 +563,7 @@ namespace BlockDrop.Game
         {
             if (UnityEngine.Screen.width != _fitW || UnityEngine.Screen.height != _fitH || SafeArea() != _fitSafe) FitCamera();
             PollKeyboard();
+            if (_screen == Screen.LevelSelect) UpdateMap();
             if (Input.GetKeyDown(KeyCode.Escape) && _screen != Screen.Menu)
             {
                 if (_screen == Screen.Playing && _offerRevive) DeclineRevive();
@@ -568,7 +586,7 @@ namespace BlockDrop.Game
             if (_screen != Screen.Playing || _paused || _offerRevive) return;
             _playSeconds += Time.unscaledDeltaTime;
             if (!_breakShown && _playSeconds > 40 * 60) { _breakShown = true; _breakOpen = true; }
-            if (_tutorial == 2 && Time.time - _tutorialStepAt > 3.5f) { _tutorial = 3; PlayerPrefs.SetInt("tutorial", 3); }
+            TickGuide();
             if (_breakOpen) return;
 
             _shownScore = Mathf.MoveTowards(_shownScore, Score, Mathf.Max(1f, Mathf.Abs(Score - _shownScore)) * Time.deltaTime * 6f);
@@ -652,7 +670,7 @@ namespace BlockDrop.Game
                 _fx.Win();
                 Confetti(50);
             }
-            if (_tutorial == 0) { _tutorial = 1; _tutorialStepAt = Time.time; }
+            AdvanceGuide(Guide.AfterPlace(_tutorial));
 
             if (lines > 0)
             {
@@ -660,7 +678,7 @@ namespace BlockDrop.Game
                 Track(MissionKind.ClearLines, lines);
                 Track(MissionKind.ComboReach, board.Combo);
                 if (Career) { Celebrate(_meta.Record(Stat.LinesCleared, lines)); Celebrate(_meta.Record(Stat.BestCombo, board.Combo)); }
-                if (_tutorial == 1) { _tutorial = 2; _tutorialStepAt = Time.time; }
+                AdvanceGuide(Guide.AfterClear(_tutorial));
                 if (NewLook.On) { NewLookClear(lines, board, gained, burst); AfterMove(); return; }
                 if (lines >= 3) StartCoroutine(MegaClear());
                 else StartCoroutine(HitStop(0.035f + 0.02f * lines));
@@ -691,8 +709,8 @@ namespace BlockDrop.Game
             NewLook.Pulse(tier);
             var mid = BoardCenter + new Vector3(0, 0.6f, 0);
             AddFloater("+" + gained, mid + new Vector3(0, -0.9f, 0), Visuals.Gold, 1.0f);
-            string praise = Feel.Praise(tier);
-            if (praise != null) AddFloater(praise, mid + new Vector3(0, 0.5f, 0), tier == FeedbackTier.BoardClear ? Visuals.Hex("7CF8FF") : Color.white, 1.2f + 0.12f * (int)tier);
+            var praise = Praise.For(lines, board.Combo, tier == FeedbackTier.BoardClear);
+            if (praise.Any) AddFloater(praise.Word, mid + new Vector3(0, 0.5f, 0), tier == FeedbackTier.BoardClear ? Visuals.Hex("7CF8FF") : Color.white, praise.Size);
             if (board.Combo >= 2) AddFloater(Loc.F("COMBO x{0}", board.Combo), mid + new Vector3(0, 1.8f, 0), Visuals.Hex("FF9BD2"), 1.1f);
             int confetti = Feel.Confetti(tier, reduced);
             if (confetti > 0) Confetti(confetti);
@@ -1054,6 +1072,7 @@ namespace BlockDrop.Game
                 case Screen.Themes: DrawThemes(w, h); break;
                 case Screen.Trophies: DrawTrophies(w, h); break;
                 case Screen.Collection: DrawCollection(w, h); break;
+                case Screen.Settings: DrawSettings(w, h); break;
             }
             GUI.enabled = true;
             DrawFloaters(w);
@@ -1081,25 +1100,7 @@ namespace BlockDrop.Game
             Outlined(r, Loc.F("STREAK x{0}", combo + 1), st, c, 1.5f);
         }
 
-        private void DrawTutorial(float w, float h)
-        {
-            if (_tutorial >= 3 || _mode != Mode.Classic) return;
-            string[] text = { "Drag a piece onto the board", "Fill a row or column to clear it!", "Clear again and again for COMBOS!" };
-            var card = new Rect(w * 0.08f, h * 0.195f, w * 0.84f, h * 0.055f);
-            Panel(card, _cardStyle);
-            Outlined(card, text[_tutorial], _small, Visuals.Hex("FFE27A"), 1.5f);
-            if (_tutorial == 0 && _dragging < 0)
-            {
-                float t = (Time.time * 0.7f) % 1f;
-                var from = _cam.WorldToScreenPoint(HandSlot(1));
-                var to = _cam.WorldToScreenPoint(BoardCenter);
-                var p = ToGui(Vector3.Lerp(from, to, Mathf.SmoothStep(0, 1, t)));
-                float size = h * 0.05f;
-                var old = GUI.color; GUI.color = new Color(1, 1, 1, 0.85f * Mathf.Sin(t * Mathf.PI));
-                GUI.DrawTexture(new Rect(p.x - size / 2, p.y - size / 2, size, size), Visuals.Circle.texture);
-                GUI.color = old;
-            }
-        }
+        private void DrawTutorial(float w, float h) => DrawGuide(w, h);
 
         private IEnumerator HitStop(float seconds)
         {
@@ -1210,41 +1211,7 @@ namespace BlockDrop.Game
             if (NewLook.On) Outlined(new Rect(0, h * 0.216f + bob, w, h * 0.03f), "Fair hands. Every game.", _small, Visuals.Hex("B9B8E8"), 1f);
             // Five quick taps on the logo switch the new look on or off (for testing on a device before it ships on).
             if (GUI.Button(new Rect(w * 0.2f, h * 0.075f, w * 0.6f, h * 0.15f), GUIContent.none, GUIStyle.none)) LogoTapped();
-            float y = h * 0.245f, bh = h * 0.064f, gap = h * 0.011f;
-            float half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
-            if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) StartMode(Mode.Classic);
-            y += bh * 1.2f + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), Loc.F("LEVELS {0}★", _progress.TotalStars), "FFC24B", "F08A1C", 0.85f)) ShowMenu(Screen.LevelSelect);
-            if (Btn(new Rect(x2, y, half, bh), "DAILY", "4FD8FF", "1C8FE0", 0.85f)) StartMode(Mode.Daily);
-            y += bh + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);
-            if (Btn(new Rect(x2, y, half, bh), "2 PLAYERS", "FF7AB6", "E0347C", 0.85f)) StartMode(Mode.Versus);
-            y += bh + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), "CHALLENGE", "6E8BFF", "3A4FE0", 0.85f)) { _codeError = ""; ShowMenu(Screen.Challenge); }
-            if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.85f)) { OnlineService.Refresh(_boardTab); ShowMenu(Screen.Leaderboard); }
-            y += bh + gap;
-            int ready = 0; for (int i = 0; i < 3; i++) if (_meta.IsComplete(i, Today) && !_meta.Claimed[i]) ready++;
-            var missionsRect = new Rect(w * 0.08f, y, half, bh);
-            if (Btn(missionsRect, "MISSIONS", "2EE59D", "13A86E", 0.85f)) ShowMenu(Screen.Missions);
-            if (ready > 0) Badge(missionsRect, ready);
-            if (Btn(new Rect(x2, y, half, bh), "THEMES", "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Themes);
-            y += bh + gap * 2;
-            float third = (w * 0.84f - gap * 2) / 3f, sw = NewLook.On ? third : half, ts = NewLook.On ? 0.5f : 0.66f;
-            if (Btn(new Rect(w * 0.08f, y, sw, bh * 0.7f), _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", "5A4FA8", "3A2F80", ts))
-            { _fx.SoundOn = !_fx.SoundOn; PlayerPrefs.SetInt("sound", _fx.SoundOn ? 1 : 0); }
-            if (Btn(new Rect(w * 0.08f + sw + gap, y, sw, bh * 0.7f), _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", "5A4FA8", "3A2F80", ts))
-            { _fx.HapticsOn = !_fx.HapticsOn; PlayerPrefs.SetInt("haptics", _fx.HapticsOn ? 1 : 0); }
-            if (NewLook.On && Btn(new Rect(w * 0.08f + (third + gap) * 2, y, third, bh * 0.7f), NewLook.ReducedMotion ? "MOTION: REDUCED" : "MOTION: FULL", "5A4FA8", "3A2F80", ts))
-                NewLook.ToggleMotion();
-            y += bh * 0.7f + gap;
-            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
-            if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
-            var playerRow = NewLook.On ? new Rect(w * 0.08f, y, half, bh * 0.7f) : Row(w, y, bh * 0.7f);
-            if (Btn(playerRow, Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.66f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
-            // Block patterns (a shape on each colour) sit beside the name in the new look.
-            if (NewLook.On && Btn(new Rect(x2, y, half, bh * 0.7f), NewLook.PatternsOn ? "PATTERNS: ON" : "PATTERNS: OFF", "2B2470", "1C1650", 0.66f))
-                NewLook.TogglePatterns();
-            y += bh * 0.7f + gap;
+            float y = DrawHomeButtons(w, h, h * 0.245f);
             Outlined(new Rect(0, y, w, h * 0.035f), Loc.F("BEST {0}   ·   {1}", _best, Loc.L(OnlineService.Ready ? "ONLINE" : "OFFLINE")), _small, new Color(1, 1, 1, 0.85f), 1.5f);
 
             if (_welcomeReward > 0)
@@ -1341,26 +1308,173 @@ namespace BlockDrop.Game
             if (Btn(Row(w, h * 0.82f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
+        // ---- level map: a scrolling winding path, one node per level, a banner at each chapter start ----
+        private float _mapBottom = -1, _mapVel, _mapTravel;
+        private bool _mapDown, _mapTapped;
+        private Vector2 _mapLast, _mapTap;
+        private static readonly string[] MapColors = { "6E8BFF", "B56EFF", "FF8FAB", "3DC9E0" };
+
+        private float MapTop => _fitSafe.height * 0.17f;
+        private float MapBottomEdge => _fitSafe.height * 0.80f;
+        private float MapStep => _fitSafe.height * 0.1f;
+        private float MapSteps => (MapBottomEdge - MapTop) / MapStep;
+
+        /// <summary>Drag or fling to scroll, tap a node to play it. Runs in Update so it works with touch and mouse alike.</summary>
+        private void UpdateMap()
+        {
+            if (_mapBottom < 0) _mapBottom = LevelMap.StartBottom(_progress.Frontier);
+            if (_mapPick > 0) { _mapDown = false; _mapVel = 0; return; }   // the start card is open
+            float dt = Mathf.Max(Time.unscaledDeltaTime, 0.001f);
+            var m = ToGui(Input.mousePosition);
+            if (Input.GetMouseButtonDown(0) && m.y > MapTop && m.y < MapBottomEdge) { _mapDown = true; _mapTravel = 0; _mapVel = 0; _mapLast = m; }
+            else if (_mapDown && Input.GetMouseButton(0))
+            {
+                var d = m - _mapLast; _mapLast = m; _mapTravel += d.magnitude;
+                if (_mapTravel > 14f) { _mapBottom += d.y / MapStep; _mapVel = d.y / MapStep / dt; }
+            }
+            else
+            {
+                if (_mapDown && _mapTravel <= 14f) { _mapTapped = true; _mapTap = m; }
+                _mapDown = false;
+                _mapBottom += _mapVel * dt;
+                _mapVel *= Mathf.Exp(-4f * dt);
+                if (Mathf.Abs(_mapVel) < 0.05f) _mapVel = 0;
+            }
+            _mapBottom += Input.mouseScrollDelta.y * 1.5f;
+            _mapBottom = LevelMap.ClampBottom(_mapBottom, MapSteps);
+        }
+
+        private static readonly Dictionary<string, Texture2D> MapTextures = new Dictionary<string, Texture2D>();
+
+        /// <summary>Original map art from Resources/Map (drawn by tools/art/make_map_art.py). Null if missing, so the map still works.</summary>
+        private static Texture2D MapTex(string name)
+        {
+            if (!MapTextures.TryGetValue(name, out var t)) MapTextures[name] = t = Resources.Load<Texture2D>("Map/" + name);
+            return t;
+        }
+
+        private static void Sprite(Rect r, string name, Color tint)
+        {
+            var t = MapTex(name);
+            GUI.color = tint;
+            GUI.DrawTexture(r, t != null ? t : Visuals.Circle.texture);
+            GUI.color = Color.white;
+        }
+
+        private int _mapPick;
+        private LevelDefinition _pickDef;
+
+        private void PickLevel(int n)
+        {
+            _mapPick = n;
+            _pickDef = LevelAssist.Apply(LevelLibrary.Get(n), _fails.FailsFor(n));
+        }
+
         private void DrawLevelSelect(float w, float h)
         {
             Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "LEVELS", _h2, Visuals.Hex("FFE27A"), 3);
-            Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"{_progress.TotalStars} / {LevelLibrary.Count * 3} ★", _body, Color.white, 1.5f);
-            const int perRow = 5;
-            float gap = w * 0.025f, cell = (w * 0.86f - gap * (perRow - 1)) / perRow, y0 = h * 0.18f;
-            for (int n = 1; n <= LevelLibrary.Count; n++)
+            Outlined(new Rect(0, h * 0.115f, w, h * 0.04f), $"{_progress.TotalStars} ★", _body, Color.white, 1.5f);
+            int frontier = _progress.Frontier;
+            var (first, last) = LevelMap.Visible(_mapBottom, MapSteps);
+            if (_mapPick == 0 && (frontier < first || frontier > last) && Btn(new Rect(w * 0.7f, h * 0.115f, w * 0.26f, h * 0.045f), Loc.F("GO TO {0}", frontier), "FFC24B", "F08A1C", 0.7f))
+                _mapBottom = LevelMap.ClampBottom(LevelMap.StartBottom(frontier), MapSteps);
+
+            float step = MapStep, mapH = MapBottomEdge - MapTop, baseY = mapH - step * 0.5f, node = step * 0.78f;
+            float X(int n) => w * LevelMap.NodeX(n);
+            float Y(int n) => baseY - (n - _mapBottom) * step;
+            int tapped = -1;
+            var tap = _mapTap - new Vector2(0, MapTop);
+            GUI.BeginClip(new Rect(0, MapTop, w, mapH));
+            bool repaint = Event.current.type == EventType.Repaint;
+            if (repaint)
             {
-                int row = (n - 1) / perRow, col = (n - 1) % perRow;
-                var r = new Rect(w * 0.07f + col * (cell + gap), y0 + row * (cell * 1.08f + gap), cell, cell * 1.08f);
+                var (ta, tb, tt) = LevelMap.Blend(_mapBottom + MapSteps / 2);   // backdrop: sky and hills fade from chapter to chapter
+                var full = new Rect(0, 0, w, mapH);
+                Sprite(full, "bg_" + LevelMap.ThemeKeys[ta], Color.white);
+                if (tt > 0.01f) Sprite(full, "bg_" + LevelMap.ThemeKeys[tb], new Color(1, 1, 1, tt));
+                for (int n = first; n <= last; n++) DrawMapProp(n, Y(n), w, step);
+                for (int n = first; n < last; n++)                            // the road between neighbouring nodes
+                {
+                    var a = new Vector2(X(n), Y(n)); var b = new Vector2(X(n + 1), Y(n + 1));
+                    bool done = _progress.StarsFor(n) > 0;
+                    for (int pass = 0; pass < 2; pass++)
+                        for (int k = 1; k < 14; k++)
+                        {
+                            var q = Vector2.Lerp(a, b, k / 14f); float ds = step * (pass == 0 ? 0.17f : 0.11f);
+                            Sprite(new Rect(q.x - ds / 2, q.y - ds / 2, ds, ds), "", pass == 0 ? new Color(0, 0, 0, 0.18f) : done ? new Color(1f, 0.85f, 0.3f, 0.95f) : new Color(1, 1, 1, 0.7f));
+                        }
+                }
+            }
+            for (int n = first; n <= last; n++)
+            {
+                if (!LevelMap.StartsChapter(n)) continue;
+                float bw = w * 0.9f, bh = bw * 96f / 512f;
+                var banner = new Rect((w - bw) / 2, Y(n) + step * 0.5f - bh / 2, bw, bh);
+                if (repaint) Sprite(banner, "ribbon", Color.white);
+                var label = new Rect(banner.x + bw * 0.12f, banner.y, bw * 0.76f, bh * 0.62f);
+                var text = Loc.F("CHAPTER {0}", LevelMap.ChapterOf(n)) + "  ·  " + Loc.L(LevelMap.ThemeNames[LevelMap.ThemeOf(LevelMap.ChapterOf(n))]);
+                Outlined(label, text, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
+            }
+            for (int n = first; n <= last; n++)
+            {
+                float cx = X(n), cy = Y(n);
+                var r = new Rect(cx - node / 2, cy - node / 2, node, node);
                 bool open = _progress.IsUnlocked(n);
                 int stars = _progress.StarsFor(n);
-                string label = open ? $"{n}\n{new string('★', stars)}{new string('☆', 3 - stars)}" : $"{n}";
-                GUI.enabled = open;
-                var (top, bottom) = !open ? ("4A4370", "2E2850") : stars == 3 ? ("FFD54A", "D99A00") : stars > 0 ? ("4BE38A", "1FA45B") : ("6E8BFF", "3A4FE0");
-                if (Btn(r, label, top, bottom, 0.8f)) StartMode(Mode.Level, level: n);
-                GUI.enabled = true;
+                var tier = LevelLibrary.TierOf(n);
+                if (repaint)
+                {
+                    Color c = !open ? Visuals.Hex("6C6590") : stars == 3 ? Visuals.Hex("FFD54A") : stars > 0 ? Visuals.Hex("4BE38A")
+                        : tier == LevelTier.SuperHard ? Visuals.Hex("C04BFF") : tier == LevelTier.Hard ? Visuals.Hex("FF6B6B") : Visuals.Hex(MapColors[LevelMap.ChapterOf(n) % MapColors.Length]);
+                    if (n == frontier) { float pulse = 1.22f + 0.06f * Mathf.Sin(Time.time * 5f); Sprite(new Rect(cx - node * pulse / 2, cy - node * pulse / 2, node * pulse, node * pulse), "", new Color(1, 1, 1, 0.5f)); }
+                    Sprite(r, "node", c);
+                    if (n == 1) Sprite(new Rect(r.x - node * 0.1f, r.y - node * 0.42f, node * 0.55f, node * 0.55f), "crown", Color.white);
+                    if (!open) Sprite(new Rect(r.xMax - node * 0.38f, r.yMax - node * 0.4f, node * 0.34f, node * 0.34f), "lock", Color.white);
+                    if (open) for (int i = 0; i < 3; i++) Sprite(new Rect(cx + (i - 1.5f) * node * 0.3f, cy + node * 0.46f, node * 0.3f, node * 0.3f), i < stars ? "star_on" : "star_off", Color.white);
+                }
+                Outlined(r, n.ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, open ? Color.white : new Color(1, 1, 1, 0.6f), 1.5f);
+                if (tier != LevelTier.Normal && open) Outlined(new Rect(r.xMax - node * 0.28f, r.y - node * 0.08f, node * 0.36f, node * 0.36f), "!", new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, tier == LevelTier.SuperHard ? Visuals.Hex("E7A6FF") : Visuals.Hex("FFB0B0"), 1.2f);
+                if (n == frontier) Outlined(new Rect(cx - node / 2, cy - node * 1.0f + Mathf.Sin(Time.time * 4f) * node * 0.06f, node, node * 0.4f), "▼", new GUIStyle(_body) { wordWrap = false }, Color.white, 1.2f);
+                if (_mapTapped && open && (new Vector2(cx, cy) - tap).sqrMagnitude < node * node * 0.3f) tapped = n;
             }
-            if (Btn(Row(w, h * 0.745f, h * 0.065f), Loc.F("COLLECTION  {0}/{1}", Collection.CompletedPictures(_progress), Collection.Pictures.Length), "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Collection);
-            if (Btn(Row(w, h * 0.88f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            GUI.EndClip();
+            _mapTapped = false;
+            if (tapped > 0) PickLevel(tapped);
+
+            if (_mapPick > 0) { DrawLevelCard(w, h); return; }
+            var left = new Rect(w * 0.06f, h * 0.835f, w * 0.52f, h * 0.075f);
+            if (Btn(left, Loc.F("COLLECTION  {0}/{1}", Collection.CompletedPictures(_progress), Collection.Pictures.Length), "FF8FAB", "D9466F", 0.75f)) ShowMenu(Screen.Collection);
+            if (Btn(new Rect(w * 0.62f, h * 0.835f, w * 0.32f, h * 0.075f), "BACK", "5A4FA8", "3A2F80", 0.85f)) ShowMenu();
+        }
+
+        /// <summary>Level start card: what to reach, best stars so far, then PLAY. Tap outside to close.</summary>
+        private void DrawLevelCard(float w, float h)
+        {
+            var d = _pickDef;
+            if (Event.current.type == EventType.Repaint) { GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(new Rect(0, 0, w, h), Texture2D.whiteTexture); GUI.color = Color.white; }
+            var card = new Rect(w * 0.08f, h * 0.24f, w * 0.84f, h * 0.44f);
+            Panel(card, _cardStyle);
+            Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.07f), Loc.F("LEVEL {0}", d.Number), _h2, Visuals.Hex("FFE27A"), 3);
+            if (d.Tier != LevelTier.Normal)
+                Outlined(new Rect(card.x, card.y + h * 0.085f, card.width, h * 0.04f), d.Tier == LevelTier.SuperHard ? "SUPER HARD LEVEL" : "HARD LEVEL", _small, Visuals.Hex(d.Tier == LevelTier.SuperHard ? "E7A6FF" : "FFB0B0"), 1.2f);
+            if (Event.current.type == EventType.Repaint)
+                for (int i = 0; i < 3; i++) Sprite(new Rect(card.center.x + (i - 1.5f) * h * 0.07f, card.y + h * 0.13f, h * 0.07f, h * 0.07f), i < _progress.StarsFor(d.Number) ? "star_on" : "star_off", Color.white);
+            Outlined(new Rect(card.x, card.y + h * 0.215f, card.width, h * 0.05f), Loc.F("Reach {0} points", d.TargetScore), _body, Color.white, 1.5f);
+            Outlined(new Rect(card.x, card.y + h * 0.265f, card.width, h * 0.04f), Loc.F("{0} moves", d.MaxMoves), _small, new Color(1, 1, 1, 0.8f), 1f);
+            if (_fails.FailsFor(d.Number) > 0) Outlined(new Rect(card.x, card.y + h * 0.3f, card.width, h * 0.035f), "A little help: the target is lower", _small, Visuals.Gold, 1f);
+            int n = d.Number;
+            if (Btn(new Rect(card.x + card.width * 0.15f, card.yMax - h * 0.095f, card.width * 0.7f, h * 0.075f), "PLAY", "4BE38A", "1FA45B")) { _mapPick = 0; StartMode(Mode.Level, level: n); return; }
+            if (GUI.Button(new Rect(0, 0, w, h), GUIContent.none, GUIStyle.none)) _mapPick = 0; // tap outside the card to close
+        }
+
+        /// <summary>Scenery beside the path (sprites tinted by the chapter's colour): a tree, a house or a lamp post.</summary>
+        private void DrawMapProp(int n, float nodeY, float w, float step)
+        {
+            var (kind, px) = LevelMap.PropFor(n);
+            if (kind < 0) return;
+            var c = Color.Lerp(Visuals.Hex(LevelMap.ThemeColors[LevelMap.ThemeOf(LevelMap.ChapterOf(n))]), Color.white, 0.2f) * 0.85f; c.a = 1;
+            float u = step * 0.62f;
+            Sprite(new Rect(w * px - u / 2, nodeY - u * 0.65f, u, u), kind == 0 ? "tree" : kind == 1 ? "house" : "lamp", kind == 2 ? Color.white : c);
         }
 
         private void DrawCollection(float w, float h)
@@ -1408,12 +1522,15 @@ namespace BlockDrop.Game
             if (Btn(new Rect(w * 0.04f, top, bs * 1.6f, bs), "MENU", "5A4FA8", "3A2F80", 0.7f)) { SetPaused(true); return; }
             if (_hintsLeft > 0 && Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), Loc.F("HINT {0}", _hintsLeft), "FFC24B", "F08A1C", 0.7f)) UseHint();
 
+            DrawHudPolish(w, h);
             switch (_mode)
             {
                 case Mode.Level:
                 {
                     var d = _level.Definition;
                     Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), Loc.F("LEVEL {0}", d.Number), _body, Visuals.Hex("FFE27A"), 1.5f);
+                    if (d.Tier != LevelTier.Normal)
+                        Outlined(new Rect(w * 0.27f, top + bs * 0.8f, w * 0.46f, bs * 0.5f), d.Tier == LevelTier.SuperHard ? "SUPER HARD LEVEL" : "HARD LEVEL", _small, Visuals.Hex(d.Tier == LevelTier.SuperHard ? "C04BFF" : "FF6B6B"), 1.2f);
                     Outlined(new Rect(0, h * 0.085f, w, h * 0.06f), Mathf.RoundToInt(_shownScore).ToString(), _h2, Color.white, 3);
                     var bar = new Rect(w * 0.12f, h * 0.178f, w * 0.76f, h * 0.022f);
                     Panel(bar, _barBackStyle);
@@ -1478,12 +1595,13 @@ namespace BlockDrop.Game
                             Outlined(new Rect(w * (0.2f + i * 0.2f) - w * 0.1f, y + h * 0.08f, w * 0.4f, h * 0.12f), earned ? "★" : "☆", st, earned ? Visuals.Gold : new Color(1, 1, 1, 0.35f), 3);
                         }
                     }
-                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? Loc.F("SCORE {0}", _level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
+                    if (won) DrawLevelCelebration(w, h, y, t);
+                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? LevelScoreLine(_level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
                     if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
                     float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
                     if (won && _level.Definition.Number < LevelLibrary.Count && Btn(Row(w, by, bh, 0.14f), "NEXT LEVEL", "4BE38A", "1FA45B")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); }
                     if (Btn(Row(w, by + bh + gap, bh, 0.14f), "RETRY", "FFC24B", "F08A1C")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number); }
-                    if (Btn(Row(w, by + 2 * (bh + gap), bh, 0.14f), "LEVELS", "5A4FA8", "3A2F80")) { ResetStars(); ShowMenu(Screen.LevelSelect); }
+                    LevelResultNav(w, by + 2 * (bh + gap), bh);
                     return;
                 }
                 case Mode.Versus:
@@ -1521,7 +1639,7 @@ namespace BlockDrop.Game
                     break;
                 }
             }
-            if (Btn(Row(w, h * 0.66f, h * 0.07f, 0.14f), "MENU", "5A4FA8", "3A2F80")) ShowMenu();
+            if (HomeBtn(Row(w, h * 0.66f, h * 0.07f, 0.14f))) ShowMenu();
         }
 
         private readonly bool[] _starPlayed = new bool[3];
@@ -1621,31 +1739,79 @@ namespace BlockDrop.Game
             _nameMsg = err ?? Loc.F("Saved! You are {0}", OnlineService.PlayerName);
         }
 
+        private readonly Dictionary<string, GUIStyle> _rankStyles = new Dictionary<string, GUIStyle>();
+        private static readonly string[] EmblemColors = { "FF5D8F", "FFB23E", "3DDC97", "4CC9F0", "9B7BFF", "FF7A59" };
+
+        private GUIStyle RankStyle(string top, string bottom)
+        {
+            string key = top + bottom;
+            if (!_rankStyles.TryGetValue(key, out var st))
+                _rankStyles[key] = st = Sliced(Visuals.RoundedRect(64, 64, 20, Visuals.Hex(top), Visuals.Hex(bottom), 0.1f), 22);
+            return st;
+        }
+
+        private void DrawRankRow(Rect row, OnlineService.Row r)
+        {
+            int medal = Ranking.Medal(r.Rank);
+            string top = medal == 1 ? "FFD54A" : medal == 2 ? "D5DCF2" : medal == 3 ? "E09B63" : "3B2F8F";
+            string bottom = medal == 1 ? "D99A00" : medal == 2 ? "9AA6CF" : medal == 3 ? "B06A35" : "2A2070";
+            Panel(row, RankStyle(top, bottom));
+            if (r.IsMe) Panel(new Rect(row.x - 3, row.y - 3, row.width + 6, row.height + 6), RankStyle("7CF8FF", "4CC9F0"));
+            if (r.IsMe) Panel(row, RankStyle("2F4FB0", "233C8A"));
+
+            Color ink = medal > 0 && !r.IsMe ? Visuals.Hex("3A1B00") : Color.white;
+            float pad = row.height * 0.12f, d = row.height - pad * 2;
+            var rankStyle = new GUIStyle(_h2) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter };
+            Outlined(new Rect(row.x + pad, row.y, row.height * 0.8f, row.height), r.Rank.ToString(), rankStyle, ink, 1.2f);
+
+            var emb = new Rect(row.x + pad + row.height * 0.85f, row.y + pad, d, d);
+            if (Event.current.type == EventType.Repaint)
+            {
+                var old = GUI.color; GUI.color = Visuals.Hex(EmblemColors[Ranking.Emblem(r.Name)]);
+                GUI.DrawTexture(emb, Visuals.Circle.texture); GUI.color = old;
+            }
+            var initial = new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false };
+            Outlined(emb, Ranking.Initial(r.Name), initial, Color.white, 1.2f);
+
+            var pill = new Rect(row.xMax - row.width * 0.3f - pad, row.y + row.height * 0.17f, row.width * 0.3f, row.height * 0.66f);
+            Panel(pill, RankStyle("FFFFFF", "E8E2FF"));
+            var score = new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false };
+            Outlined(pill, Ranking.FormatScore(r.Score), score, Visuals.Hex("3A1B7A"), 0.6f);
+
+            float nx = emb.xMax + pad * 1.2f, nw = pill.x - nx - pad;
+            Ranking.SplitName(r.Name, out var name, out var tag);
+            string sub = r.IsMe ? (tag.Length > 0 ? tag + " · " : "") + Loc.L("(you)") : tag;
+            var left = new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false };
+            var small = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false };
+            Outlined(new Rect(nx, row.y + (sub.Length > 0 ? 0 : row.height * 0.1f), nw, row.height * (sub.Length > 0 ? 0.62f : 0.8f)), name, left, ink, 1f);
+            if (sub.Length > 0) Outlined(new Rect(nx, row.y + row.height * 0.52f, nw, row.height * 0.4f), sub, small, ink, 0.8f);
+        }
+
         private void DrawLeaderboard(float w, float h)
         {
-            Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "LEADERBOARD", _h2, Visuals.Gold, 3);
+            Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "RANKINGS", _h2, Visuals.Gold, 3);
             float half = w * 0.4f;
             bool classic = _boardTab == OnlineService.ClassicBoard;
             if (Btn(new Rect(w * 0.08f, h * 0.14f, half, h * 0.06f), "CLASSIC", classic ? "FFD54A" : "5A4FA8", classic ? "D99A00" : "3A2F80", 0.8f)) { _boardTab = OnlineService.ClassicBoard; OnlineService.Refresh(_boardTab); }
             if (Btn(new Rect(w * 0.92f - half, h * 0.14f, half, h * 0.06f), "DAILY", !classic ? "FFD54A" : "5A4FA8", !classic ? "D99A00" : "3A2F80", 0.8f)) { _boardTab = OnlineService.DailyBoard; OnlineService.Refresh(_boardTab); }
-            var card = new Rect(w * 0.06f, h * 0.22f, w * 0.88f, h * 0.6f);
+            var card = new Rect(w * 0.04f, h * 0.22f, w * 0.92f, h * 0.62f);
             Panel(card, _cardStyle);
-            float y = card.y + h * 0.02f, rh = h * 0.052f;
+            float y = card.y + h * 0.015f, rh = h * 0.058f;
             if (OnlineService.Errors.TryGetValue(_boardTab, out var err)) Outlined(new Rect(card.x, y, card.width, rh * 3), err, _body, Color.white, 1.2f);
             else if (!OnlineService.Ready) Outlined(new Rect(card.x, y, card.width, rh * 2), OnlineService.Status, _body, Color.white, 1.2f);
             else if (!OnlineService.Top.TryGetValue(_boardTab, out var rows)) Outlined(new Rect(card.x, y, card.width, rh), "Loading…", _body, Color.white, 1.2f);
             else if (rows.Count == 0) Outlined(new Rect(card.x, y, card.width, rh * 2), "No scores yet.\nBe the first!", _body, Color.white, 1.2f);
             else
+            {
+                rh = Mathf.Min(rh, (card.height - h * 0.03f) / rows.Count);
+                float gap = rh * 0.08f;
                 foreach (var r in rows)
                 {
-                    var c = r.IsMe ? Visuals.Hex("7CF8FF") : r.Rank == 1 ? Visuals.Gold : Color.white;
-                    var left = new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft };
-                    var right = new GUIStyle(_body) { alignment = TextAnchor.MiddleRight };
-                    Outlined(new Rect(card.x + w * 0.05f, y, card.width * 0.65f, rh), $"{r.Rank}.  {r.Name}{(r.IsMe ? " " + Loc.L("(you)") : "")}", left, c, 1.2f);
-                    Outlined(new Rect(card.x, y, card.width - w * 0.05f, rh), r.Score.ToString(), right, c, 1.2f);
+                    DrawRankRow(new Rect(card.x + card.width * 0.03f, y, card.width * 0.94f, rh - gap), r);
                     y += rh;
                 }
-            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            }
+            if (Btn(Row(w, h * 0.87f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
         private void DrawFloaters(float w)

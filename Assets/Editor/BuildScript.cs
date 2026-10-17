@@ -76,6 +76,20 @@ namespace BlockDrop.EditorTools
             Debug.Log("PreExportAppBundle: building .aab for Google Play");
         }
 
+        /// <summary>Unity Build Automation "Pre-export method" for the Preview target: an installable .apk with its own
+        /// app id, name and version code, so it installs next to the Play version without touching it. Never set this
+        /// on the Play Release target.</summary>
+        public static void PreExportPreview()
+        {
+            EditorUserBuildSettings.buildAppBundle = false;
+            PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.sabin.blockdrop.preview");
+            PlayerSettings.productName = "Block Drop Preview";
+            PlayerSettings.bundleVersion = "preview";
+            // Unity Build Automation numbers each build; reuse it so a newer preview always installs over an older one.
+            PlayerSettings.Android.bundleVersionCode = int.TryParse(System.Environment.GetEnvironmentVariable("UCB_BUILD_NUMBER"), out int n) && n > 0 ? n : 1;
+            Debug.Log("PreExportPreview: building com.sabin.blockdrop.preview .apk");
+        }
+
         /// <summary>Puts IL2CPP symbol tables inside the .aab so Play Console's Android vitals shows readable
         /// crash stacks. Set by reflection: the API lives in the Android build-support assembly, which a
         /// machine without Android support doesn't have, and a missing type must not break editor scripts.</summary>

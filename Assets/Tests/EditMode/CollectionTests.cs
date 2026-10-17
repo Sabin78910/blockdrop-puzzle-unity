@@ -6,7 +6,7 @@ public class CollectionTests
 {
     [Test] public void OnePictureFor10LevelsAndValidArt()
     {
-        Assert.AreEqual(LevelLibrary.Count, Collection.Pictures.Length * Collection.TilesPerPicture);
+        Assert.AreEqual(LevelLibrary.Handmade, Collection.Pictures.Length * Collection.TilesPerPicture);
         foreach (var pic in Collection.Pictures)
         {
             Assert.AreEqual(Collection.Height, pic.Rows.Length, pic.Name);

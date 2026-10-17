@@ -17,6 +17,9 @@ namespace BlockDrop.Core
         private readonly int[,] _cells;
         public int Score { get; private set; }
         public int Combo { get; private set; }
+        /// <summary>Pieces placed and lines cleared so far; sent with scores so the server can sanity-check them.</summary>
+        public int Placements { get; private set; }
+        public int LinesCleared { get; private set; }
 
         public Board(int size = 8)
         {
@@ -59,9 +62,15 @@ namespace BlockDrop.Core
             return (rows, cols);
         }
 
+        /// <summary>Puts back a saved score and counters (resuming a game). Cells are restored with <see cref="SetCell"/>.</summary>
+        public void RestoreScore(int score, int combo, int placements, int linesCleared)
+        {
+            Score = score; Combo = combo; Placements = placements; LinesCleared = linesCleared;
+        }
+
         public Board Clone()
         {
-            var b = new Board(Size) { Score = Score, Combo = Combo };
+            var b = new Board(Size) { Score = Score, Combo = Combo, Placements = Placements, LinesCleared = LinesCleared };
             System.Array.Copy(_cells, b._cells, _cells.Length);
             return b;
         }
@@ -119,6 +128,8 @@ namespace BlockDrop.Core
                 Combo = 0;
             }
             Score += points;
+            Placements++;
+            LinesCleared += lines;
             return new PlaceResult(lines, points);
         }
 

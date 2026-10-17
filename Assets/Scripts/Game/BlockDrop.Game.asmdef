@@ -4,7 +4,8 @@
     "BlockDrop.Core",
     "Unity.Services.Core",
     "Unity.Services.Authentication",
-    "Unity.Services.Leaderboards"
+    "Unity.Services.Leaderboards",
+    "Unity.Services.CloudCode"
   ],
   "autoReferenced": true
 }

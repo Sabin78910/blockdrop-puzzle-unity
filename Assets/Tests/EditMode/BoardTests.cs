@@ -28,6 +28,18 @@ public class BoardTests
         Assert.AreEqual(1, b.Combo);
     }
 
+    [Test] public void CountsPlacementsAndLinesForScoreChecks()
+    {
+        var b = new Board(8);
+        b.Place(Line(4), 0, 3);
+        b.Place(Line(4), 4, 3);
+        Assert.AreEqual(2, b.Placements);
+        Assert.AreEqual(1, b.LinesCleared);
+        var copy = b.Clone();
+        Assert.AreEqual(2, copy.Placements);
+        Assert.AreEqual(1, copy.LinesCleared);
+    }
+
     [Test] public void ClearsRowAndColumnTogether()
     {
         var b = new Board(3);

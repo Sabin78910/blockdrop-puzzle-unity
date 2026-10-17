@@ -175,5 +175,15 @@ namespace BlockDrop.Tests
             foreach (var key in new[] { "CHAPTER {0} COMPLETE!", "NEW STAR RECORD!", "NEXT: LEVEL {0}", "SCORE {0}   +{1} ●" })
                 Assert.IsTrue(Coach.Table.ContainsKey(key), key);
         }
+
+        [Test]
+        public void Settings_text_is_translated_into_both_languages()
+        {
+            foreach (var key in new[] { "SETTINGS", "MORE WAYS TO PLAY", "OPTIONS" })
+            {
+                Assert.IsTrue(Coach.Table.ContainsKey(key), key);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(Coach.Table[key].es) || string.IsNullOrWhiteSpace(Coach.Table[key].pt), key);
+            }
+        }
     }
 }

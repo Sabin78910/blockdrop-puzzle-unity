@@ -134,6 +134,7 @@ namespace BlockDrop.Core
         public static readonly Dictionary<string, (string es, string pt)> Table = new Dictionary<string, (string, string)>
         {
             ["SKIP"] = ("SALTAR", "PULAR"),
+            ["SETTINGS"] = ("AJUSTES", "CONFIGURAÇÕES"), ["MORE WAYS TO PLAY"] = ("MÁS FORMAS DE JUGAR", "MAIS FORMAS DE JOGAR"), ["OPTIONS"] = ("OPCIONES", "OPÇÕES"),
             ["BLOCKY"] = ("BLOCKY", "BLOCKY"),
             ["HOME"] = ("INICIO", "INÍCIO"),
             ["STEP {0} OF {1}"] = ("PASO {0} DE {1}", "PASSO {0} DE {1}"),

@@ -12,7 +12,7 @@ namespace BlockDrop.Game
     /// vs-AI, 2-player, challenge codes and online leaderboards. Fully playable offline.</summary>
     public sealed partial class GameController : MonoBehaviour
     {
-        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection }
+        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection, Settings }
         private enum Mode { Classic, Daily, Level, Versus, VsAi, Challenge }
 
         private const int Size = 8;
@@ -1072,6 +1072,7 @@ namespace BlockDrop.Game
                 case Screen.Themes: DrawThemes(w, h); break;
                 case Screen.Trophies: DrawTrophies(w, h); break;
                 case Screen.Collection: DrawCollection(w, h); break;
+                case Screen.Settings: DrawSettings(w, h); break;
             }
             GUI.enabled = true;
             DrawFloaters(w);
@@ -1210,41 +1211,7 @@ namespace BlockDrop.Game
             if (NewLook.On) Outlined(new Rect(0, h * 0.216f + bob, w, h * 0.03f), "Fair hands. Every game.", _small, Visuals.Hex("B9B8E8"), 1f);
             // Five quick taps on the logo switch the new look on or off (for testing on a device before it ships on).
             if (GUI.Button(new Rect(w * 0.2f, h * 0.075f, w * 0.6f, h * 0.15f), GUIContent.none, GUIStyle.none)) LogoTapped();
-            float y = h * 0.245f, bh = h * 0.064f, gap = h * 0.011f;
-            float half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
-            if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) StartMode(Mode.Classic);
-            y += bh * 1.2f + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), Loc.F("LEVELS {0}★", _progress.TotalStars), "FFC24B", "F08A1C", 0.85f)) ShowMenu(Screen.LevelSelect);
-            if (Btn(new Rect(x2, y, half, bh), "DAILY", "4FD8FF", "1C8FE0", 0.85f)) StartMode(Mode.Daily);
-            y += bh + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);
-            if (Btn(new Rect(x2, y, half, bh), "2 PLAYERS", "FF7AB6", "E0347C", 0.85f)) StartMode(Mode.Versus);
-            y += bh + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), "CHALLENGE", "6E8BFF", "3A4FE0", 0.85f)) { _codeError = ""; ShowMenu(Screen.Challenge); }
-            if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.85f)) { OnlineService.Refresh(_boardTab); ShowMenu(Screen.Leaderboard); }
-            y += bh + gap;
-            int ready = 0; for (int i = 0; i < 3; i++) if (_meta.IsComplete(i, Today) && !_meta.Claimed[i]) ready++;
-            var missionsRect = new Rect(w * 0.08f, y, half, bh);
-            if (Btn(missionsRect, "MISSIONS", "2EE59D", "13A86E", 0.85f)) ShowMenu(Screen.Missions);
-            if (ready > 0) Badge(missionsRect, ready);
-            if (Btn(new Rect(x2, y, half, bh), "THEMES", "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Themes);
-            y += bh + gap * 2;
-            float third = (w * 0.84f - gap * 2) / 3f, sw = NewLook.On ? third : half, ts = NewLook.On ? 0.5f : 0.66f;
-            if (Btn(new Rect(w * 0.08f, y, sw, bh * 0.7f), _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", "5A4FA8", "3A2F80", ts))
-            { _fx.SoundOn = !_fx.SoundOn; PlayerPrefs.SetInt("sound", _fx.SoundOn ? 1 : 0); }
-            if (Btn(new Rect(w * 0.08f + sw + gap, y, sw, bh * 0.7f), _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", "5A4FA8", "3A2F80", ts))
-            { _fx.HapticsOn = !_fx.HapticsOn; PlayerPrefs.SetInt("haptics", _fx.HapticsOn ? 1 : 0); }
-            if (NewLook.On && Btn(new Rect(w * 0.08f + (third + gap) * 2, y, third, bh * 0.7f), NewLook.ReducedMotion ? "MOTION: REDUCED" : "MOTION: FULL", "5A4FA8", "3A2F80", ts))
-                NewLook.ToggleMotion();
-            y += bh * 0.7f + gap;
-            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
-            if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
-            var playerRow = NewLook.On ? new Rect(w * 0.08f, y, half, bh * 0.7f) : Row(w, y, bh * 0.7f);
-            if (Btn(playerRow, Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.66f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
-            // Block patterns (a shape on each colour) sit beside the name in the new look.
-            if (NewLook.On && Btn(new Rect(x2, y, half, bh * 0.7f), NewLook.PatternsOn ? "PATTERNS: ON" : "PATTERNS: OFF", "2B2470", "1C1650", 0.66f))
-                NewLook.TogglePatterns();
-            y += bh * 0.7f + gap;
+            float y = DrawHomeButtons(w, h, h * 0.245f);
             Outlined(new Rect(0, y, w, h * 0.035f), Loc.F("BEST {0}   ·   {1}", _best, Loc.L(OnlineService.Ready ? "ONLINE" : "OFFLINE")), _small, new Color(1, 1, 1, 0.85f), 1.5f);
 
             if (_welcomeReward > 0)

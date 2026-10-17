@@ -177,6 +177,64 @@ namespace BlockDrop.Game
             return Coach.F("SCORE {0}   +{1} ●", score, LevelCelebration.CountUp(_levelCoins, since));
         }
 
+        // ---------- home and settings ----------
+
+        /// <summary>The home screen shows only the rewarding choices; everything else lives under SETTINGS.
+        /// Returns the y below the last button.</summary>
+        private float DrawHomeButtons(float w, float h, float y)
+        {
+            float bh = h * 0.088f, gap = h * 0.016f, half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
+            if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) StartMode(Mode.Classic);
+            y += bh * 1.2f + gap;
+            if (Btn(new Rect(w * 0.08f, y, half, bh), Loc.F("LEVELS {0}★", _progress.TotalStars), "FFC24B", "F08A1C", 0.95f)) ShowMenu(Screen.LevelSelect);
+            if (Btn(new Rect(x2, y, half, bh), "DAILY", "4FD8FF", "1C8FE0", 0.95f)) StartMode(Mode.Daily);
+            y += bh + gap;
+            int ready = 0; for (int i = 0; i < 3; i++) if (_meta.IsComplete(i, Today) && !_meta.Claimed[i]) ready++;
+            var missionsRect = new Rect(w * 0.08f, y, half, bh);
+            if (Btn(missionsRect, "MISSIONS", "2EE59D", "13A86E", 0.95f)) ShowMenu(Screen.Missions);
+            if (ready > 0) Badge(missionsRect, ready);
+            if (Btn(new Rect(x2, y, half, bh), "THEMES", "FF8FAB", "D9466F", 0.95f)) ShowMenu(Screen.Themes);
+            y += bh + gap * 1.5f;
+            if (Btn(Row(w, y, bh * 0.75f, 0.22f), Coach.T("SETTINGS"), "5A4FA8", "3A2F80", 0.8f)) ShowMenu(Screen.Settings);
+            return y + bh * 0.75f + gap;
+        }
+
+        /// <summary>Everything that left the home screen: the other game modes, rankings, and the options.</summary>
+        private void DrawSettings(float w, float h)
+        {
+            float bh = h * 0.07f, gap = h * 0.012f, half = (w * 0.84f - gap) / 2f, x1 = w * 0.08f, x2 = x1 + half + gap;
+            var label = new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false };
+            Outlined(new Rect(0, h * 0.04f, w, h * 0.07f), Coach.T("SETTINGS"), _h2, Color.white, 3);
+            float y = h * 0.13f;
+            Outlined(new Rect(0, y, w, h * 0.03f), Coach.T("MORE WAYS TO PLAY"), label, Visuals.Hex("C9A7FF"), 1.2f);
+            y += h * 0.035f;
+            if (Btn(new Rect(x1, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);
+            if (Btn(new Rect(x2, y, half, bh), "2 PLAYERS", "FF7AB6", "E0347C", 0.85f)) StartMode(Mode.Versus);
+            y += bh + gap;
+            if (Btn(new Rect(x1, y, half, bh), "CHALLENGE", "6E8BFF", "3A4FE0", 0.85f)) { _codeError = ""; ShowMenu(Screen.Challenge); }
+            if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.85f)) { OnlineService.Refresh(_boardTab); ShowMenu(Screen.Leaderboard); }
+            y += bh + gap * 3f;
+
+            Outlined(new Rect(0, y, w, h * 0.03f), Coach.T("OPTIONS"), label, Visuals.Hex("C9A7FF"), 1.2f);
+            y += h * 0.035f;
+            float sh = bh * 0.85f;
+            if (Btn(new Rect(x1, y, half, sh), _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", "5A4FA8", "3A2F80", 0.75f))
+            { _fx.SoundOn = !_fx.SoundOn; PlayerPrefs.SetInt("sound", _fx.SoundOn ? 1 : 0); }
+            if (Btn(new Rect(x2, y, half, sh), _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", "5A4FA8", "3A2F80", 0.75f))
+            { _fx.HapticsOn = !_fx.HapticsOn; PlayerPrefs.SetInt("haptics", _fx.HapticsOn ? 1 : 0); }
+            y += sh + gap;
+            if (NewLook.On)
+            {
+                if (Btn(new Rect(x1, y, half, sh), NewLook.ReducedMotion ? "MOTION: REDUCED" : "MOTION: FULL", "5A4FA8", "3A2F80", 0.75f)) NewLook.ToggleMotion();
+                if (Btn(new Rect(x2, y, half, sh), NewLook.PatternsOn ? "PATTERNS: ON" : "PATTERNS: OFF", "5A4FA8", "3A2F80", 0.75f)) NewLook.TogglePatterns();
+                y += sh + gap;
+            }
+            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
+            if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
+            if (Btn(Row(w, y, sh, 0.08f), Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.75f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
+            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+        }
+
         // ---------- end of game ----------
 
         private bool HomeBtn(Rect r) => Btn(r, Coach.T("HOME"), "5A4FA8", "3A2F80");

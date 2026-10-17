@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace BlockDrop.Core
 {
-    public enum Lang { En, Es, Pt }
+    public enum Lang { En, Es, Pt, Ne }
 
     /// <summary>English text is the key. Spanish (Latin America) and Portuguese (Brazil) first: Brazil and Mexico
     /// are the top growth markets for block puzzles. Missing keys fall back to English.</summary>
@@ -12,19 +12,21 @@ namespace BlockDrop.Core
     {
         public static Lang Current = Lang.En;
 
-        public static readonly string[] Names = { "ENGLISH", "ESPAÑOL", "PORTUGUÊS" };
+        public static readonly string[] Names = { "ENGLISH", "ESPAÑOL", "PORTUGUÊS", "नेपाली" };
 
         public static Lang FromCode(string code)
         {
             code = (code ?? "").ToLowerInvariant();
-            return code.StartsWith("es") ? Lang.Es : code.StartsWith("pt") ? Lang.Pt : Lang.En;
+            return code.StartsWith("es") ? Lang.Es : code.StartsWith("pt") ? Lang.Pt : code.StartsWith("ne") ? Lang.Ne : Lang.En;
         }
 
-        public static string Code(Lang l) => l == Lang.Es ? "es" : l == Lang.Pt ? "pt" : "en";
+        public static string Code(Lang l) => l == Lang.Es ? "es" : l == Lang.Pt ? "pt" : l == Lang.Ne ? "ne" : "en";
 
         public static string L(string en)
         {
-            if (Current == Lang.En || string.IsNullOrEmpty(en) || !Table.TryGetValue(en, out var t)) return en;
+            if (Current == Lang.En || string.IsNullOrEmpty(en)) return en;
+            if (Current == Lang.Ne) return Nepali.Table.TryGetValue(en, out var n) ? n : en;
+            if (!Table.TryGetValue(en, out var t)) return en;
             return Current == Lang.Es ? t.es : t.pt;
         }
 
@@ -133,6 +135,12 @@ namespace BlockDrop.Core
             ["One cell away from a clear!"] = ("¡A una casilla de borrar una línea!", "A uma casa de limpar uma linha!"),
             ["MOTION: FULL"] = ("MOVIMIENTO: COMPLETO", "MOVIMENTO: COMPLETO"), ["MOTION: REDUCED"] = ("MOVIMIENTO: REDUCIDO", "MOVIMENTO: REDUZIDO"),
             ["PATTERNS: ON"] = ("PATRONES: SÍ", "PADRÕES: SIM"), ["PATTERNS: OFF"] = ("PATRONES: NO", "PADRÕES: NÃO"),
+            ["HARD LEVEL"] = ("NIVEL DIFÍCIL", "NÍVEL DIFÍCIL"), ["SUPER HARD LEVEL"] = ("NIVEL SÚPER DIFÍCIL", "NÍVEL SUPERDIFÍCIL"),
+            ["CHAPTER {0}"] = ("CAPÍTULO {0}", "CAPÍTULO {0}"), ["GO TO {0}"] = ("IR A {0}", "IR PARA {0}"),
+            ["Sunny Meadow"] = ("Prado Soleado", "Prado Ensolarado"), ["Pink Dusk"] = ("Atardecer Rosa", "Crepúsculo Rosa"), ["Blue Lagoon"] = ("Laguna Azul", "Lagoa Azul"),
+            ["Violet Night"] = ("Noche Violeta", "Noite Violeta"), ["Golden Dunes"] = ("Dunas Doradas", "Dunas Douradas"), ["Mint Frost"] = ("Escarcha de Menta", "Gelo de Menta"),
+            ["A little help: the target is lower"] = ("Un poco de ayuda: la meta es menor", "Uma ajudinha: a meta está menor"), ["+{0} ●"] = ("+{0} ●", "+{0} ●"),
+            ["Reach {0} points"] = ("Llega a {0} puntos", "Chegue a {0} pontos"), ["{0} moves"] = ("{0} movimientos", "{0} jogadas"),
             ["NEW LOOK ON"] = ("NUEVO ESTILO ACTIVADO", "NOVO VISUAL LIGADO"), ["NEW LOOK OFF"] = ("NUEVO ESTILO DESACTIVADO", "NOVO VISUAL DESLIGADO"),
         };
     }

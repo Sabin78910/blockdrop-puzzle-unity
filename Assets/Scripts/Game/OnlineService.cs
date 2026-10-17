@@ -67,6 +67,7 @@ namespace BlockDrop.Game
         {
             try
             {
+                if (IsPreview) return; // test builds never post to the live leaderboard
                 await EnsureReady();
                 if (!Ready || result.Score <= 0) return;
                 var args = new Dictionary<string, object>
@@ -80,6 +81,9 @@ namespace BlockDrop.Game
             }
             catch (Exception e) { Debug.LogWarning($"Score submit failed ({board}): {e.Message}"); }
         }
+
+        /// <summary>The Preview Cloud Build target installs as com.sabin.blockdrop.preview.</summary>
+        public static bool IsPreview => Application.identifier.EndsWith("preview", StringComparison.Ordinal);
 
         [Serializable] private class SubmitReply { public bool accepted; public string reason; }
 

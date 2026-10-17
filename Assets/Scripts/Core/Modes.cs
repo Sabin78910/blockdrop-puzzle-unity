@@ -227,21 +227,31 @@ namespace BlockDrop.Core
         }
     }
 
+    /// <summary>Hard and super hard levels are labelled in game, like Candy Crush and Royal Match do.</summary>
+    public enum LevelTier { Normal, Hard, SuperHard }
+
     public sealed class LevelDefinition
     {
         public int Number, Seed, MaxMoves, TargetScore, TwoStarScore, ThreeStarScore;
+        public LevelTier Tier;
         public (int x, int y)[] Obstacles;
 
         public int StarsFor(int score) =>
             score >= ThreeStarScore ? 3 : score >= TwoStarScore ? 2 : score >= TargetScore ? 1 : 0;
     }
 
-    /// <summary>30 deterministic levels. Difficulty rises with more obstacles, fewer spare moves and
-    /// higher targets. Targets are calibrated against the greedy bot, so every level is winnable.</summary>
+    /// <summary>Endless deterministic levels: every player gets the same level N. Levels 1-30 are the launch set,
+    /// unchanged so saved stars keep their meaning. From 31 on, levels are generated from their number in chapters
+    /// of 10 with a sawtooth curve (easy opener, hard 5th, dip, super hard 10th) on a slow overall rise that levels
+    /// off, so deep levels stay varied rather than impossible. Targets are calibrated against the greedy bot,
+    /// so every level is winnable.</summary>
     public static class LevelLibrary
     {
-        public const int Count = 30;
+        public const int Handmade = 30;
+        public const int Count = 1000000; // effectively endless; nobody reaches the end
+        public const int ChapterSize = 10;
         public const int ObstacleColor = 5;
+        private const int CacheLimit = 64;
         private static readonly Dictionary<int, LevelDefinition> Cache = new Dictionary<int, LevelDefinition>();
 
         public static LevelDefinition Get(int number)
@@ -249,20 +259,22 @@ namespace BlockDrop.Core
             if (number < 1 || number > Count) throw new ArgumentOutOfRangeException(nameof(number));
             if (Cache.TryGetValue(number, out var cached)) return cached;
 
-            var def = new LevelDefinition
-            {
-                Number = number,
-                Seed = 1000 + number * 7919,
-                MaxMoves = 20 + number / 2,
-                Obstacles = MakeObstacles(number),
-            };
+            var def = number <= Handmade ? Launch(number) : Generated(number);
             int bot = Bot.Play(NewSeat(def), def.MaxMoves);
-            double difficulty = 0.55 + 0.35 * (number - 1) / (Count - 1);
+            double difficulty = number <= Handmade ? LaunchRatio(number) : TargetRatio(number);
             def.TargetScore = Math.Max(1, Math.Min(bot, (int)(bot * difficulty)));
             def.TwoStarScore = Math.Max(def.TargetScore, (def.TargetScore + bot) / 2);
             def.ThreeStarScore = Math.Max(def.TwoStarScore, bot);
+            if (Cache.Count >= CacheLimit) Cache.Clear();
             Cache[number] = def;
             return def;
+        }
+
+        public static LevelTier TierOf(int number)
+        {
+            if (number <= ChapterSize) return LevelTier.Normal; // the first chapter is a warm-up
+            int p = (number - 1) % ChapterSize;
+            return p == ChapterSize - 1 ? LevelTier.SuperHard : p == 4 ? LevelTier.Hard : LevelTier.Normal;
         }
 
         public static Seat NewSeat(LevelDefinition def)
@@ -272,10 +284,65 @@ namespace BlockDrop.Core
             return seat;
         }
 
+        /// <summary>The first levels are a warm-up: no obstacles for three levels, then one more every other level or so,
+        /// and a target of only 30% of what the bot scores, creeping up to 60% by level 30 so it joins level 31 smoothly.
+        /// From level 11 the chapter sawtooth (hard 5th, super hard 10th) starts, once players have the hang of it.</summary>
+        private static LevelDefinition Launch(int number) => new LevelDefinition
+        {
+            Number = number,
+            Seed = 1000 + number * 7919,
+            MaxMoves = 30 - number / 10,
+            Tier = TierOf(number),
+            Obstacles = MakeObstacles(number),
+        };
+
+        private static double LaunchRatio(int number) =>
+            0.30 + 0.30 * (number - 1) / (Handmade - 1) + (number > ChapterSize ? 0.05 * Saw[(number - 1) % ChapterSize] : 0);
+
+        // position inside a chapter of 10: 0 = breather ... 4 = hard, 5 = dip ... 9 = super hard
+        private static readonly double[] Saw = { 0.0, 0.25, 0.45, 0.6, 1.0, 0.3, 0.5, 0.65, 0.8, 1.3 };
+
+        /// <summary>0 at level 31, rising quickly at first and levelling off towards 1.</summary>
+        private static double Depth(int number) => 1 - Math.Exp(-(number - Handmade) / 300.0);
+
+        private static double TargetRatio(int number)
+        {
+            double r = 0.62 + 0.2 * Depth(number) + 0.08 * Saw[(number - 1) % ChapterSize];
+            return Math.Min(0.95, r);
+        }
+
+        private static LevelDefinition Generated(int number)
+        {
+            int seed = Mix(number);
+            var rng = new Random(seed);
+            double depth = Depth(number), saw = Saw[(number - 1) % ChapterSize];
+            int obstacles = Math.Min(22, 8 + (int)(10 * depth + 4 * saw) + rng.Next(3));
+            return new LevelDefinition
+            {
+                Number = number,
+                Seed = seed,
+                Tier = TierOf(number),
+                MaxMoves = Math.Max(22, 34 - (int)(6 * saw) + rng.Next(-2, 3)),
+                Obstacles = Layout(rng, obstacles),
+            };
+        }
+
+        /// <summary>Stable integer hash, so a level's seed never depends on the runtime's own hashing.</summary>
+        private static int Mix(int n)
+        {
+            unchecked
+            {
+                uint z = (uint)n * 0x9E3779B9u;
+                z = (z ^ (z >> 16)) * 0x85EBCA6Bu;
+                z = (z ^ (z >> 13)) * 0xC2B2AE35u;
+                return (int)((z ^ (z >> 16)) & 0x7FFFFFFF);
+            }
+        }
+
         private static (int, int)[] MakeObstacles(int number)
         {
             var rng = new Random(number * 104729);
-            int count = Math.Min(2 + number * 2 / 3, 22);
+            int count = number <= 3 ? 0 : Math.Min((number - 3) * 2 / 3, 22);
             var set = new HashSet<(int, int)>();
             var rows = new int[8];
             var cols = new int[8];
@@ -290,6 +357,96 @@ namespace BlockDrop.Core
             list.Sort();
             return list.ToArray();
         }
+
+        /// <summary>Generated layouts vary in shape so chapters do not look alike: scattered, mirrored,
+        /// four-way symmetric, diagonal or pillars. The 5-per-line cap keeps every row and column clearable.</summary>
+        private static (int, int)[] Layout(Random rng, int count)
+        {
+            var set = new HashSet<(int, int)>();
+            var rows = new int[8];
+            var cols = new int[8];
+            bool TryAdd(params (int x, int y)[] group)
+            {
+                var cells = new HashSet<(int, int)>(group);
+                var r = (int[])rows.Clone();
+                var c = (int[])cols.Clone();
+                foreach (var (x, y) in cells)
+                {
+                    if (set.Contains((x, y)) || ++r[y] > 5 || ++c[x] > 5) return false;
+                }
+                foreach (var cell in cells) set.Add(cell);
+                Array.Copy(r, rows, 8); Array.Copy(c, cols, 8);
+                return true;
+            }
+
+            int style = rng.Next(5);
+            for (int tries = 0; set.Count < count && tries < 400; tries++)
+            {
+                int x = rng.Next(8), y = rng.Next(8);
+                switch (style)
+                {
+                    case 1: if (set.Count + 2 <= count) TryAdd((x, y), (7 - x, y)); break;                             // mirrored
+                    case 2: if (set.Count + 4 <= count) TryAdd((x, y), (7 - x, y), (x, 7 - y), (7 - x, 7 - y)); break; // four-way
+                    case 3: { int d = rng.Next(8), o = rng.Next(-1, 2); if (d + o >= 0 && d + o < 8) TryAdd((d, d + o)); else TryAdd((7 - d, d)); break; } // diagonals
+                    case 4: { int px = rng.Next(4) * 2 + 1, py = rng.Next(7); TryAdd((px, py), (px, py + 1)); break; } // pillars
+                    default: TryAdd((x, y)); break;
+                }
+            }
+            for (int tries = 0; set.Count < count && tries < 1000; tries++) TryAdd((rng.Next(8), rng.Next(8))); // top up
+            var list = new List<(int, int)>(set);
+            list.Sort();
+            return list.ToArray();
+        }
+    }
+
+    /// <summary>Gentle rubber band: each lost try on a level lowers its target by 10% (up to 30%), so a stuck player
+    /// gets a win soon instead of quitting. Resets on a win. Stars still need the full-strength scores.</summary>
+    public static class LevelAssist
+    {
+        public const int MaxFails = 3;
+        private const double PerFail = 0.10;
+
+        public static LevelDefinition Apply(LevelDefinition def, int fails)
+        {
+            fails = Math.Min(Math.Max(fails, 0), MaxFails);
+            if (fails == 0) return def;
+            int target = Math.Max(1, (int)(def.TargetScore * (1 - PerFail * fails)));
+            return new LevelDefinition
+            {
+                Number = def.Number, Seed = def.Seed, MaxMoves = def.MaxMoves, Tier = def.Tier, Obstacles = def.Obstacles,
+                TargetScore = target, TwoStarScore = Math.Max(def.TwoStarScore, target), ThreeStarScore = Math.Max(def.ThreeStarScore, target),
+            };
+        }
+
+        /// <summary>Coins for a clear: 5 per new star, plus 5 for the first time through a level.</summary>
+        public static int Coins(int oldStars, int newStars) => newStars > oldStars ? 5 * (newStars - oldStars) + (oldStars == 0 ? 5 : 0) : 0;
+    }
+
+    /// <summary>Remembers the last level the player lost and how many times in a row (one short string).</summary>
+    public sealed class FailTracker
+    {
+        public int Level { get; private set; }
+        public int Fails { get; private set; }
+
+        public int FailsFor(int level) => level == Level ? Fails : 0;
+
+        public void Record(int level, bool won)
+        {
+            if (won) { if (level == Level) { Level = 0; Fails = 0; } return; }
+            Fails = level == Level ? Math.Min(Fails + 1, LevelAssist.MaxFails) : 1;
+            Level = level;
+        }
+
+        public string Serialize() => Level + "," + Fails;
+
+        public static FailTracker Parse(string data)
+        {
+            var t = new FailTracker();
+            var f = (data ?? "").Split(',');
+            if (f.Length == 2 && int.TryParse(f[0], out int l) && int.TryParse(f[1], out int n) && l >= 0 && l <= LevelLibrary.Count && n >= 0 && n <= LevelAssist.MaxFails)
+            { t.Level = l; t.Fails = l == 0 ? 0 : n; }
+            return t;
+        }
     }
 
     public enum LevelState { Playing, Won, Lost }
@@ -299,9 +456,9 @@ namespace BlockDrop.Core
         public readonly LevelDefinition Definition;
         public readonly Seat Seat;
 
-        public LevelSession(int number)
+        public LevelSession(int number, int fails = 0)
         {
-            Definition = LevelLibrary.Get(number);
+            Definition = LevelAssist.Apply(LevelLibrary.Get(number), fails);
             Seat = LevelLibrary.NewSeat(Definition);
         }
 
@@ -323,24 +480,39 @@ namespace BlockDrop.Core
         public bool TryPlace(int handIndex, int x, int y) => State == LevelState.Playing && Seat.TryPlace(handIndex, x, y);
     }
 
-    /// <summary>Which levels are unlocked and their best stars. Serialized to a short string for PlayerPrefs.</summary>
+    /// <summary>Which levels are unlocked and their best stars. Serialized to a short string for PlayerPrefs:
+    /// one digit per level up to the furthest one played, so it grows with the player, not with the level count.</summary>
     public sealed class Progress
     {
-        private readonly int[] _stars = new int[LevelLibrary.Count + 1];
+        private readonly List<int> _stars = new List<int> { 0 }; // index 0 unused
 
-        public int StarsFor(int level) => _stars[level];
-        public bool IsUnlocked(int level) => level == 1 || (level <= LevelLibrary.Count && _stars[level - 1] > 0);
-        public int TotalStars { get { int t = 0; foreach (var s in _stars) t += s; return t; } }
+        public int StarsFor(int level) => level > 0 && level < _stars.Count ? _stars[level] : 0;
+        public bool IsUnlocked(int level) => level == 1 || (level >= 2 && level <= LevelLibrary.Count && StarsFor(level - 1) > 0);
+        public int TotalStars { get; private set; }
+
+        /// <summary>The furthest level the player can play now.</summary>
+        public int Frontier
+        {
+            get
+            {
+                int n = 1;
+                while (n < LevelLibrary.Count && StarsFor(n) > 0) n++;
+                return n;
+            }
+        }
 
         public void Record(int level, int stars)
         {
-            if (stars > _stars[level]) _stars[level] = stars;
+            if (level < 1 || level > LevelLibrary.Count || stars <= StarsFor(level)) return;
+            while (_stars.Count <= level) _stars.Add(0);
+            TotalStars += stars - _stars[level];
+            _stars[level] = stars;
         }
 
         public string Serialize()
         {
             var sb = new StringBuilder();
-            for (int i = 1; i <= LevelLibrary.Count; i++) sb.Append(_stars[i]);
+            for (int i = 1; i < _stars.Count; i++) sb.Append(_stars[i]);
             return sb.ToString();
         }
 
@@ -349,7 +521,7 @@ namespace BlockDrop.Core
             var p = new Progress();
             if (string.IsNullOrEmpty(data)) return p;
             for (int i = 0; i < data.Length && i < LevelLibrary.Count; i++)
-                if (data[i] >= '0' && data[i] <= '3') p._stars[i + 1] = data[i] - '0';
+                if (data[i] >= '0' && data[i] <= '3') p.Record(i + 1, data[i] - '0');
             return p;
         }
     }

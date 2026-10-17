@@ -24,9 +24,12 @@ public class ModesTests
         Assert.AreEqual(a.TargetScore, b.TargetScore);
     }
 
+    // the 30 launch levels, two full generated chapters, and spot checks deep into the endless run
+    private static readonly int[] Sample = Enumerable.Range(1, 50).Concat(new[] { 99, 100, 101, 555, 1000, 4999, 10000, 99999, 100000, 543210, LevelLibrary.Count }).ToArray();
+
     [Test] public void EveryLevelIsBeatableByTheBot()
     {
-        for (int n = 1; n <= LevelLibrary.Count; n++)
+        foreach (int n in Sample)
         {
             var s = new LevelSession(n);
             while (s.State == LevelState.Playing && Bot.TryBestMove(s.Seat.Board, s.Seat.Dealer.Hand, out int i, out int x, out int y))
@@ -39,14 +42,34 @@ public class ModesTests
     [Test] public void DifficultyRises()
     {
         var easy = LevelLibrary.Get(1);
-        var hard = LevelLibrary.Get(LevelLibrary.Count);
+        var hard = LevelLibrary.Get(LevelLibrary.Handmade);
         Assert.Greater(hard.Obstacles.Length, easy.Obstacles.Length);
         Assert.Greater((double)hard.TargetScore / hard.ThreeStarScore, (double)easy.TargetScore / easy.ThreeStarScore);
     }
 
+    [Test] public void GeneratedLevelsFollowASawtoothThatRisesOverall()
+    {
+        Assert.AreEqual(LevelTier.Normal, LevelLibrary.Get(31).Tier);
+        Assert.AreEqual(LevelTier.Hard, LevelLibrary.Get(35).Tier);
+        Assert.AreEqual(LevelTier.SuperHard, LevelLibrary.Get(40).Tier);
+        Assert.AreEqual(LevelTier.SuperHard, LevelLibrary.Get(30).Tier);
+        double Ratio(int n) { var d = LevelLibrary.Get(n); return (double)d.TargetScore / d.ThreeStarScore; }
+        double Chapter(int first) => Enumerable.Range(first, 10).Select(n => (double)LevelLibrary.Get(n).Obstacles.Length).Average();
+        Assert.Greater(Chapter(2001), Chapter(31), "deep chapters have more obstacles on average");
+        Assert.Greater(Ratio(40), Ratio(41), "a breather follows the super hard level");
+        Assert.LessOrEqual(LevelLibrary.Get(LevelLibrary.Count).Obstacles.Length, 22);
+    }
+
+    [Test] public void GeneratedLevelsDifferFromEachOther()
+    {
+        var layouts = Enumerable.Range(31, 100).Select(n => string.Join(";", LevelLibrary.Get(n).Obstacles)).Distinct().Count();
+        Assert.AreEqual(100, layouts);
+        Assert.Throws<System.ArgumentOutOfRangeException>(() => LevelLibrary.Get(LevelLibrary.Count + 1));
+    }
+
     [Test] public void ObstaclesNeverFillALine()
     {
-        for (int n = 1; n <= LevelLibrary.Count; n++)
+        foreach (int n in Sample)
         {
             var obs = LevelLibrary.Get(n).Obstacles;
             for (int i = 0; i < 8; i++)
@@ -86,6 +109,21 @@ public class ModesTests
         Assert.AreEqual(2, q.StarsFor(1));
         Assert.AreEqual(2, q.TotalStars);
         Assert.IsTrue(Progress.Parse("garbage!!").IsUnlocked(1));
+    }
+
+    [Test] public void ProgressGrowsPastTheLaunchLevelsAndKeepsOldSaves()
+    {
+        var old = Progress.Parse(new string('3', 30)); // a 1.0.0 save with every launch level beaten
+        Assert.AreEqual(90, old.TotalStars);
+        Assert.IsTrue(old.IsUnlocked(31));
+        Assert.AreEqual(31, old.Frontier);
+        for (int n = 31; n <= 5000; n++) old.Record(n, 1);
+        var q = Progress.Parse(old.Serialize());
+        Assert.AreEqual(90 + 4970, q.TotalStars);
+        Assert.IsTrue(q.IsUnlocked(5001));
+        Assert.IsFalse(q.IsUnlocked(5002));
+        Assert.AreEqual(5001, q.Frontier);
+        Assert.AreEqual(5000, q.Serialize().Length);
     }
 
     [Test] public void VersusPlayersAlternateWithIdenticalPieces()
@@ -163,5 +201,53 @@ public class AiAndPreviewTests
         }
         int easy = Total(BotLevel.Easy), hard = Total(BotLevel.Hard);
         Assert.Greater(hard, easy, $"hard {hard} vs easy {easy}");
+    }
+
+    [Test] public void TheFirstChapterIsAnEasyWarmUpThatEasesIntoHarderLevels()
+    {
+        double Ratio(int n) { var d = LevelLibrary.Get(n); return (double)d.TargetScore / d.ThreeStarScore; }
+        for (int n = 1; n <= 3; n++) Assert.AreEqual(0, LevelLibrary.Get(n).Obstacles.Length, "no obstacles on level " + n);
+        Assert.Less(Ratio(1), 0.35, "level 1 needs only about a third of what the bot scores");
+        for (int n = 1; n <= 10; n++) Assert.AreEqual(LevelTier.Normal, LevelLibrary.Get(n).Tier, "level " + n);
+        for (int n = 2; n <= 10; n++) Assert.GreaterOrEqual(Ratio(n) + 0.02, Ratio(n - 1), "level " + n + " should not be easier than " + (n - 1));
+        Assert.AreEqual(LevelTier.Hard, LevelLibrary.Get(15).Tier);
+        Assert.AreEqual(LevelTier.SuperHard, LevelLibrary.Get(20).Tier);
+        Assert.Less(LevelLibrary.Get(10).Obstacles.Length, 6);
+        Assert.Less(LevelLibrary.Get(30).Obstacles.Length, 20);
+        Assert.Less(Ratio(1), Ratio(30));
+    }
+
+    [Test] public void LosingEasesTheTargetUntilYouWinThenItResets()
+    {
+        var def = LevelLibrary.Get(20);
+        Assert.AreSame(def, LevelAssist.Apply(def, 0));
+        var eased = LevelAssist.Apply(def, 2);
+        Assert.Less(eased.TargetScore, def.TargetScore);
+        Assert.AreEqual(def.Seed, eased.Seed);
+        Assert.AreEqual(LevelAssist.Apply(def, 3).TargetScore, LevelAssist.Apply(def, 9).TargetScore, "capped at 30%");
+        Assert.GreaterOrEqual(eased.TwoStarScore, eased.TargetScore);
+        Assert.AreEqual(eased.TargetScore, new LevelSession(20, 2).Definition.TargetScore);
+
+        var t = new FailTracker();
+        t.Record(20, false); t.Record(20, false);
+        Assert.AreEqual(2, t.FailsFor(20));
+        Assert.AreEqual(0, t.FailsFor(21));
+        t.Record(21, true);
+        Assert.AreEqual(2, t.FailsFor(20), "winning another level keeps the help");
+        var back = FailTracker.Parse(t.Serialize());
+        Assert.AreEqual(2, back.FailsFor(20));
+        t.Record(20, true);
+        Assert.AreEqual(0, t.FailsFor(20));
+        Assert.AreEqual(0, FailTracker.Parse("garbage").Fails);
+        Assert.AreEqual(0, FailTracker.Parse("5,99").Fails);
+    }
+
+    [Test] public void ClearsPayCoinsForNewStarsOnly()
+    {
+        Assert.AreEqual(10, LevelAssist.Coins(0, 1));
+        Assert.AreEqual(20, LevelAssist.Coins(0, 3));
+        Assert.AreEqual(10, LevelAssist.Coins(1, 3));
+        Assert.AreEqual(0, LevelAssist.Coins(3, 3));
+        Assert.AreEqual(0, LevelAssist.Coins(2, 1));
     }
 }

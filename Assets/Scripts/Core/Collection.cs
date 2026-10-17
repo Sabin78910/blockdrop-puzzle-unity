@@ -31,6 +31,9 @@ namespace BlockDrop.Core
                 Colors = new Dictionary<char, string> { ['p'] = "FFD6E8", ['r'] = "FF4D6D", ['d'] = "C9184A", ['w'] = "FFFFFF" } },
         };
 
+        /// <summary>Only the launch levels have picture pieces; generated levels beyond them do not.</summary>
+        public static bool Covers(int level) => level >= 1 && level <= Pictures.Length * TilesPerPicture;
+
         public static (int picture, int tile) ForLevel(int level) => ((level - 1) / TilesPerPicture, (level - 1) % TilesPerPicture);
 
         public static int TileAt(int x, int y) => (y / TileH) * TileCols + x / TileW;

@@ -138,6 +138,7 @@ namespace BlockDrop.Core
             ["Sunny Meadow"] = ("Prado Soleado", "Prado Ensolarado"), ["Pink Dusk"] = ("Atardecer Rosa", "Crepúsculo Rosa"), ["Blue Lagoon"] = ("Laguna Azul", "Lagoa Azul"),
             ["Violet Night"] = ("Noche Violeta", "Noite Violeta"), ["Golden Dunes"] = ("Dunas Doradas", "Dunas Douradas"), ["Mint Frost"] = ("Escarcha de Menta", "Gelo de Menta"),
             ["A little help: the target is lower"] = ("Un poco de ayuda: la meta es menor", "Uma ajudinha: a meta está menor"), ["+{0} ●"] = ("+{0} ●", "+{0} ●"),
+            ["Reach {0} points"] = ("Llega a {0} puntos", "Chegue a {0} pontos"), ["{0} moves"] = ("{0} movimientos", "{0} jogadas"),
             ["NEW LOOK ON"] = ("NUEVO ESTILO ACTIVADO", "NOVO VISUAL LIGADO"), ["NEW LOOK OFF"] = ("NUEVO ESTILO DESACTIVADO", "NOVO VISUAL DESLIGADO"),
         };
     }

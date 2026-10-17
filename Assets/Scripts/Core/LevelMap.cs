@@ -15,6 +15,9 @@ namespace BlockDrop.Core
         public static readonly string[] ThemeNames = { "Sunny Meadow", "Pink Dusk", "Blue Lagoon", "Violet Night", "Golden Dunes", "Mint Frost" };
         public static readonly string[] ThemeColors = { "7FD66B", "FF9EC4", "49C6E5", "5B3FB8", "F2C46B", "A8E6D9" };
 
+        /// <summary>File names of the generated backdrops in Resources/Map (tools/art/make_map_art.py).</summary>
+        public static readonly string[] ThemeKeys = { "meadow", "dusk", "lagoon", "night", "dunes", "frost" };
+
         public static int ThemeOf(int chapter) => (chapter - 1) % ThemeNames.Length;
 
         /// <summary>0..1 position between chapter themes for a (fractional) level, used to blend the backdrop.</summary>

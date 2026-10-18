@@ -429,6 +429,8 @@ namespace BlockDrop.Game
             _ => _single.Out,
         };
 
+        private const float AutoNextDelay = 3.2f;
+
         private void Finish()
         {
             bool good = true;
@@ -1647,7 +1649,14 @@ namespace BlockDrop.Game
                     Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? Loc.F("SCORE {0}", _level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
                     if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
                     float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
-                    if (won && _level.Definition.Number < LevelLibrary.Count && Btn(Row(w, by, bh, 0.14f), "NEXT LEVEL", "4BE38A", "1FA45B")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); }
+                    if (won && _level.Definition.Number < LevelLibrary.Count)
+                    {
+                        // Winning rolls straight on to the next level after a short celebration; any button below takes over.
+                        float left = AutoNextDelay - t;
+                        var nb = Row(w, by, bh, 0.14f);
+                        if (Btn(nb, "NEXT LEVEL", "4BE38A", "1FA45B") || left <= 0f) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); return; }
+                        GUI.DrawTexture(new Rect(nb.x, nb.yMax - bh * 0.07f, nb.width * Mathf.Clamp01(left / (AutoNextDelay - 1f)), bh * 0.07f), Texture2D.whiteTexture);
+                    }
                     if (Btn(Row(w, by + bh + gap, bh, 0.14f), "RETRY", "FFC24B", "F08A1C")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number); }
                     if (Btn(Row(w, by + 2 * (bh + gap), bh, 0.14f), "LEVELS", "5A4FA8", "3A2F80")) { ResetStars(); ShowMenu(Screen.LevelSelect); }
                     return;

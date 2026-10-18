@@ -1261,28 +1261,7 @@ namespace BlockDrop.Game
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
-        private void DrawTrophies(float w, float h)
-        {
-            Outlined(new Rect(0, h * 0.045f, w, h * 0.07f), "TROPHIES", _h2, Visuals.Hex("7CF8FF"), 3);
-            Outlined(new Rect(0, h * 0.11f, w, h * 0.035f), Loc.F("LEVEL {0}   ·   {1}/{2} XP", _meta.Level, _meta.Xp, PlayerMeta.XpToNext(_meta.Level)), _small, Visuals.Gold, 1.2f);
-            var card = new Rect(w * 0.04f, h * 0.155f, w * 0.92f, h * 0.675f);
-            Panel(card, _cardStyle);
-            float rh = card.height / PlayerMeta.Achievements.Length;
-            var left = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false };
-            var right = new GUIStyle(_small) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold };
-            for (int i = 0; i < PlayerMeta.Achievements.Length; i++)
-            {
-                var a = PlayerMeta.Achievements[i];
-                bool done = _meta.HasAchievement(i);
-                int have = Mathf.Min(_meta.Stats[(int)a.Stat], a.Target);
-                var row = new Rect(card.x + w * 0.05f, card.y + i * rh, card.width - w * 0.1f, rh);
-                Outlined(new Rect(row.x, row.y + rh * 0.05f, row.width * 0.7f, rh * 0.5f), (done ? "★ " : "☆ ") + Loc.L(a.Name), new GUIStyle(left) { fontStyle = FontStyle.Bold }, done ? Visuals.Gold : Color.white, 1.2f);
-                Outlined(new Rect(row.x, row.y + rh * 0.48f, row.width * 0.75f, rh * 0.45f), a.Text, left, new Color(1, 1, 1, 0.7f), 1f);
-                Outlined(new Rect(row.x, row.y + rh * 0.05f, row.width, rh * 0.5f), done ? "DONE" : $"+{a.Reward} ●", right, done ? Visuals.Hex("2EE59D") : Visuals.Gold, 1.2f);
-                if (!done) Outlined(new Rect(row.x, row.y + rh * 0.48f, row.width, rh * 0.45f), $"{have}/{a.Target}", new GUIStyle(right) { fontStyle = FontStyle.Normal }, new Color(1, 1, 1, 0.7f), 1f);
-            }
-            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Missions);
-        }
+        private void DrawTrophies(float w, float h) => DrawTrophiesPolish(w, h);
 
         private readonly Dictionary<Color, GUIStyle> _swatches = new Dictionary<Color, GUIStyle>();
         private GUIStyle Swatch(Color c)

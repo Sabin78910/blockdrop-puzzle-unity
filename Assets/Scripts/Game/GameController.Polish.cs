@@ -136,6 +136,48 @@ namespace BlockDrop.Game
 
         private int _levelCoins, _levelStarsBefore;
 
+        /// <summary>The Trophies screen: a level bar toward the next level, and one rounded card per trophy.
+        /// Won trophies glow gold with a badge; the rest show a progress bar and the coins waiting.</summary>
+        private void DrawTrophiesPolish(float w, float h)
+        {
+            var ach = PlayerMeta.Achievements;
+            int got = 0; for (int i = 0; i < ach.Length; i++) if (_meta.HasAchievement(i)) got++;
+            Outlined(new Rect(0, h * 0.04f, w, h * 0.07f), "TROPHIES", _h2, Visuals.Hex("7CF8FF"), 3);
+            Outlined(new Rect(0, h * 0.105f, w, h * 0.035f), Loc.F("LEVEL {0}   ·   {1}/{2} XP", _meta.Level, _meta.Xp, PlayerMeta.XpToNext(_meta.Level)), _small, Visuals.Gold, 1.2f);
+            var xpBar = new Rect(w * 0.2f, h * 0.142f, w * 0.6f, h * 0.012f);
+            Panel(xpBar, _barBackStyle);
+            float xf = Mathf.Clamp01(_meta.Xp / (float)Mathf.Max(1, PlayerMeta.XpToNext(_meta.Level)));
+            if (xf > 0f) Panel(new Rect(xpBar.x, xpBar.y, Mathf.Max(xpBar.height, xpBar.width * xf), xpBar.height), _barFillStyle);
+            Outlined(new Rect(0, h * 0.157f, w, h * 0.03f), Loc.F("TROPHIES  {0}/{1}", got, ach.Length), _small, new Color(1, 1, 1, 0.85f), 1f);
+
+            float top = h * 0.195f, area = h * 0.635f, gap = h * 0.006f, rh = area / ach.Length - gap;
+            var name = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold };
+            var desc = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontSize = Mathf.RoundToInt(_small.fontSize * 0.85f) };
+            var right = new GUIStyle(_small) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold };
+            for (int i = 0; i < ach.Length; i++)
+            {
+                var a = ach[i];
+                bool done = _meta.HasAchievement(i);
+                int have = Mathf.Min(_meta.Stats[(int)a.Stat], a.Target);
+                var card = new Rect(w * 0.05f, top + i * (rh + gap), w * 0.9f, rh);
+                Panel(card, Swatch(done ? Visuals.Hex("9A7414") : Visuals.Hex("2B2C86")));
+                float pad = w * 0.035f, tw = card.width * 0.64f;
+                Outlined(new Rect(card.x + pad, card.y + rh * 0.04f, tw, rh * 0.5f), (done ? "★ " : "☆ ") + Loc.L(a.Name), name, done ? Visuals.Hex("FFE27A") : Color.white, 1.2f);
+                Outlined(new Rect(card.x + pad, card.y + rh * 0.46f, tw, rh * 0.4f), a.Text, desc, new Color(1, 1, 1, 0.75f), 1f);
+                Outlined(new Rect(card.x, card.y + rh * 0.04f, card.width - pad, rh * 0.5f), done ? "DONE" : $"+{a.Reward} ●", right, done ? Visuals.Hex("7CFFC4") : Visuals.Gold, 1.2f);
+                if (!done)
+                {
+                    float bw = card.width * 0.3f, bh = rh * 0.16f;
+                    var bar = new Rect(card.xMax - pad - bw, card.y + rh * 0.62f, bw, bh);
+                    Panel(bar, _barBackStyle);
+                    float f = have / (float)Mathf.Max(1, a.Target);
+                    if (f > 0f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bh, bw * f), bh), _barFillStyle);
+                    Outlined(new Rect(bar.x, card.y + rh * 0.74f, bw, rh * 0.26f), $"{have}/{a.Target}", new GUIStyle(desc) { alignment = TextAnchor.MiddleRight }, new Color(1, 1, 1, 0.8f), 1f);
+                }
+            }
+            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Missions);
+        }
+
         private bool _victoryRun;
         private bool ShouldAutoFinish => _mode == Mode.Level && !_victoryRun && !_finishing && _level.GoalMet;
 

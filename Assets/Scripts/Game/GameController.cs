@@ -120,7 +120,7 @@ namespace BlockDrop.Game
             NewLook.Apply(_world, _cam);
             ShowMenu();
             if (_welcomeReward > 0) { _fx.Win(); Confetti(40); }
-            ResumeRun();
+            ResumeRun(Mode.Level);
             _ = OnlineService.EnsureReady(); // best effort; game is fully playable offline
         }
 
@@ -254,12 +254,13 @@ namespace BlockDrop.Game
         private static void ClearRun() => PlayerPrefs.DeleteKey(RunKey);
 
         /// <summary>Continues a run the app was closed in the middle of, opening on the pause card.</summary>
-        private void ResumeRun()
+        private bool ResumeRun(Mode want)
         {
             var save = SavedGame.Parse(PlayerPrefs.GetString(RunKey, ""));
+            if (save == null || !Enum.TryParse(save.Mode, out Mode mode) || !Enum.IsDefined(typeof(Mode), mode) || mode == Mode.Versus || mode == Mode.VsAi) { ClearRun(); return false; }
+            if (mode != want) return false; // another mode's run stays saved for its own button; PLAY always opens the level map
             ClearRun();
-            if (save == null || !Enum.TryParse(save.Mode, out Mode mode) || !Enum.IsDefined(typeof(Mode), mode) || mode == Mode.Versus || mode == Mode.VsAi) return;
-            if (mode == Mode.Daily && save.Seed != PieceGenerator.DailySeed(DateTime.UtcNow)) return; // that day's challenge is over
+            if (mode == Mode.Daily && save.Seed != PieceGenerator.DailySeed(DateTime.UtcNow)) return false; // that day's challenge is over
             try
             {
                 switch (mode)
@@ -275,7 +276,7 @@ namespace BlockDrop.Game
             catch (Exception e)
             {
                 Debug.LogWarning("Block Drop could not resume a saved game: " + e.Message);
-                return;
+                return false;
             }
             EnterPlay(mode);
             _hintsLeft = Mathf.Clamp(save.Hints, 0, Competitive ? 0 : 3);
@@ -283,6 +284,7 @@ namespace BlockDrop.Game
             _shownScore = Score;
             if (IsFinished) AfterMove(); // closed on the last move: offer the second chance or finish properly
             else { SaveRun(); SetPaused(true); }
+            return true;
         }
 
         private void ApplyTheme()
@@ -428,6 +430,8 @@ namespace BlockDrop.Game
             Mode.Versus or Mode.VsAi => _versus.Over,
             _ => _single.Out,
         };
+
+        private const float AutoNextDelay = 3.2f;
 
         private void Finish()
         {
@@ -1567,6 +1571,7 @@ namespace BlockDrop.Game
                 {
                     string label = _mode == Mode.Daily ? "DAILY" : _mode == Mode.Challenge ? ChallengeCode.Encode(_challengeSeed) : Loc.F("BEST {0}", Mathf.Max(_best, Score));
                     Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), label, _body, Visuals.Hex("FFE27A"), 1.5f);
+                    if (_mode == Mode.Classic) Outlined(new Rect(w * 0.27f, top + bs * 0.8f, w * 0.46f, bs * 0.5f), "CLASSIC", _small, Visuals.Hex("7CF8FF"), 1.2f);
                     float punch = 1f + Mathf.Clamp01((Score - _shownScore) / 60f) * 0.25f;
                     var st = new GUIStyle(_h1) { fontSize = Mathf.RoundToInt(_h1.fontSize * punch) };
                     Outlined(new Rect(0, h * 0.095f, w, h * 0.1f), Mathf.RoundToInt(_shownScore).ToString(), st, Color.white, 3);
@@ -1601,7 +1606,14 @@ namespace BlockDrop.Game
                     Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? LevelScoreLine(_level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
                     if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
                     float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
-                    if (won && _level.Definition.Number < LevelLibrary.Count && Btn(Row(w, by, bh, 0.14f), "NEXT LEVEL", "4BE38A", "1FA45B")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); }
+                    if (won && _level.Definition.Number < LevelLibrary.Count)
+                    {
+                        // Winning rolls straight on to the next level after a short celebration; any button below takes over.
+                        float left = AutoNextDelay - t;
+                        var nb = Row(w, by, bh, 0.14f);
+                        if (Btn(nb, "NEXT LEVEL", "4BE38A", "1FA45B") || left <= 0f) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); return; }
+                        GUI.DrawTexture(new Rect(nb.x, nb.yMax - bh * 0.07f, nb.width * Mathf.Clamp01(left / (AutoNextDelay - 1f)), bh * 0.07f), Texture2D.whiteTexture);
+                    }
                     if (Btn(Row(w, by + bh + gap, bh, 0.14f), "RETRY", "FFC24B", "F08A1C")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number); }
                     LevelResultNav(w, by + 2 * (bh + gap), bh);
                     return;

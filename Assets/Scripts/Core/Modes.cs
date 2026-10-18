@@ -297,7 +297,7 @@ namespace BlockDrop.Core
         };
 
         private static double LaunchRatio(int number) =>
-            0.30 + 0.30 * (number - 1) / (Handmade - 1) + (number > ChapterSize ? 0.05 * Saw[(number - 1) % ChapterSize] : 0);
+            0.20 + 0.40 * (number - 1) / (Handmade - 1) + (number > ChapterSize ? 0.05 * Saw[(number - 1) % ChapterSize] : 0);
 
         // position inside a chapter of 10: 0 = breather ... 4 = hard, 5 = dip ... 9 = super hard
         private static readonly double[] Saw = { 0.0, 0.25, 0.45, 0.6, 1.0, 0.3, 0.5, 0.65, 0.8, 1.3 };

@@ -72,4 +72,12 @@ public class LevelMapTests
         }
         Assert.That(shown, Is.InRange(100, 250));
     }
+
+    [Test] public void EveryThemeHasItsArtOnDisk()
+    {
+        Assert.AreEqual(LevelMap.ThemeNames.Length, LevelMap.ThemeKeys.Length);
+        foreach (var k in LevelMap.ThemeKeys) Assert.IsTrue(System.IO.File.Exists("Assets/Resources/Map/bg_" + k + ".png"), k);
+        foreach (var f in new[] { "node", "ribbon", "tree", "house", "lamp", "star_on", "star_off", "crown", "lock" })
+            Assert.IsTrue(System.IO.File.Exists("Assets/Resources/Map/" + f + ".png"), f);
+    }
 }

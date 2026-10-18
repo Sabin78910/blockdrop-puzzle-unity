@@ -10,7 +10,7 @@ namespace BlockDrop.Game
     /// <summary>Builds the whole game at runtime: responsive portrait layout, glossy board, drag & drop
     /// with landing preview and line glow, particles, praise pop-ups, sounds, haptics, menus, levels,
     /// vs-AI, 2-player, challenge codes and online leaderboards. Fully playable offline.</summary>
-    public sealed class GameController : MonoBehaviour
+    public sealed partial class GameController : MonoBehaviour
     {
         private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection }
         private enum Mode { Classic, Daily, Level, Versus, VsAi, Challenge }
@@ -464,6 +464,7 @@ namespace BlockDrop.Game
                 }
                 int coins = good ? LevelAssist.Coins(starsBefore, _level.Stars) : 0;
                 if (coins > 0) { _meta.AddCoins(coins); Toast(Loc.F("+{0} ●", coins), Visuals.Gold); }
+                _levelCoins = coins; _levelStarsBefore = starsBefore;
             }
             if (_mode == Mode.Classic || _mode == Mode.Daily)
             {
@@ -485,7 +486,7 @@ namespace BlockDrop.Game
             }
             SaveMeta();
             PlayerPrefs.Save();
-            if (good) { _fx.Win(); Confetti(60); } else _fx.GameOver();
+            if (good) { _fx.Win(); if (_mode == Mode.Level) StartLevelCelebration(); else Confetti(60); } else _fx.GameOver();
             _resultTime = Time.time;
             ShowMenu(Screen.Result);
         }
@@ -589,7 +590,7 @@ namespace BlockDrop.Game
             if (_screen != Screen.Playing || _paused || _offerRevive) return;
             _playSeconds += Time.unscaledDeltaTime;
             if (!_breakShown && _playSeconds > 40 * 60) { _breakShown = true; _breakOpen = true; }
-            if (_tutorial == 2 && Time.time - _tutorialStepAt > 3.5f) { _tutorial = 3; PlayerPrefs.SetInt("tutorial", 3); }
+            TickGuide();
             if (_breakOpen) return;
 
             _shownScore = Mathf.MoveTowards(_shownScore, Score, Mathf.Max(1f, Mathf.Abs(Score - _shownScore)) * Time.deltaTime * 6f);
@@ -673,7 +674,7 @@ namespace BlockDrop.Game
                 _fx.Win();
                 Confetti(50);
             }
-            if (_tutorial == 0) { _tutorial = 1; _tutorialStepAt = Time.time; }
+            AdvanceGuide(Guide.AfterPlace(_tutorial));
 
             if (lines > 0)
             {
@@ -681,7 +682,7 @@ namespace BlockDrop.Game
                 Track(MissionKind.ClearLines, lines);
                 Track(MissionKind.ComboReach, board.Combo);
                 if (Career) { Celebrate(_meta.Record(Stat.LinesCleared, lines)); Celebrate(_meta.Record(Stat.BestCombo, board.Combo)); }
-                if (_tutorial == 1) { _tutorial = 2; _tutorialStepAt = Time.time; }
+                AdvanceGuide(Guide.AfterClear(_tutorial));
                 if (NewLook.On) { NewLookClear(lines, board, gained, burst); AfterMove(); return; }
                 if (lines >= 3) StartCoroutine(MegaClear());
                 else StartCoroutine(HitStop(0.035f + 0.02f * lines));
@@ -712,8 +713,8 @@ namespace BlockDrop.Game
             NewLook.Pulse(tier);
             var mid = BoardCenter + new Vector3(0, 0.6f, 0);
             AddFloater("+" + gained, mid + new Vector3(0, -0.9f, 0), Visuals.Gold, 1.0f);
-            string praise = Feel.Praise(tier);
-            if (praise != null) AddFloater(praise, mid + new Vector3(0, 0.5f, 0), tier == FeedbackTier.BoardClear ? Visuals.Hex("7CF8FF") : Color.white, 1.2f + 0.12f * (int)tier);
+            var praise = Praise.For(lines, board.Combo, tier == FeedbackTier.BoardClear);
+            if (praise.Any) AddFloater(praise.Word, mid + new Vector3(0, 0.5f, 0), tier == FeedbackTier.BoardClear ? Visuals.Hex("7CF8FF") : Color.white, praise.Size);
             if (board.Combo >= 2) AddFloater(Loc.F("COMBO x{0}", board.Combo), mid + new Vector3(0, 1.8f, 0), Visuals.Hex("FF9BD2"), 1.1f);
             int confetti = Feel.Confetti(tier, reduced);
             if (confetti > 0) Confetti(confetti);
@@ -1102,25 +1103,7 @@ namespace BlockDrop.Game
             Outlined(r, Loc.F("STREAK x{0}", combo + 1), st, c, 1.5f);
         }
 
-        private void DrawTutorial(float w, float h)
-        {
-            if (_tutorial >= 3 || _mode != Mode.Classic) return;
-            string[] text = { "Drag a piece onto the board", "Fill a row or column to clear it!", "Clear again and again for COMBOS!" };
-            var card = new Rect(w * 0.08f, h * 0.195f, w * 0.84f, h * 0.055f);
-            Panel(card, _cardStyle);
-            Outlined(card, text[_tutorial], _small, Visuals.Hex("FFE27A"), 1.5f);
-            if (_tutorial == 0 && _dragging < 0)
-            {
-                float t = (Time.time * 0.7f) % 1f;
-                var from = _cam.WorldToScreenPoint(HandSlot(1));
-                var to = _cam.WorldToScreenPoint(BoardCenter);
-                var p = ToGui(Vector3.Lerp(from, to, Mathf.SmoothStep(0, 1, t)));
-                float size = h * 0.05f;
-                var old = GUI.color; GUI.color = new Color(1, 1, 1, 0.85f * Mathf.Sin(t * Mathf.PI));
-                GUI.DrawTexture(new Rect(p.x - size / 2, p.y - size / 2, size, size), Visuals.Circle.texture);
-                GUI.color = old;
-            }
-        }
+        private void DrawTutorial(float w, float h) => DrawGuide(w, h);
 
         private IEnumerator HitStop(float seconds)
         {
@@ -1576,6 +1559,7 @@ namespace BlockDrop.Game
             if (Btn(new Rect(w * 0.04f, top, bs * 1.6f, bs), "MENU", "5A4FA8", "3A2F80", 0.7f)) { SetPaused(true); return; }
             if (_hintsLeft > 0 && Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), Loc.F("HINT {0}", _hintsLeft), "FFC24B", "F08A1C", 0.7f)) UseHint();
 
+            DrawHudPolish(w, h);
             switch (_mode)
             {
                 case Mode.Level:
@@ -1649,7 +1633,8 @@ namespace BlockDrop.Game
                             Outlined(new Rect(w * (0.2f + i * 0.2f) - w * 0.1f, y + h * 0.08f, w * 0.4f, h * 0.12f), earned ? "★" : "☆", st, earned ? Visuals.Gold : new Color(1, 1, 1, 0.35f), 3);
                         }
                     }
-                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? Loc.F("SCORE {0}", _level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
+                    if (won) DrawLevelCelebration(w, h, y, t);
+                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? LevelScoreLine(_level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
                     if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
                     float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
                     if (won && _level.Definition.Number < LevelLibrary.Count)
@@ -1661,7 +1646,7 @@ namespace BlockDrop.Game
                         GUI.DrawTexture(new Rect(nb.x, nb.yMax - bh * 0.07f, nb.width * Mathf.Clamp01(left / (AutoNextDelay - 1f)), bh * 0.07f), Texture2D.whiteTexture);
                     }
                     if (Btn(Row(w, by + bh + gap, bh, 0.14f), "RETRY", "FFC24B", "F08A1C")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number); }
-                    if (Btn(Row(w, by + 2 * (bh + gap), bh, 0.14f), "LEVELS", "5A4FA8", "3A2F80")) { ResetStars(); ShowMenu(Screen.LevelSelect); }
+                    LevelResultNav(w, by + 2 * (bh + gap), bh);
                     return;
                 }
                 case Mode.Versus:
@@ -1699,7 +1684,7 @@ namespace BlockDrop.Game
                     break;
                 }
             }
-            if (Btn(Row(w, h * 0.66f, h * 0.07f, 0.14f), "MENU", "5A4FA8", "3A2F80")) ShowMenu();
+            if (HomeBtn(Row(w, h * 0.66f, h * 0.07f, 0.14f))) ShowMenu();
         }
 
         private readonly bool[] _starPlayed = new bool[3];

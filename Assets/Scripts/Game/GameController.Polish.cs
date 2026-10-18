@@ -230,7 +230,7 @@ namespace BlockDrop.Game
         /// Returns the y below the last button.</summary>
         private float DrawHomeButtons(float w, float h, float y)
         {
-            float bh = h * 0.088f, gap = h * 0.016f, half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
+            float bh = h * 0.07f, gap = h * 0.012f, half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
             if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) ShowMenu(Screen.LevelSelect);
             y += bh * 1.2f + gap;
             if (Btn(new Rect(w * 0.08f, y, half, bh), "CLASSIC", "FFC24B", "F08A1C", 0.95f)) { if (!ResumeRun(Mode.Classic)) StartMode(Mode.Classic); }
@@ -241,6 +241,12 @@ namespace BlockDrop.Game
             if (Btn(missionsRect, "MISSIONS", "2EE59D", "13A86E", 0.95f)) ShowMenu(Screen.Missions);
             if (ready > 0) Badge(missionsRect, ready);
             if (Btn(new Rect(x2, y, half, bh), "THEMES", "FF8FAB", "D9466F", 0.95f)) ShowMenu(Screen.Themes);
+            y += bh + gap;
+            if (Btn(new Rect(w * 0.08f, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.95f)) ShowMenu(Screen.AiSelect);
+            if (Btn(new Rect(x2, y, half, bh), "2 PLAYERS", "FF7AB6", "E0347C", 0.95f)) StartMode(Mode.Versus);
+            y += bh + gap;
+            if (Btn(new Rect(w * 0.08f, y, half, bh), "CHALLENGE", "6E8BFF", "3A4FE0", 0.95f)) { _codeError = ""; ShowMenu(Screen.Challenge); }
+            if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.95f)) { OnlineService.Refresh(_boardTab); ShowMenu(Screen.Leaderboard); }
             y += bh + gap * 1.5f;
             if (Btn(Row(w, y, bh * 0.75f, 0.22f), Coach.T("SETTINGS"), "5A4FA8", "3A2F80", 0.8f)) ShowMenu(Screen.Settings);
             return y + bh * 0.75f + gap;
@@ -261,15 +267,6 @@ namespace BlockDrop.Game
             var label = new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false };
             Outlined(new Rect(0, h * 0.04f, w, h * 0.07f), Coach.T("SETTINGS"), _h2, Color.white, 3);
             float y = h * 0.13f;
-            Outlined(new Rect(0, y, w, h * 0.03f), Coach.T("MORE WAYS TO PLAY"), label, Visuals.Hex("C9A7FF"), 1.2f);
-            y += h * 0.035f;
-            if (Btn(new Rect(x1, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);
-            if (Btn(new Rect(x2, y, half, bh), "2 PLAYERS", "FF7AB6", "E0347C", 0.85f)) StartMode(Mode.Versus);
-            y += bh + gap;
-            if (Btn(new Rect(x1, y, half, bh), "CHALLENGE", "6E8BFF", "3A4FE0", 0.85f)) { _codeError = ""; ShowMenu(Screen.Challenge); }
-            if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.85f)) { OnlineService.Refresh(_boardTab); ShowMenu(Screen.Leaderboard); }
-            y += bh + gap * 3f;
-
             Outlined(new Rect(0, y, w, h * 0.03f), Coach.T("OPTIONS"), label, Visuals.Hex("C9A7FF"), 1.2f);
             y += h * 0.035f;
             float sh = bh * 0.85f;

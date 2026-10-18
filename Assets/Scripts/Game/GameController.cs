@@ -1231,9 +1231,9 @@ namespace BlockDrop.Game
             if (GUI.Button(new Rect(w * 0.2f, h * 0.075f, w * 0.6f, h * 0.15f), GUIContent.none, GUIStyle.none)) LogoTapped();
             float y = h * 0.245f, bh = h * 0.064f, gap = h * 0.011f;
             float half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
-            if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) StartMode(Mode.Classic);
+            if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) ShowMenu(Screen.LevelSelect);
             y += bh * 1.2f + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), Loc.F("LEVELS {0}★", _progress.TotalStars), "FFC24B", "F08A1C", 0.85f)) ShowMenu(Screen.LevelSelect);
+            if (Btn(new Rect(w * 0.08f, y, half, bh), "CLASSIC", "FFC24B", "F08A1C", 0.85f)) StartMode(Mode.Classic);
             if (Btn(new Rect(x2, y, half, bh), "DAILY", "4FD8FF", "1C8FE0", 0.85f)) StartMode(Mode.Daily);
             y += bh + gap;
             if (Btn(new Rect(w * 0.08f, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);

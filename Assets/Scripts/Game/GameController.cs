@@ -659,6 +659,7 @@ namespace BlockDrop.Game
             int lines = rows.Count + cols.Count;
             foreach (var (cx, cy) in piece.Cells) _pop[ox + cx, oy + cy] = 1f;
             _fx.Place();
+            PlaceSparkle(piece, ox, oy);
             Track(MissionKind.PlaceBlocks, 1);
             if (gained > 0) Track(MissionKind.ScorePoints, gained);
             GainXp(gained);
@@ -1213,6 +1214,7 @@ namespace BlockDrop.Game
             if (GUI.Button(new Rect(w * 0.2f, h * 0.075f, w * 0.6f, h * 0.15f), GUIContent.none, GUIStyle.none)) LogoTapped();
             float y = DrawHomeButtons(w, h, h * 0.245f);
             Outlined(new Rect(0, y, w, h * 0.035f), Loc.F("BEST {0}   ·   {1}", _best, Loc.L(OnlineService.Ready ? "ONLINE" : "OFFLINE")), _small, new Color(1, 1, 1, 0.85f), 1.5f);
+            PlayerButton(Row(w, y + h * 0.045f, h * 0.06f, 0.18f));
 
             if (_welcomeReward > 0)
             {

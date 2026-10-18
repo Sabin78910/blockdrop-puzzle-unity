@@ -8,16 +8,16 @@ namespace BlockDrop.Game
     {
         public static readonly Color[] BlockColors =
         {
-            Hex("FF4D6D"), // ruby
-            Hex("FFB627"), // amber
-            Hex("2EE59D"), // emerald
-            Hex("2EC4F1"), // sky
-            Hex("A66CFF"), // amethyst
+            Hex("FF5C7A"), // ruby
+            Hex("FFC83D"), // amber
+            Hex("3DF2AA"), // emerald
+            Hex("42D2FF"), // sky
+            Hex("B57DFF"), // amethyst
             Hex("6B7390"), // stone (level obstacles)
         };
 
-        public static readonly Color BoardPanel = Hex("101845");
-        public static readonly Color EmptySlot = Hex("1E2A6B");
+        public static readonly Color BoardPanel = Hex("17216A");
+        public static readonly Color EmptySlot = Hex("2B3C9A");
         public static readonly Color Gold = Hex("FFD54A");
 
         private static Sprite _tile, _gloss, _slot, _panel, _circle, _background;

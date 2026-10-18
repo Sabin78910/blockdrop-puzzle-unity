@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace BlockDrop.Core
 {
-    public enum Lang { En, Es, Pt }
+    public enum Lang { En, Es, Pt, Ne }
 
     /// <summary>English text is the key. Spanish (Latin America) and Portuguese (Brazil) first: Brazil and Mexico
     /// are the top growth markets for block puzzles. Missing keys fall back to English.</summary>
@@ -12,19 +12,21 @@ namespace BlockDrop.Core
     {
         public static Lang Current = Lang.En;
 
-        public static readonly string[] Names = { "ENGLISH", "ESPAÑOL", "PORTUGUÊS" };
+        public static readonly string[] Names = { "ENGLISH", "ESPAÑOL", "PORTUGUÊS", "नेपाली" };
 
         public static Lang FromCode(string code)
         {
             code = (code ?? "").ToLowerInvariant();
-            return code.StartsWith("es") ? Lang.Es : code.StartsWith("pt") ? Lang.Pt : Lang.En;
+            return code.StartsWith("es") ? Lang.Es : code.StartsWith("pt") ? Lang.Pt : code.StartsWith("ne") ? Lang.Ne : Lang.En;
         }
 
-        public static string Code(Lang l) => l == Lang.Es ? "es" : l == Lang.Pt ? "pt" : "en";
+        public static string Code(Lang l) => l == Lang.Es ? "es" : l == Lang.Pt ? "pt" : l == Lang.Ne ? "ne" : "en";
 
         public static string L(string en)
         {
-            if (Current == Lang.En || string.IsNullOrEmpty(en) || !Table.TryGetValue(en, out var t)) return en;
+            if (Current == Lang.En || string.IsNullOrEmpty(en)) return en;
+            if (Current == Lang.Ne) return Nepali.Table.TryGetValue(en, out var n) ? n : en;
+            if (!Table.TryGetValue(en, out var t)) return en;
             return Current == Lang.Es ? t.es : t.pt;
         }
 

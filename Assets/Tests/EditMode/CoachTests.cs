@@ -70,7 +70,7 @@ namespace BlockDrop.Tests
         [Test]
         public void Guide_has_words_for_each_step_in_every_language()
         {
-            foreach (var lang in new[] { Lang.En, Lang.Es, Lang.Pt })
+            foreach (var lang in new[] { Lang.En, Lang.Es, Lang.Pt, Lang.Ne })
             {
                 Loc.Current = lang;
                 for (int s = 0; s < Guide.Done; s++) Assert.IsNotEmpty(Coach.T(Guide.Say(s)));

@@ -154,6 +154,7 @@ namespace BlockDrop.Core
 
         public static string T(string en)
         {
+            if (Loc.Current == Lang.Ne) return en != null && Nepali.Table.TryGetValue(en, out var n) ? n : en;
             if (Loc.Current != Lang.En && en != null && Table.TryGetValue(en, out var t)) return Loc.Current == Lang.Es ? t.es : t.pt;
             return Loc.L(en);
         }

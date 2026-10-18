@@ -6,7 +6,7 @@ namespace BlockDrop.Tests
     public class CoachTests
     {
         [TestCase(0, 1, false, null)]
-        [TestCase(1, 1, false, null)]
+        [TestCase(1, 1, false, "NICE!")]
         [TestCase(1, 2, false, "NICE!")]
         [TestCase(2, 1, false, "GREAT!")]
         [TestCase(1, 3, false, "GREAT!")]

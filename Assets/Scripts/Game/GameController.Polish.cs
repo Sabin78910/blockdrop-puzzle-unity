@@ -136,6 +136,24 @@ namespace BlockDrop.Game
 
         private int _levelCoins, _levelStarsBefore;
 
+        /// <summary>A small glittering pop on every placed block, so each drop feels good, not only clears.
+        /// Skipped with reduced motion.</summary>
+        private void PlaceSparkle(Piece piece, int ox, int oy)
+        {
+            if (NewLook.ReducedMotion) return;
+            var col = Color.Lerp(Visuals.BlockColors[piece.ColorIndex], Color.white, 0.55f);
+            foreach (var (cx, cy) in piece.Cells)
+            {
+                var pos = CellPos(ox + cx, oy + cy);
+                for (int k = 0; k < 2; k++)
+                {
+                    var spark = Rent(Visuals.Circle, col, pos, Random.Range(0.14f, 0.24f), 7);
+                    var dir = Random.insideUnitCircle.normalized * Random.Range(1.2f, 3f);
+                    _particles.Add(new Particle { Sr = spark, V = new Vector3(dir.x, dir.y + 0.8f, 0), Life = 0.45f, Max = 0.45f, Spin = 0, Grow = -0.3f });
+                }
+            }
+        }
+
         /// <summary>The moment a level is won: confetti scaled to the stars (none under reduced motion), and a second
         /// burst for three stars or the end of a chapter. The win chime itself is played by the caller.</summary>
         private void StartLevelCelebration()
@@ -199,6 +217,14 @@ namespace BlockDrop.Game
             return y + bh * 0.75f + gap;
         }
 
+        /// <summary>The player name entry: on the home screen and in Settings, so the name is always one tap away.</summary>
+        private void PlayerButton(Rect r)
+        {
+            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
+            if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
+            if (Btn(r, Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.75f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
+        }
+
         /// <summary>Everything that left the home screen: the other game modes, rankings, and the options.</summary>
         private void DrawSettings(float w, float h)
         {
@@ -229,9 +255,7 @@ namespace BlockDrop.Game
                 if (Btn(new Rect(x2, y, half, sh), NewLook.PatternsOn ? "PATTERNS: ON" : "PATTERNS: OFF", "5A4FA8", "3A2F80", 0.75f)) NewLook.TogglePatterns();
                 y += sh + gap;
             }
-            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
-            if (shown.Length > 16) shown = shown.Substring(0, 15) + "…";
-            if (Btn(Row(w, y, sh, 0.08f), Loc.F("PLAYER: {0}", shown), "2B2470", "1C1650", 0.75f)) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
+            PlayerButton(Row(w, y, sh, 0.08f));
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 

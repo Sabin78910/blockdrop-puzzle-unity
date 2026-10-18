@@ -15,8 +15,7 @@ namespace BlockDrop.Core
     }
 
     /// <summary>The praise ladder. The word follows whichever is bigger, the lines cleared in one move or the
-    /// combo streak, so a long streak keeps earning new words. A lone line gets none (docs/FEEL.md: feedback
-    /// matches the achievement). The words are the same in every mode; reduced motion only drops the movement.</summary>
+    /// combo streak, so a long streak keeps earning new words. A lone line gets the smallest word, so every clear is acknowledged; the size grows with the achievement. The words are the same in every mode; reduced motion only drops the movement.</summary>
     public static class Praise
     {
         private static readonly string[] Ladder = { null, "NICE!", "GREAT!", "EXCELLENT!", "AMAZING!", "UNBELIEVABLE!", "PERFECT CLEAR!" };
@@ -25,7 +24,7 @@ namespace BlockDrop.Core
         {
             if (lines <= 0) return 0;
             if (boardEmpty) return 6;
-            int byLines = lines >= 5 ? 5 : lines == 4 ? 4 : lines == 3 ? 3 : lines == 2 ? 2 : 0;
+            int byLines = lines >= 5 ? 5 : lines == 4 ? 4 : lines == 3 ? 3 : lines == 2 ? 2 : 1;
             int byCombo = combo >= 7 ? 5 : combo >= 5 ? 4 : combo == 4 ? 3 : combo == 3 ? 2 : combo == 2 ? 1 : 0;
             return Math.Max(byLines, byCombo);
         }

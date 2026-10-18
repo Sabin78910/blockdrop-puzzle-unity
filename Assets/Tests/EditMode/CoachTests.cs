@@ -195,5 +195,16 @@ namespace BlockDrop.Tests
             Assert.IsTrue(level.GoalMet);
             Assert.AreEqual(LevelState.Playing, level.State);
         }
+
+        [Test]
+        public void Trophies_list_unwon_closest_first()
+        {
+            var meta = new PlayerMeta();
+            var unwon = TrophyBoard.Unwon(meta);
+            Assert.AreEqual(PlayerMeta.Achievements.Length, unwon.Count);
+            for (int i = 1; i < unwon.Count; i++)
+                Assert.GreaterOrEqual(TrophyBoard.Progress(meta, unwon[i - 1]), TrophyBoard.Progress(meta, unwon[i]));
+            Assert.AreEqual(1, new System.Collections.Generic.HashSet<int>(unwon).Count == unwon.Count ? 1 : 0);
+        }
 }
 }

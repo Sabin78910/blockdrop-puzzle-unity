@@ -136,46 +136,91 @@ namespace BlockDrop.Game
 
         private int _levelCoins, _levelStarsBefore;
 
-        /// <summary>The Trophies screen: a level bar toward the next level, and one rounded card per trophy.
-        /// Won trophies glow gold with a badge; the rest show a progress bar and the coins waiting.</summary>
+        /// <summary>The Trophies screen as a dashboard: a summary card (level, XP, trophies, coins, stars), the three
+        /// trophies closest to done up top, the won ones as gold chips, and a line for what is still ahead.</summary>
         private void DrawTrophiesPolish(float w, float h)
         {
             var ach = PlayerMeta.Achievements;
-            int got = 0; for (int i = 0; i < ach.Length; i++) if (_meta.HasAchievement(i)) got++;
-            Outlined(new Rect(0, h * 0.04f, w, h * 0.07f), "TROPHIES", _h2, Visuals.Hex("7CF8FF"), 3);
-            Outlined(new Rect(0, h * 0.105f, w, h * 0.035f), Loc.F("LEVEL {0}   ·   {1}/{2} XP", _meta.Level, _meta.Xp, PlayerMeta.XpToNext(_meta.Level)), _small, Visuals.Gold, 1.2f);
-            var xpBar = new Rect(w * 0.2f, h * 0.142f, w * 0.6f, h * 0.012f);
-            Panel(xpBar, _barBackStyle);
-            float xf = Mathf.Clamp01(_meta.Xp / (float)Mathf.Max(1, PlayerMeta.XpToNext(_meta.Level)));
-            if (xf > 0f) Panel(new Rect(xpBar.x, xpBar.y, Mathf.Max(xpBar.height, xpBar.width * xf), xpBar.height), _barFillStyle);
-            Outlined(new Rect(0, h * 0.157f, w, h * 0.03f), Loc.F("TROPHIES  {0}/{1}", got, ach.Length), _small, new Color(1, 1, 1, 0.85f), 1f);
+            var unwon = TrophyBoard.Unwon(_meta);
+            int got = ach.Length - unwon.Count;
+            var small = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold };
+            var label = new GUIStyle(small) { fontSize = Mathf.RoundToInt(_small.fontSize * 0.8f), fontStyle = FontStyle.Normal };
+            var rightS = new GUIStyle(small) { alignment = TextAnchor.MiddleRight };
+            var center = new GUIStyle(small) { alignment = TextAnchor.MiddleCenter };
+            Outlined(new Rect(0, h * 0.035f, w, h * 0.065f), Coach.T("TROPHIES"), _h2, Visuals.Hex("7CF8FF"), 3);
 
-            float top = h * 0.195f, area = h * 0.635f, gap = h * 0.006f, rh = area / ach.Length - gap;
-            var name = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold };
-            var desc = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontSize = Mathf.RoundToInt(_small.fontSize * 0.85f) };
-            var right = new GUIStyle(_small) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold };
+            // summary card
+            var sum = new Rect(w * 0.05f, h * 0.105f, w * 0.9f, h * 0.19f);
+            Panel(sum, _cardStyle);
+            var badge = new Rect(sum.x + w * 0.04f, sum.y + h * 0.018f, h * 0.075f, h * 0.075f);
+            Panel(badge, Swatch(Visuals.Hex("FFB627")));
+            Outlined(badge, _meta.Level.ToString(), new GUIStyle(_h2) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(_h2.fontSize * 0.7f) }, Color.white, 2f);
+            float tx = badge.xMax + w * 0.04f, tw = sum.xMax - tx - w * 0.04f;
+            Outlined(new Rect(tx, sum.y + h * 0.014f, tw, h * 0.035f), Loc.F("LEVEL {0}", _meta.Level), small, Visuals.Gold, 1.2f);
+            int need = PlayerMeta.XpToNext(_meta.Level);
+            var xpBar = new Rect(tx, sum.y + h * 0.056f, tw, h * 0.016f);
+            Panel(xpBar, _barBackStyle);
+            float xf = Mathf.Clamp01(_meta.Xp / (float)Mathf.Max(1, need));
+            if (xf > 0f) Panel(new Rect(xpBar.x, xpBar.y, Mathf.Max(xpBar.height, xpBar.width * xf), xpBar.height), _barFillStyle);
+            Outlined(new Rect(tx, sum.y + h * 0.074f, tw, h * 0.026f), $"{_meta.Xp}/{need} XP", label, new Color(1, 1, 1, 0.8f), 1f);
+            float tileW = (sum.width - w * 0.08f - 2 * w * 0.02f) / 3f, ty = sum.y + h * 0.107f, th = h * 0.07f;
+            var tiles = new[] { ($"{got}/{ach.Length}", Coach.T("TROPHIES"), "FFE27A"), ("● " + _meta.Coins, Coach.T("COINS"), "FFD54A"), ("★ " + _progress.TotalStars, Coach.T("STARS"), "7CF8FF") };
+            for (int k = 0; k < 3; k++)
+            {
+                var r = new Rect(sum.x + w * 0.04f + k * (tileW + w * 0.02f), ty, tileW, th);
+                Panel(r, Swatch(Visuals.Hex("2B2C86")));
+                Outlined(new Rect(r.x, r.y + th * 0.04f, r.width, th * 0.55f), tiles[k].Item1, center, Visuals.Hex(tiles[k].Item3), 1.2f);
+                Outlined(new Rect(r.x, r.y + th * 0.56f, r.width, th * 0.4f), tiles[k].Item2, new GUIStyle(label) { alignment = TextAnchor.MiddleCenter }, new Color(1, 1, 1, 0.75f), 1f);
+            }
+
+            // next up: the three unwon trophies closest to done
+            float y = h * 0.31f;
+            Outlined(new Rect(w * 0.06f, y, w * 0.5f, h * 0.03f), Coach.T("NEXT UP"), label, Visuals.Hex("C9A7FF"), 1.2f);
+            y += h * 0.032f;
+            float cardH = h * 0.075f, gap = h * 0.008f;
+            for (int k = 0; k < Mathf.Min(3, unwon.Count); k++)
+            {
+                int i = unwon[k];
+                var a = ach[i];
+                int have = Mathf.Min(_meta.Stats[(int)a.Stat], a.Target);
+                var card = new Rect(w * 0.05f, y, w * 0.9f, cardH);
+                Panel(card, Swatch(Visuals.Hex("3A34A8")));
+                float pad = w * 0.04f, cw = card.width * 0.62f;
+                Outlined(new Rect(card.x + pad, card.y + cardH * 0.06f, cw, cardH * 0.4f), "☆ " + Loc.L(a.Name), small, Color.white, 1.2f);
+                Outlined(new Rect(card.x + pad, card.y + cardH * 0.46f, cw, cardH * 0.36f), a.Text, label, new Color(1, 1, 1, 0.75f), 1f);
+                Outlined(new Rect(card.x, card.y + cardH * 0.06f, card.width - pad, cardH * 0.4f), $"+{a.Reward} ●", rightS, Visuals.Gold, 1.2f);
+                float bw = card.width * 0.3f, bh = cardH * 0.18f;
+                var bar = new Rect(card.xMax - pad - bw, card.y + cardH * 0.56f, bw, bh);
+                Panel(bar, _barBackStyle);
+                float f = TrophyBoard.Progress(_meta, i);
+                if (f > 0f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bh, bw * f), bh), _barFillStyle);
+                Outlined(new Rect(bar.x, card.y + cardH * 0.74f, bw, cardH * 0.26f), $"{have}/{a.Target}", new GUIStyle(label) { alignment = TextAnchor.MiddleRight }, new Color(1, 1, 1, 0.8f), 1f);
+                y += cardH + gap;
+            }
+            if (unwon.Count == 0) { Outlined(new Rect(0, y, w, h * 0.05f), "★", center, Visuals.Gold, 2f); y += h * 0.06f; }
+
+            // earned: gold chips, two per row
+            y += h * 0.008f;
+            Outlined(new Rect(w * 0.06f, y, w * 0.5f, h * 0.03f), Coach.T("EARNED"), label, Visuals.Hex("C9A7FF"), 1.2f);
+            y += h * 0.032f;
+            float chipW = (w * 0.9f - gap) / 2f, chipH = h * 0.036f;
+            int n = 0;
             for (int i = 0; i < ach.Length; i++)
             {
-                var a = ach[i];
-                bool done = _meta.HasAchievement(i);
-                int have = Mathf.Min(_meta.Stats[(int)a.Stat], a.Target);
-                var card = new Rect(w * 0.05f, top + i * (rh + gap), w * 0.9f, rh);
-                Panel(card, Swatch(done ? Visuals.Hex("9A7414") : Visuals.Hex("2B2C86")));
-                float pad = w * 0.035f, tw = card.width * 0.64f;
-                Outlined(new Rect(card.x + pad, card.y + rh * 0.04f, tw, rh * 0.5f), (done ? "★ " : "☆ ") + Loc.L(a.Name), name, done ? Visuals.Hex("FFE27A") : Color.white, 1.2f);
-                Outlined(new Rect(card.x + pad, card.y + rh * 0.46f, tw, rh * 0.4f), a.Text, desc, new Color(1, 1, 1, 0.75f), 1f);
-                Outlined(new Rect(card.x, card.y + rh * 0.04f, card.width - pad, rh * 0.5f), done ? "DONE" : $"+{a.Reward} ●", right, done ? Visuals.Hex("7CFFC4") : Visuals.Gold, 1.2f);
-                if (!done)
-                {
-                    float bw = card.width * 0.3f, bh = rh * 0.16f;
-                    var bar = new Rect(card.xMax - pad - bw, card.y + rh * 0.62f, bw, bh);
-                    Panel(bar, _barBackStyle);
-                    float f = have / (float)Mathf.Max(1, a.Target);
-                    if (f > 0f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bh, bw * f), bh), _barFillStyle);
-                    Outlined(new Rect(bar.x, card.y + rh * 0.74f, bw, rh * 0.26f), $"{have}/{a.Target}", new GUIStyle(desc) { alignment = TextAnchor.MiddleRight }, new Color(1, 1, 1, 0.8f), 1f);
-                }
+                if (!_meta.HasAchievement(i)) continue;
+                var r = new Rect(w * 0.05f + (n % 2) * (chipW + gap), y + (n / 2) * (chipH + gap), chipW, chipH);
+                Panel(r, Swatch(Visuals.Hex("9A7414")));
+                Outlined(r, "★ " + Loc.L(ach[i].Name), new GUIStyle(small) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(_small.fontSize * 0.85f) }, Visuals.Hex("FFE27A"), 1f);
+                n++;
             }
-            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Missions);
+            y += ((n + 1) / 2) * (chipH + gap) + h * 0.006f;
+
+            // what is still ahead
+            int ahead = Mathf.Max(0, unwon.Count - 3), coins = 0;
+            for (int k = 3; k < unwon.Count; k++) coins += ach[unwon[k]].Reward;
+            if (ahead > 0) Outlined(new Rect(0, y, w, h * 0.03f), Coach.F("MORE TO WIN: {0}   ·   +{1} ●", ahead, coins), new GUIStyle(label) { alignment = TextAnchor.MiddleCenter }, new Color(1, 1, 1, 0.8f), 1f);
+
+            if (Btn(Row(w, h * 0.89f, h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Missions);
         }
 
         private bool _victoryRun;

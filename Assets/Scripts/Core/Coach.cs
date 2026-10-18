@@ -36,6 +36,25 @@ namespace BlockDrop.Core
         }
     }
 
+    /// <summary>Trophies screen data: how close each unwon trophy is, so the closest ones show first.</summary>
+    public static class TrophyBoard
+    {
+        public static float Progress(PlayerMeta meta, int i)
+        {
+            var a = PlayerMeta.Achievements[i];
+            return Math.Min(1f, meta.Stats[(int)a.Stat] / (float)Math.Max(1, a.Target));
+        }
+
+        /// <summary>Indices of trophies not yet won, closest to done first (ties keep the list order).</summary>
+        public static List<int> Unwon(PlayerMeta meta)
+        {
+            var list = new List<int>();
+            for (int i = 0; i < PlayerMeta.Achievements.Length; i++) if (!meta.HasAchievement(i)) list.Add(i);
+            list.Sort((x, y) => { int c = Progress(meta, y).CompareTo(Progress(meta, x)); return c != 0 ? c : x.CompareTo(y); });
+            return list;
+        }
+    }
+
     /// <summary>The first-run tutorial. Steps are stored as the same 0-3 number the game already keeps in
     /// PlayerPrefs ("tutorial"), on the phone only. It runs in Classic and can always be skipped.</summary>
     public static class Guide
@@ -149,6 +168,11 @@ namespace BlockDrop.Core
             ["GOAL REACHED!"] = ("¡META ALCANZADA!", "META ALCANÇADA!"),
             ["BONUS MOVES!"] = ("¡MOVIMIENTOS EXTRA!", "JOGADAS EXTRAS!"),
             ["BONUS x{0}"] = ("EXTRA x{0}", "EXTRA x{0}"),
+            ["NEXT UP"] = ("A SEGUIR", "PRÓXIMOS"),
+            ["EARNED"] = ("GANADOS", "CONQUISTADOS"),
+            ["COINS"] = ("MONEDAS", "MOEDAS"),
+            ["STARS"] = ("ESTRELLAS", "ESTRELAS"),
+            ["MORE TO WIN: {0}   ·   +{1} ●"] = ("POR GANAR: {0}   ·   +{1} ●", "A CONQUISTAR: {0}   ·   +{1} ●"),
             ["NEW STAR RECORD!"] = ("¡NUEVO RÉCORD DE ESTRELLAS!", "NOVO RECORDE DE ESTRELAS!"),
             ["NEXT: LEVEL {0}"] = ("SIGUIENTE: NIVEL {0}", "PRÓXIMO: NÍVEL {0}"),
             ["SCORE {0}   +{1} ●"] = ("PUNTAJE {0}   +{1} ●", "PONTUAÇÃO {0}   +{1} ●"),

@@ -1,5 +1,6 @@
 """Draws Block Drop's level-map art from scratch (no stock images, no third-party assets), so it is ours to ship.
 Run: python3 tools/art/make_map_art.py  -> Assets/Resources/Map/*.png (+ .meta files with sprite-friendly import settings)."""
+# Note: the six bg_*.png backdrops are now Canva-made (1080x1920 resized to 432x768); rerunning this script would overwrite them with the drawn fallback.
 import hashlib, math, os, random
 from PIL import Image, ImageDraw, ImageFilter
 

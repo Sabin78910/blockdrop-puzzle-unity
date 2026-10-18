@@ -120,7 +120,7 @@ namespace BlockDrop.Game
             NewLook.Apply(_world, _cam);
             ShowMenu();
             if (_welcomeReward > 0) { _fx.Win(); Confetti(40); }
-            ResumeRun();
+            ResumeRun(Mode.Level);
             _ = OnlineService.EnsureReady(); // best effort; game is fully playable offline
         }
 
@@ -254,12 +254,13 @@ namespace BlockDrop.Game
         private static void ClearRun() => PlayerPrefs.DeleteKey(RunKey);
 
         /// <summary>Continues a run the app was closed in the middle of, opening on the pause card.</summary>
-        private void ResumeRun()
+        private bool ResumeRun(Mode want)
         {
             var save = SavedGame.Parse(PlayerPrefs.GetString(RunKey, ""));
+            if (save == null || !Enum.TryParse(save.Mode, out Mode mode) || !Enum.IsDefined(typeof(Mode), mode) || mode == Mode.Versus || mode == Mode.VsAi) { ClearRun(); return false; }
+            if (mode != want) return false; // another mode's run stays saved for its own button; PLAY always opens the level map
             ClearRun();
-            if (save == null || !Enum.TryParse(save.Mode, out Mode mode) || !Enum.IsDefined(typeof(Mode), mode) || mode == Mode.Versus || mode == Mode.VsAi) return;
-            if (mode == Mode.Daily && save.Seed != PieceGenerator.DailySeed(DateTime.UtcNow)) return; // that day's challenge is over
+            if (mode == Mode.Daily && save.Seed != PieceGenerator.DailySeed(DateTime.UtcNow)) return false; // that day's challenge is over
             try
             {
                 switch (mode)
@@ -275,7 +276,7 @@ namespace BlockDrop.Game
             catch (Exception e)
             {
                 Debug.LogWarning("Block Drop could not resume a saved game: " + e.Message);
-                return;
+                return false;
             }
             EnterPlay(mode);
             _hintsLeft = Mathf.Clamp(save.Hints, 0, Competitive ? 0 : 3);
@@ -283,6 +284,7 @@ namespace BlockDrop.Game
             _shownScore = Score;
             if (IsFinished) AfterMove(); // closed on the last move: offer the second chance or finish properly
             else { SaveRun(); SetPaused(true); }
+            return true;
         }
 
         private void ApplyTheme()
@@ -1233,7 +1235,7 @@ namespace BlockDrop.Game
             float half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
             if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) ShowMenu(Screen.LevelSelect);
             y += bh * 1.2f + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), "CLASSIC", "FFC24B", "F08A1C", 0.85f)) StartMode(Mode.Classic);
+            if (Btn(new Rect(w * 0.08f, y, half, bh), "CLASSIC", "FFC24B", "F08A1C", 0.85f)) { if (!ResumeRun(Mode.Classic)) StartMode(Mode.Classic); }
             if (Btn(new Rect(x2, y, half, bh), "DAILY", "4FD8FF", "1C8FE0", 0.85f)) StartMode(Mode.Daily);
             y += bh + gap;
             if (Btn(new Rect(w * 0.08f, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);
@@ -1616,6 +1618,7 @@ namespace BlockDrop.Game
                 {
                     string label = _mode == Mode.Daily ? "DAILY" : _mode == Mode.Challenge ? ChallengeCode.Encode(_challengeSeed) : Loc.F("BEST {0}", Mathf.Max(_best, Score));
                     Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), label, _body, Visuals.Hex("FFE27A"), 1.5f);
+                    if (_mode == Mode.Classic) Outlined(new Rect(w * 0.27f, top + bs * 0.8f, w * 0.46f, bs * 0.5f), "CLASSIC", _small, Visuals.Hex("7CF8FF"), 1.2f);
                     float punch = 1f + Mathf.Clamp01((Score - _shownScore) / 60f) * 0.25f;
                     var st = new GUIStyle(_h1) { fontSize = Mathf.RoundToInt(_h1.fontSize * punch) };
                     Outlined(new Rect(0, h * 0.095f, w, h * 0.1f), Mathf.RoundToInt(_shownScore).ToString(), st, Color.white, 3);

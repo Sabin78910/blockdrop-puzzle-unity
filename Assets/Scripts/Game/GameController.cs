@@ -102,7 +102,7 @@ namespace BlockDrop.Game
             _progress = Progress.Parse(PlayerPrefs.GetString("progress", ""));
             _fails = FailTracker.Parse(PlayerPrefs.GetString("fails", ""));
             _localName = PlayerPrefs.GetString("name", "");
-            string sysLang = Application.systemLanguage == SystemLanguage.Spanish ? "es" : Application.systemLanguage == SystemLanguage.Portuguese ? "pt" : "en";
+            string sysLang = Application.systemLanguage == SystemLanguage.Spanish ? "es" : Application.systemLanguage == SystemLanguage.Portuguese ? "pt" : System.Globalization.CultureInfo.CurrentCulture.TwoLetterISOLanguageName == "ne" ? "ne" : "en";
             Loc.Current = Loc.FromCode(PlayerPrefs.GetString("lang", sysLang));
             _meta = PlayerMeta.Parse(PlayerPrefs.GetString("meta", ""));
             _adPolicy = AdPolicy.Parse(PlayerPrefs.GetString("ads", ""));

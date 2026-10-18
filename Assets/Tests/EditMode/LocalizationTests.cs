@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -45,13 +47,39 @@ public class LocalizationTests
         {
             Assert.AreEqual(Lang.Es, Loc.FromCode("es-MX"));
             Assert.AreEqual(Lang.Pt, Loc.FromCode("pt_BR"));
-            Assert.AreEqual(Lang.En, Loc.FromCode("ne"));
+            Assert.AreEqual(Lang.Ne, Loc.FromCode("ne-NP"));
+            Assert.AreEqual(Lang.En, Loc.FromCode("fr"));
             Loc.Current = Lang.Pt;
             Assert.AreEqual("JOGAR", Loc.L("PLAY"));
             Assert.AreEqual("RECORDE 120", Loc.F("BEST {0}", 120));
             Assert.AreEqual("Some untranslated text", Loc.L("Some untranslated text"));
             Loc.Current = Lang.Es;
             Assert.AreEqual("Borra 10 líneas", new Mission { Kind = MissionKind.ClearLines, Target = 10 }.Text);
+        }
+        finally { Loc.Current = before; }
+    }
+
+    [Test] public void NepaliCoversEveryTranslatedString()
+    {
+        var missing = new List<string>();
+        foreach (var k in Loc.Table.Keys) if (!Nepali.Table.ContainsKey(k)) missing.Add(k);
+        foreach (var k in Coach.Table.Keys) if (!Nepali.Table.ContainsKey(k)) missing.Add(k);
+        Assert.IsEmpty(missing, string.Join(" | ", missing));
+        foreach (var kv in Nepali.Table)
+            for (int i = 0; i < 4; i++)
+                Assert.AreEqual(kv.Key.Contains("{" + i + "}"), kv.Value.Contains("{" + i + "}"), kv.Key);
+    }
+
+    [Test] public void NepaliSwitchesText()
+    {
+        var before = Loc.Current;
+        try
+        {
+            Loc.Current = Lang.Ne;
+            Assert.AreEqual("खेल्नुहोस्", Loc.L("PLAY"));
+            Assert.AreEqual("Some untranslated text", Loc.L("Some untranslated text"));
+            Assert.AreEqual("ne", Loc.Code(Lang.Ne));
+            Assert.AreEqual(Enum.GetValues(typeof(Lang)).Length, Loc.Names.Length);
         }
         finally { Loc.Current = before; }
     }

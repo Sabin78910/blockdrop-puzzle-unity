@@ -136,6 +136,35 @@ namespace BlockDrop.Game
 
         private int _levelCoins, _levelStarsBefore;
 
+        private bool _victoryRun;
+        private bool ShouldAutoFinish => _mode == Mode.Level && !_victoryRun && !_finishing && _level.GoalMet;
+
+        /// <summary>Once a level's goal is met with moves left, the game plays the rest itself as a quick streak
+        /// (each move with the normal sparkles, praise and clears) so the win lands as a reward, not a wait.
+        /// Input is paused meanwhile; leaving the screen or starting a new run stops it.</summary>
+        private IEnumerator VictoryRun()
+        {
+            int run = _runId;
+            _victoryRun = true;
+            _aiThinking = true;
+            var mid = BoardCenter + new Vector3(0, 0.6f, 0);
+            AddFloater(Coach.T("GOAL REACHED!"), mid + new Vector3(0, 1.4f, 0), Visuals.Hex("FFE27A"), 1.8f);
+            AddFloater(Coach.T("BONUS MOVES!"), mid + new Vector3(0, 0.1f, 0), Color.white, 1.3f);
+            _fx.Win();
+            if (!NewLook.ReducedMotion) Confetti(60);
+            yield return new WaitForSeconds(NewLook.ReducedMotion ? 0.5f : 1.0f);
+            for (int n = 1; run == _runId && _screen == Screen.Playing && _mode == Mode.Level && _level.State == LevelState.Playing; n++)
+            {
+                var seat = _level.Seat;
+                if (!Bot.TryMove(seat.Board, seat.Dealer.Hand, BotLevel.Hard, _rng, out int i, out int x, out int y)) break;
+                AddFloater(Coach.F("BONUS x{0}", n), mid + new Vector3(0, -2.2f, 0), Visuals.Hex("FF9BD2"), 0.9f);
+                PlaceWithEffects(i, x, y);
+                yield return new WaitForSeconds(Mathf.Max(0.16f, 0.5f - 0.04f * n));
+            }
+            _victoryRun = false;
+            if (run == _runId && !_finishing) _aiThinking = false;
+        }
+
         /// <summary>A small glittering pop on every placed block, so each drop feels good, not only clears.
         /// Skipped with reduced motion.</summary>
         private void PlaceSparkle(Piece piece, int ox, int oy)

@@ -396,7 +396,7 @@ namespace BlockDrop.Game
         {
             _mode = mode;
             _runId++;
-            _hint = null; _newBest = false; _aiThinking = false; _finishing = false; _bestCelebrated = false; _offerRevive = false;
+            _hint = null; _newBest = false; _aiThinking = false; _finishing = false; _victoryRun = false; _bestCelebrated = false; _offerRevive = false;
             _shownScore = 0;
             _floaters.Clear();
             _screen = Screen.Playing;
@@ -756,6 +756,7 @@ namespace BlockDrop.Game
             }
             if (_mode == Mode.Versus) { _turnBannerUntil = Time.time + 1.1f; Array.Clear(_pop, 0, _pop.Length); }
             RefreshBoard(); RebuildHand();
+            if (_mode == Mode.Versus || _mode == Mode.VsAi) { } else if (ShouldAutoFinish) StartCoroutine(VictoryRun());
             if (_mode == Mode.VsAi && _versus.Turn == 1) StartCoroutine(AiTurns());
         }
 

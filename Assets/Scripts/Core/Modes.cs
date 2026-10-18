@@ -464,6 +464,9 @@ namespace BlockDrop.Core
 
         public int MovesLeft => Math.Max(0, Definition.MaxMoves - Seat.Moves);
 
+        /// <summary>The target is reached with moves still to spend: the game plays them out as a bonus streak.</summary>
+        public bool GoalMet => State == LevelState.Playing && Seat.Board.Score >= Definition.TargetScore;
+
         /// <summary>Won once the target is reached and moves run out (or the board locks up);
         /// lost if the target was not reached by then.</summary>
         public LevelState State

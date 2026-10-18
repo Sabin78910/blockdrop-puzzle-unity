@@ -8,6 +8,9 @@ namespace BlockDrop.Core
     {
         public static readonly Dictionary<string, string> Table = new Dictionary<string, string>
         {
+            ["GOAL REACHED!"] = "लक्ष्य पूरा!",
+            ["BONUS MOVES!"] = "बोनस चाल!",
+            ["BONUS x{0}"] = "बोनस x{0}",
             ["PLAY"] = "खेल्नुहोस्",
             ["DAILY"] = "दैनिक",
             ["VS AI"] = "AI विरुद्ध",

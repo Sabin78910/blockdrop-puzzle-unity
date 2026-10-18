@@ -185,5 +185,15 @@ namespace BlockDrop.Tests
                 Assert.IsFalse(string.IsNullOrWhiteSpace(Coach.Table[key].es) || string.IsNullOrWhiteSpace(Coach.Table[key].pt), key);
             }
         }
-    }
+    
+        [Test]
+        public void Level_goal_is_met_only_while_moves_remain()
+        {
+            var level = new LevelSession(1);
+            Assert.IsFalse(level.GoalMet);
+            level.Seat.Board.RestoreScore(level.Definition.TargetScore, 0, 0, 0);
+            Assert.IsTrue(level.GoalMet);
+            Assert.AreEqual(LevelState.Playing, level.State);
+        }
+}
 }

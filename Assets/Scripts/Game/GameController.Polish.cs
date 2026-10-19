@@ -220,7 +220,7 @@ namespace BlockDrop.Game
             for (int k = 3; k < unwon.Count; k++) coins += ach[unwon[k]].Reward;
             if (ahead > 0) Outlined(new Rect(0, y, w, h * 0.03f), Coach.F("MORE TO WIN: {0}   ·   +{1} ●", ahead, coins), new GUIStyle(label) { alignment = TextAnchor.MiddleCenter }, new Color(1, 1, 1, 0.8f), 1f);
 
-            if (Btn(Row(w, h * 0.89f, h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Missions);
+            if (Btn(Row(w, Mathf.Min(h * 0.89f, y + h * 0.05f), h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Missions);
         }
 
         private bool _victoryRun;

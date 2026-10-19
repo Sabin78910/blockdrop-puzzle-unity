@@ -37,7 +37,7 @@ namespace BlockDrop.EditorTools
             PlayerSettings.Android.minSdkVersion = (AndroidSdkVersions)26;
             PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)36;
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
-            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64; // ARMv7 keeps budget 32-bit phones eligible on Play
             PlayerSettings.Android.forceInternetPermission = true; // online leaderboards (optional at runtime)
             bool icons = ConfigureIcons();
             EnsureScene();

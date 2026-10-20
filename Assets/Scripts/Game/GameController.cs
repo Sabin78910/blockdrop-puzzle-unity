@@ -49,7 +49,7 @@ namespace BlockDrop.Game
         private int _best, _challengeSeed, _hintsLeft;
         private bool _aiThinking, _newBest;
         private float _shownScore, _resultTime, _turnBannerUntil;
-        private string _codeInput = "", _codeError = "", _boardTab = OnlineService.ClassicBoard;
+        private string _codeInput = "", _codeError = "", _boardTab = OnlineService.LevelsBoard;
         private string _nameInput = "", _nameMsg = "", _localName = "";
         private readonly System.Random _rng = new System.Random();
 
@@ -486,6 +486,7 @@ namespace BlockDrop.Game
             }
             SaveMeta();
             PlayerPrefs.Save();
+            if (good && _mode == Mode.Level) OnlineService.SubmitLevels(_progress.TotalStars);
             if (good) { _fx.Win(); if (_mode == Mode.Level) StartLevelCelebration(); else Confetti(60); } else _fx.GameOver();
             _resultTime = Time.time;
             ShowMenu(Screen.Result);
@@ -958,8 +959,11 @@ namespace BlockDrop.Game
             _small = new GUIStyle(_body) { fontSize = Mathf.RoundToInt(fs * 0.8f) };
             if (NewLook.On && NewLook.Display != null) { _h1.font = _h2.font = NewLook.Display; _h1.fontStyle = _h2.fontStyle = FontStyle.Normal; }
             _field = new GUIStyle(GUI.skin.textField) { fontSize = fs * 2, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-            _field.normal.background = _field.focused.background = Visuals.RoundedRect(96, 96, 28, Visuals.Hex("F4F1FF"), Visuals.Hex("D9D2FF"), 0f);
-            _field.normal.textColor = _field.focused.textColor = Visuals.Hex("2A0E61");
+            // every state gets the same texture: the skin's own hover/active textures are 9-sliced for a different
+            // border and render as garbled stripes on a touch screen when the field is pressed.
+            var fieldBg = Visuals.RoundedRect(96, 96, 28, Visuals.Hex("F4F1FF"), Visuals.Hex("D9D2FF"), 0f);
+            foreach (var state in new[] { _field.normal, _field.hover, _field.active, _field.focused, _field.onNormal, _field.onHover, _field.onActive, _field.onFocused })
+            { state.background = fieldBg; state.textColor = Visuals.Hex("2A0E61"); }
             _field.border = new RectOffset(30, 30, 30, 30);
             _barBackStyle = Sliced(Visuals.RoundedRect(64, 32, 15, new Color(0, 0, 0, 0.35f), new Color(0, 0, 0, 0.35f), 0f), 15);
             _barFillStyle = Sliced(Visuals.RoundedRect(64, 32, 15, Visuals.Hex("FFE27A"), Visuals.Hex("FFB627"), 0f), 15);
@@ -1157,7 +1161,7 @@ namespace BlockDrop.Game
             var card = new Rect(w * 0.08f, h * 0.3f, w * 0.84f, h * 0.34f);
             Modal(w, h, card);
             Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.06f), "OUT OF MOVES", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.85f) }, Visuals.Hex("FF8FA3"), 3);
-            Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.085f, card.width - w * 0.1f, h * 0.065f), Loc.F("Score {0}. Second chance: 3 new pieces that fit!", Score), _small, Color.white, 1.2f);
+            Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.08f, card.width - w * 0.1f, h * 0.08f), Loc.F("Score {0}. Second chance: 3 new pieces that fit!", Score), _small, Color.white, 1.2f);
             float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
             if (Btn(new Rect(bx, card.y + h * 0.165f, bw, h * 0.065f), _ads.RewardedIsFree ? "CONTINUE  (FREE)" : "WATCH VIDEO TO CONTINUE", "4BE38A", "1FA45B", 0.85f)) AcceptRevive();
             if (Btn(new Rect(bx, card.y + h * 0.245f, bw, h * 0.06f), "NO THANKS", "5A4FA8", "3A2F80", 0.8f)) DeclineRevive();
@@ -1182,7 +1186,7 @@ namespace BlockDrop.Game
             float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
             if (Btn(new Rect(bx, card.y + h * 0.14f, bw, h * 0.065f), "RESUME", "4BE38A", "1FA45B")) SetPaused(false);
             if (Btn(new Rect(bx, card.y + h * 0.22f, bw, h * 0.065f), "QUIT TO MENU", "FF7AB6", "E0347C", 0.85f)) ShowMenu();
-            Outlined(new Rect(card.x, card.y + h * 0.29f, card.width, h * 0.04f), "Quitting ends this game.", _small, new Color(1, 1, 1, 0.7f), 1f);
+            Outlined(new Rect(card.x, card.y + h * 0.29f, card.width, h * 0.04f), "Quitting ends this game.", _small, new Color(1, 1, 1, 0.88f), 1f);
         }
 
         private void DrawBreak(float w, float h)
@@ -1253,9 +1257,9 @@ namespace BlockDrop.Game
                 var btn = new Rect(card.xMax - w * 0.3f, card.y + h * 0.05f, w * 0.26f, h * 0.06f);
                 if (_meta.Claimed[i]) Outlined(btn, "DONE ✓", _body, Visuals.Hex("2EE59D"), 1.2f);
                 else if (_meta.IsComplete(i, Today)) { if (Btn(btn, $"+{ms[i].Reward} ●", "FFD54A", "D99A00", 0.75f) && _meta.Claim(i, Today)) { _fx.Win(); Confetti(25); SaveMeta(); } }
-                else Outlined(btn, $"+{ms[i].Reward} ●", _body, new Color(1, 1, 1, 0.5f), 1.2f);
+                else Outlined(btn, $"+{ms[i].Reward} ●", _body, new Color(1, 1, 1, 0.85f), 1.2f);
             }
-            Outlined(new Rect(w * 0.08f, h * 0.69f, w * 0.84f, h * 0.06f), "New missions every day. Coins unlock themes; they never buy an advantage.", _small, new Color(1, 1, 1, 0.75f), 1.2f);
+            Outlined(new Rect(w * 0.08f, h * 0.68f, w * 0.84f, h * 0.08f), "New missions every day. Coins unlock themes; they never buy an advantage.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
             int got = 0; for (int i = 0; i < PlayerMeta.Achievements.Length; i++) if (_meta.HasAchievement(i)) got++;
             if (Btn(Row(w, h * 0.765f, h * 0.065f), Loc.F("TROPHIES  {0}/{1}", got, PlayerMeta.Achievements.Length), "7CF8FF", "1C8FE0", 0.85f)) ShowMenu(Screen.Trophies);
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
@@ -1418,7 +1422,7 @@ namespace BlockDrop.Game
                     if (!open) Sprite(new Rect(r.xMax - node * 0.38f, r.yMax - node * 0.4f, node * 0.34f, node * 0.34f), "lock", Color.white);
                     if (open) for (int i = 0; i < 3; i++) Sprite(new Rect(cx + (i - 1.5f) * node * 0.3f, cy + node * 0.46f, node * 0.3f, node * 0.3f), i < stars ? "star_on" : "star_off", Color.white);
                 }
-                Outlined(r, n.ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, open ? Color.white : new Color(1, 1, 1, 0.6f), 1.5f);
+                Outlined(r, n.ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, open ? Color.white : new Color(1, 1, 1, 0.85f), 1.5f);
                 if (tier != LevelTier.Normal && open) Outlined(new Rect(r.xMax - node * 0.28f, r.y - node * 0.08f, node * 0.36f, node * 0.36f), "!", new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, tier == LevelTier.SuperHard ? Visuals.Hex("E7A6FF") : Visuals.Hex("FFB0B0"), 1.2f);
                 if (n == frontier) Outlined(new Rect(cx - node / 2, cy - node * 1.0f + Mathf.Sin(Time.time * 4f) * node * 0.06f, node, node * 0.4f), "▼", new GUIStyle(_body) { wordWrap = false }, Color.white, 1.2f);
                 if (_mapTapped && open && (new Vector2(cx, cy) - tap).sqrMagnitude < node * node * 0.3f) tapped = n;
@@ -1494,7 +1498,7 @@ namespace BlockDrop.Game
         private void DrawAiSelect(float w, float h)
         {
             Outlined(new Rect(0, h * 0.12f, w, h * 0.08f), "VS AI", _h1, Visuals.Hex("C9A7FF"), 3);
-            Outlined(new Rect(0, h * 0.22f, w, h * 0.06f), "Same pieces for you and the AI. Highest score wins.", _body, Color.white, 1.5f);
+            Outlined(new Rect(w * 0.05f, h * 0.21f, w * 0.9f, h * 0.08f), "Same pieces for you and the AI. Highest score wins.", _small, Color.white, 1.5f);
             float y = h * 0.32f, bh = h * 0.085f, gap = h * 0.02f;
             if (Btn(Row(w, y, bh), "EASY", "4BE38A", "1FA45B")) { _aiLevel = BotLevel.Easy; StartMode(Mode.VsAi); }
             if (Btn(Row(w, y + bh + gap, bh), "MEDIUM", "FFC24B", "F08A1C")) { _aiLevel = BotLevel.Medium; StartMode(Mode.VsAi); }
@@ -1525,7 +1529,8 @@ namespace BlockDrop.Game
                     foreach (var s in new[] { d.TargetScore, d.TwoStarScore, d.ThreeStarScore })
                     {
                         float sx = bar.x + bar.width * Mathf.Clamp01((float)s / Mathf.Max(1, d.ThreeStarScore));
-                        Outlined(new Rect(sx - 20, bar.y - h * 0.03f, 40, h * 0.03f), "★", _small, Score >= s ? Visuals.Gold : new Color(1, 1, 1, 0.5f), 1);
+                        bool got = Score >= s;
+                        Outlined(new Rect(sx - h * 0.03f, bar.y - h * 0.046f, h * 0.06f, h * 0.046f), got ? "★" : "☆", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.8f), font = null, fontStyle = FontStyle.Bold }, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
                     }
                     Outlined(new Rect(0, h * 0.205f, w, h * 0.04f), Loc.F("MOVES LEFT  {0}", _level.MovesLeft), _small, _level.MovesLeft <= 3 ? Visuals.Hex("FF8FA3") : Color.white, 1.5f);
                     break;
@@ -1626,7 +1631,7 @@ namespace BlockDrop.Game
                     Outlined(new Rect(0, y + h * 0.1f, w, h * 0.12f), Score.ToString(), st, Color.white, 3);
                     Outlined(new Rect(0, y + h * 0.21f, w, h * 0.05f), Loc.F("BEST {0}", _best), _body, Visuals.Gold, 1.5f);
                     if (!_newBest && _best > 0 && Score >= _best * 0.8f)
-                        Outlined(new Rect(0, y + h * 0.255f, w, h * 0.04f), Loc.F("So close! Only {0} points from your best.", _best - Score), _small, Visuals.Hex("7CF8FF"), 1.2f);
+                        Outlined(new Rect(w * 0.05f, y + h * 0.25f, w * 0.9f, h * 0.06f), Loc.F("So close! Only {0} points from your best.", _best - Score), _small, Visuals.Hex("7CF8FF"), 1.2f);
                     else if (NewLook.On && !_newBest && NearMiss.Find(MainSeat.Board).Message() is string miss)
                         Outlined(new Rect(0, y + h * 0.255f, w, h * 0.04f), miss, _small, Visuals.Hex("7CF8FF"), 1.2f);
                     if (Btn(Row(w, y + h * 0.3f, h * 0.07f, 0.14f), "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(_mode);
@@ -1697,22 +1702,22 @@ namespace BlockDrop.Game
         private void DrawChallenge(float w, float h)
         {
             Outlined(new Rect(0, h * 0.08f, w, h * 0.08f), "CHALLENGE", _h2, Visuals.Hex("7CF8FF"), 3);
-            Outlined(new Rect(w * 0.08f, h * 0.165f, w * 0.84f, h * 0.11f), "Start a challenge and share its code, or enter a friend's code to play their exact pieces.", _body, Color.white, 1.5f);
+            Outlined(new Rect(w * 0.08f, h * 0.165f, w * 0.84f, h * 0.125f), "Start a challenge and share its code, or enter a friend's code to play their exact pieces.", _small, Color.white, 1.5f);
             if (Btn(Row(w, h * 0.30f, h * 0.08f), "NEW CHALLENGE", "4BE38A", "1FA45B")) StartMode(Mode.Challenge, ChallengeCode.NewSeed(_rng));
             Outlined(new Rect(0, h * 0.415f, w, h * 0.04f), "FRIEND'S CODE", _body, Visuals.Hex("FFE27A"), 1.5f);
             _codeInput = KeyboardField(Row(w, h * 0.465f, h * 0.085f, 0.16f), _codeInput, "code", ChallengeCode.Length, "K7Q2MX").ToUpperInvariant();
             if (Btn(Row(w, h * 0.57f, h * 0.075f), "PLAY CODE", "6E8BFF", "3A4FE0")) PlayCode();
-            if (_codeError != "") Outlined(new Rect(0, h * 0.655f, w, h * 0.05f), _codeError, _small, Visuals.Hex("FF8FA3"), 1.2f);
+            if (_codeError != "") Outlined(new Rect(w * 0.05f, h * 0.655f, w * 0.9f, h * 0.08f), _codeError, _small, Visuals.Hex("FF8FA3"), 1.2f);
             if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
         private void DrawProfile(float w, float h)
         {
             Outlined(new Rect(0, h * 0.1f, w, h * 0.08f), "YOUR NAME", _h2, Visuals.Gold, 3);
-            Outlined(new Rect(w * 0.08f, h * 0.19f, w * 0.84f, h * 0.08f), "Shown on leaderboards. Letters, numbers and _ only (3–20).", _body, Color.white, 1.5f);
-            _nameInput = KeyboardField(Row(w, h * 0.3f, h * 0.085f, 0.1f), _nameInput, "name", 20, "Your name");
-            if (Btn(Row(w, h * 0.41f, h * 0.075f), "SAVE", "4BE38A", "1FA45B")) SaveName();
-            if (_nameMsg != "") Outlined(new Rect(w * 0.05f, h * 0.5f, w * 0.9f, h * 0.08f), _nameMsg, _small, Visuals.Hex("FFE27A"), 1.2f);
+            Outlined(new Rect(w * 0.08f, h * 0.185f, w * 0.84f, h * 0.12f), "Shown on leaderboards. Letters, numbers and _ only (3–20).", _small, Color.white, 1.5f);
+            _nameInput = KeyboardField(Row(w, h * 0.32f, h * 0.085f, 0.1f), _nameInput, "name", 20, "Your name");
+            if (Btn(Row(w, h * 0.43f, h * 0.075f), "SAVE", "4BE38A", "1FA45B")) SaveName();
+            if (_nameMsg != "") Outlined(new Rect(w * 0.05f, h * 0.52f, w * 0.9f, h * 0.1f), _nameMsg, _small, Visuals.Hex("FFE27A"), 1.2f);
             if (Btn(Row(w, h * 0.66f, h * 0.07f), Loc.F("LANGUAGE: {0}", Loc.Names[(int)Loc.Current]), "6E8BFF", "3A4FE0", 0.8f))
             {
                 Loc.Current = (Lang)(((int)Loc.Current + 1) % Loc.Names.Length);
@@ -1784,10 +1789,13 @@ namespace BlockDrop.Game
         private void DrawLeaderboard(float w, float h)
         {
             Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "RANKINGS", _h2, Visuals.Gold, 3);
-            float half = w * 0.4f;
-            bool classic = _boardTab == OnlineService.ClassicBoard;
-            if (Btn(new Rect(w * 0.08f, h * 0.14f, half, h * 0.06f), "CLASSIC", classic ? "FFD54A" : "5A4FA8", classic ? "D99A00" : "3A2F80", 0.8f)) { _boardTab = OnlineService.ClassicBoard; OnlineService.Refresh(_boardTab); }
-            if (Btn(new Rect(w * 0.92f - half, h * 0.14f, half, h * 0.06f), "DAILY", !classic ? "FFD54A" : "5A4FA8", !classic ? "D99A00" : "3A2F80", 0.8f)) { _boardTab = OnlineService.DailyBoard; OnlineService.Refresh(_boardTab); }
+            float tabW = (w * 0.84f - 2 * w * 0.015f) / 3f;
+            var tabs = new[] { ("LEVELS", OnlineService.LevelsBoard), ("CLASSIC", OnlineService.ClassicBoard), ("DAILY", OnlineService.DailyBoard) };
+            for (int k = 0; k < tabs.Length; k++)
+            {
+                bool on = _boardTab == tabs[k].Item2;
+                if (Btn(new Rect(w * 0.08f + k * (tabW + w * 0.015f), h * 0.14f, tabW, h * 0.06f), tabs[k].Item1, on ? "FFD54A" : "5A4FA8", on ? "D99A00" : "3A2F80", 0.7f)) { _boardTab = tabs[k].Item2; OnlineService.Refresh(_boardTab); if (_boardTab == OnlineService.LevelsBoard) OnlineService.SubmitLevels(_progress.TotalStars); }
+            }
             var card = new Rect(w * 0.04f, h * 0.22f, w * 0.92f, h * 0.62f);
             Panel(card, _cardStyle);
             float y = card.y + h * 0.015f, rh = h * 0.058f;

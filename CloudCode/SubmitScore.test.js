@@ -34,3 +34,9 @@ test("rejects scores the rules cannot reach", () => {
 test("accepts the best possible single placement", () => {
   ok({ score: 9 + 10 * 36, placements: 1, lines: 6 });
 });
+
+test("Levels board takes total stars within range", () => {
+  assert.strictEqual(validate({ leaderboardId: "Levels", score: 120, placements: 0, lines: 0 }), null);
+  assert.notStrictEqual(validate({ leaderboardId: "Levels", score: -1, placements: 0, lines: 0 }), null);
+  assert.notStrictEqual(validate({ leaderboardId: "Levels", score: 30001, placements: 0, lines: 0 }), null);
+});

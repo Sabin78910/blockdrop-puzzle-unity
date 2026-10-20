@@ -10,7 +10,7 @@ public class LocalizationTests
 {
     // Not user-facing: brand words, object names, IDs, preference keys, log prefixes.
     private static readonly Regex NotUi = new Regex(
-        @"^([0-9A-Fa-f]{6}|[a-z_]+|[a-z]+[A-Z][A-Za-z]*|[A-Z][a-z]+[A-Z][A-Za-z]*|.*Loc\..*|.*_versus.*|\).*|Main Camera|Map/|Background|Board|Panel|Rim|MenuDeco|MiniBoard|MiniPanel|BlockDrop|World|Classic|Daily|BLOCK|DROP|K7Q2MX|SwiftFox#1234|\(prefers.*|\^.*|.*: |.*://.*)$", RegexOptions.Singleline);
+        @"^([0-9A-Fa-f]{6}|[a-z_]+|[a-z]+[A-Z][A-Za-z]*|[A-Z][a-z]+[A-Z][A-Za-z]*|.*Loc\..*|.*_versus.*|\).*|Main Camera|Map/|Background|Board|Panel|Rim|MenuDeco|MiniBoard|MiniPanel|BlockDrop|World|Classic|Daily|Levels|BLOCK|DROP|K7Q2MX|SwiftFox#1234|\(prefers.*|\^.*|.*: |.*://.*)$", RegexOptions.Singleline);
 
     private static string[] UiLiterals(params string[] files)
     {

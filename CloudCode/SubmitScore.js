@@ -9,7 +9,8 @@
  */
 const { LeaderboardsApi } = require("@unity-services/leaderboards-1.1");
 
-const BOARDS = ["Classic", "Daily"];
+const BOARDS = ["Classic", "Daily", "Levels"];
+const MAX_LEVEL_STARS = 30000; // the Levels board ranks total stars; three per level
 const MAX_CELLS = 9;
 const MAX_LINES_PER_PLACEMENT = 6;
 const MAX_PLACEMENTS = 20000;
@@ -17,6 +18,10 @@ const MAX_PLACEMENTS = 20000;
 /** Returns null when the claim is possible under the Board rules, otherwise the reason it is not. */
 function validate({ leaderboardId, score, placements, lines }) {
   if (!BOARDS.includes(leaderboardId)) return "unknown leaderboard";
+  if (leaderboardId === "Levels") {
+    // Stars come from level play, not Board counts: only the range can be checked here.
+    return Number.isSafeInteger(score) && score >= 0 && score <= MAX_LEVEL_STARS ? null : "stars out of range";
+  }
   for (const [name, v] of [["score", score], ["placements", placements], ["lines", lines]])
     if (!Number.isSafeInteger(v) || v < 0) return `${name} must be a non-negative integer`;
   if (placements === 0 || placements > MAX_PLACEMENTS) return "placements out of range";

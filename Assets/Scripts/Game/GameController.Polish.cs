@@ -170,7 +170,7 @@ namespace BlockDrop.Game
                 var r = new Rect(sum.x + w * 0.04f + k * (tileW + w * 0.02f), ty, tileW, th);
                 Panel(r, Swatch(Visuals.Hex("2B2C86")));
                 Outlined(new Rect(r.x, r.y + th * 0.04f, r.width, th * 0.55f), tiles[k].Item1, center, Visuals.Hex(tiles[k].Item3), 1.2f);
-                Outlined(new Rect(r.x, r.y + th * 0.56f, r.width, th * 0.4f), tiles[k].Item2, new GUIStyle(label) { alignment = TextAnchor.MiddleCenter }, new Color(1, 1, 1, 0.75f), 1f);
+                Outlined(new Rect(r.x, r.y + th * 0.56f, r.width, th * 0.4f), tiles[k].Item2, new GUIStyle(label) { alignment = TextAnchor.MiddleCenter }, new Color(1, 1, 1, 0.9f), 1f);
             }
 
             // next up: the three unwon trophies closest to done
@@ -187,7 +187,7 @@ namespace BlockDrop.Game
                 Panel(card, Swatch(Visuals.Hex("3A34A8")));
                 float pad = w * 0.04f, cw = card.width * 0.62f;
                 Outlined(new Rect(card.x + pad, card.y + cardH * 0.06f, cw, cardH * 0.4f), "☆ " + Loc.L(a.Name), small, Color.white, 1.2f);
-                Outlined(new Rect(card.x + pad, card.y + cardH * 0.46f, cw, cardH * 0.36f), a.Text, label, new Color(1, 1, 1, 0.75f), 1f);
+                Outlined(new Rect(card.x + pad, card.y + cardH * 0.46f, cw, cardH * 0.36f), a.Text, label, new Color(1, 1, 1, 0.9f), 1f);
                 Outlined(new Rect(card.x, card.y + cardH * 0.06f, card.width - pad, cardH * 0.4f), $"+{a.Reward} ●", rightS, Visuals.Gold, 1.2f);
                 float bw = card.width * 0.3f, bh = cardH * 0.18f;
                 var bar = new Rect(card.xMax - pad - bw, card.y + cardH * 0.56f, bw, bh);
@@ -333,7 +333,7 @@ namespace BlockDrop.Game
             if (Btn(new Rect(x2, y, half, bh), "2 PLAYERS", "FF7AB6", "E0347C", 0.95f)) StartMode(Mode.Versus);
             y += bh + gap;
             if (Btn(new Rect(w * 0.08f, y, half, bh), "CHALLENGE", "6E8BFF", "3A4FE0", 0.95f)) { _codeError = ""; ShowMenu(Screen.Challenge); }
-            if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.95f)) { OnlineService.Refresh(_boardTab); ShowMenu(Screen.Leaderboard); }
+            if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.95f)) { OnlineService.Refresh(_boardTab); if (_boardTab == OnlineService.LevelsBoard) OnlineService.SubmitLevels(_progress.TotalStars); ShowMenu(Screen.Leaderboard); }
             y += bh + gap * 1.5f;
             if (Btn(Row(w, y, bh * 0.75f, 0.22f), Coach.T("SETTINGS"), "5A4FA8", "3A2F80", 0.8f)) ShowMenu(Screen.Settings);
             return y + bh * 0.75f + gap;

@@ -52,16 +52,23 @@ namespace BlockDrop.Core
             new Theme { Name = "Candy",  Price = 250, Blocks = new[] { "FF8FAB", "FFD6A5", "9BF6C4", "A0E7FF", "CDB4FF" }, BackgroundTint = "FFC2E2" },
             new Theme { Name = "Ocean",  Price = 350, Blocks = new[] { "00B4D8", "48CAE4", "2EC4B6", "0077B6", "90E0EF" }, BackgroundTint = "8FD3FF" },
             new Theme { Name = "Sunset", Price = 500, Blocks = new[] { "FF6B35", "F7C59F", "EF476F", "FFD166", "C77DFF" }, BackgroundTint = "FFB38A" },
+            new Theme { Name = "Forest", Price = 650,  Blocks = new[] { "2D6A4F", "95D5B2", "D4A373", "74C69D", "B7E4C7" }, BackgroundTint = "7FC8A0" },
+            new Theme { Name = "Lava",   Price = 800,  Blocks = new[] { "FF4500", "FF8C00", "FFD000", "D00000", "9D0208" }, BackgroundTint = "FF7A5A" },
+            new Theme { Name = "Arctic", Price = 950,  Blocks = new[] { "A8DADC", "457B9D", "F1FAEE", "8ECAE6", "219EBC" }, BackgroundTint = "BFE6FF" },
+            new Theme { Name = "Galaxy", Price = 1100, Blocks = new[] { "7B2CBF", "9D4EDD", "5A189A", "E0AAFF", "3C096C" }, BackgroundTint = "5B3FA0" },
+            new Theme { Name = "Retro",  Price = 1300, Blocks = new[] { "F72585", "FFBE0B", "3A86FF", "8338EC", "06D6A0" }, BackgroundTint = "C8A2FF" },
+            new Theme { Name = "Gold",   Price = 1600, Blocks = new[] { "FFD700", "DAA520", "F4C430", "B8860B", "FFEC8B" }, BackgroundTint = "FFE08A" },
+            new Theme { Name = "Mono",   Price = 2000, Blocks = new[] { "F8F9FA", "ADB5BD", "6C757D", "CED4DA", "495057" }, BackgroundTint = "AAB2BD" },
         };
 
         private static readonly (MissionKind kind, int[] targets, int reward)[] Pool =
         {
-            (MissionKind.ClearLines, new[] { 10, 20, 30 }, 30),
-            (MissionKind.ScorePoints, new[] { 500, 1000, 2000 }, 30),
-            (MissionKind.PlaceBlocks, new[] { 30, 50, 80 }, 20),
-            (MissionKind.ComboReach, new[] { 2, 3, 4 }, 40),
-            (MissionKind.PlayGames, new[] { 2, 3, 5 }, 25),
-            (MissionKind.EarnStars, new[] { 2, 3, 5 }, 35),
+            (MissionKind.ClearLines, new[] { 10, 20, 30, 45, 60 }, 30),
+            (MissionKind.ScorePoints, new[] { 500, 1000, 2000, 3500, 5000 }, 30),
+            (MissionKind.PlaceBlocks, new[] { 30, 50, 80, 120, 160 }, 20),
+            (MissionKind.ComboReach, new[] { 2, 3, 4, 5, 6 }, 40),
+            (MissionKind.PlayGames, new[] { 2, 3, 5, 7, 10 }, 25),
+            (MissionKind.EarnStars, new[] { 2, 3, 5, 8, 12 }, 35),
         };
 
         public int Coins { get; private set; }

@@ -28,6 +28,7 @@ namespace BlockDrop.Game
         private Seat _single;
         private LevelSession _level;
         private VersusMatch _versus;
+        private int _themePage;
         private Progress _progress;
         private PlayerMeta _meta;
         private int _welcomeReward;
@@ -1161,10 +1162,12 @@ namespace BlockDrop.Game
         {
             Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "THEMES", _h2, Visuals.Hex("FF8FAB"), 3);
             Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"● {_meta.Coins}", _body, Visuals.Gold, 1.5f);
-            for (int t = 0; t < PlayerMeta.Themes.Length; t++)
+            const int perPage = 5;
+            int pages = (PlayerMeta.Themes.Length + perPage - 1) / perPage;
+            for (int t = _themePage * perPage; t < Mathf.Min(PlayerMeta.Themes.Length, (_themePage + 1) * perPage); t++)
             {
                 var th = PlayerMeta.Themes[t];
-                var card = new Rect(w * 0.06f, h * (0.17f + t * 0.125f), w * 0.88f, h * 0.11f);
+                var card = new Rect(w * 0.06f, h * (0.17f + (t % perPage) * 0.125f), w * 0.88f, h * 0.11f);
                 Panel(card, _cardStyle);
                 Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.008f, w * 0.4f, h * 0.045f), th.Name.ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
                 float sw = h * 0.035f;
@@ -1178,7 +1181,8 @@ namespace BlockDrop.Game
                     else _fx.Invalid();
                 }
             }
-            if (Btn(Row(w, h * 0.82f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            if (pages > 1 && Btn(Row(w, h * 0.82f, h * 0.06f, 0.25f), $"PAGE {_themePage + 1}/{pages}", "6E8BFF", "3A4FE0", 0.75f)) _themePage = (_themePage + 1) % pages;
+            if (Btn(Row(w, h * 0.89f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
         private void DrawLevelSelect(float w, float h)
@@ -1277,6 +1281,7 @@ namespace BlockDrop.Game
                     Outlined(new Rect(w * 0.06f, h * 0.14f, w * 0.5f, h * 0.07f), _versus.Seats[me].Board.Score.ToString(), _h2, Color.white, 2.5f);
                     Outlined(new Rect(w * 0.55f, h * 0.025f + bs, w * 0.4f, h * 0.035f), $"{them}: {_versus.Seats[1 - me].Board.Score}{(_versus.Seats[1 - me].Out ? " " + Loc.L("(out)") : "")}", _small, Visuals.Hex("E6D9FF"), 1.2f);
                     if (_aiThinking && ai) Outlined(new Rect(0, h * 0.205f, w, h * 0.035f), Loc.L("AI is thinking") + new string('.', 1 + (int)(Time.time * 3) % 3), _small, Visuals.Hex("C9A7FF"), 1.2f);
+                    if (!ai) Outlined(new Rect(0, h * 0.205f, w, h * 0.035f), Loc.F("PLAYER {0}  YOUR TURN", me + 1), _small, Visuals.Hex(me == 0 ? "7CF8FF" : "FF8FD0"), 1.2f);
                     if (!ai && Time.time < _turnBannerUntil)
                     {
                         Panel(new Rect(w * 0.1f, h * 0.38f, w * 0.8f, h * 0.14f), _cardStyle);

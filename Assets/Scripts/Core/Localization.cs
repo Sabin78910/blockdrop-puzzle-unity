@@ -117,6 +117,7 @@ namespace BlockDrop.Core
             ["TROPHIES  {0}/{1}"] = ("TROFEOS  {0}/{1}", "TROFÉUS  {0}/{1}"), ["LEVEL {0}   ·   {1}/{2} XP"] = ("NIVEL {0}   ·   {1}/{2} XP", "NÍVEL {0}   ·   {1}/{2} XP"),
             ["HINT {0}"] = ("PISTA {0}", "DICA {0}"), ["LEVEL {0}"] = ("NIVEL {0}", "NÍVEL {0}"), ["MOVES LEFT  {0}"] = ("MOVIMIENTOS  {0}", "JOGADAS  {0}"),
             ["PLAYER {0}"] = ("JUGADOR {0}", "JOGADOR {0}"), ["AI ({0})"] = ("IA ({0})", "IA ({0})"),
+            ["PLAYER {0}  YOUR TURN"] = ("JUGADOR {0}  TU TURNO", "JOGADOR {0}  SUA VEZ"),
             ["PLAYER {0}\nYOUR TURN"] = ("JUGADOR {0}\nTU TURNO", "JOGADOR {0}\nSUA VEZ"), ["BEST {0}"] = ("RÉCORD {0}", "RECORDE {0}"),
             ["SCORE {0}"] = ("PUNTAJE {0}", "PONTUAÇÃO {0}"), ["SCORE {0} / {1}"] = ("PUNTAJE {0} / {1}", "PONTUAÇÃO {0} / {1}"),
             ["PLAYER {0} WINS!"] = ("¡GANA EL JUGADOR {0}!", "JOGADOR {0} VENCEU!"),

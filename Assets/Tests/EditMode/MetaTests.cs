@@ -55,6 +55,16 @@ public class MetaTests
         Assert.AreEqual(1, m.Progress[idx]);
     }
 
+    [Test] public void ThemesAreManyAndUniquelyNamedWithValidColours()
+    {
+        Assert.GreaterOrEqual(PlayerMeta.Themes.Length, 12);
+        Assert.AreEqual(PlayerMeta.Themes.Length, PlayerMeta.Themes.Select(t => t.Name).Distinct().Count());
+        foreach (var t in PlayerMeta.Themes) Assert.AreEqual(5, t.Blocks.Length);
+        var m = PlayerMeta.Parse("c=9999");
+        Assert.IsTrue(m.BuyOrSelect(PlayerMeta.Themes.Length - 1));
+        Assert.IsTrue(PlayerMeta.Parse(m.Serialize()).Owns(PlayerMeta.Themes.Length - 1));
+    }
+
     [Test] public void ThemesCostCoinsAndPersist()
     {
         var m = PlayerMeta.Parse("c=200");

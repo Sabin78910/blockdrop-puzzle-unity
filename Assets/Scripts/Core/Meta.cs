@@ -5,7 +5,7 @@ using System.Text;
 
 namespace BlockDrop.Core
 {
-    public enum MissionKind { ClearLines, ScorePoints, PlaceBlocks, ComboReach, PlayGames, EarnStars }
+    public enum MissionKind { ClearLines, ScorePoints, PlaceBlocks, ComboReach, PlayGames, EarnStars, MultiClear }
 
     public sealed class Mission
     {
@@ -19,6 +19,7 @@ namespace BlockDrop.Core
             MissionKind.PlaceBlocks => Loc.F("Place {0} pieces", Target),
             MissionKind.ComboReach => Loc.F("Reach a x{0} combo", Target),
             MissionKind.PlayGames => Loc.F("Finish {0} games", Target),
+            MissionKind.MultiClear => Loc.F("Clear 2+ lines at once {0} times", Target),
             _ => Loc.F("Earn {0} level stars", Target),
         };
     }
@@ -52,6 +53,11 @@ namespace BlockDrop.Core
             new Theme { Name = "Candy",  Price = 250, Blocks = new[] { "FF8FAB", "FFD6A5", "9BF6C4", "A0E7FF", "CDB4FF" }, BackgroundTint = "FFC2E2" },
             new Theme { Name = "Ocean",  Price = 350, Blocks = new[] { "00B4D8", "48CAE4", "2EC4B6", "0077B6", "90E0EF" }, BackgroundTint = "8FD3FF" },
             new Theme { Name = "Sunset", Price = 500, Blocks = new[] { "FF6B35", "F7C59F", "EF476F", "FFD166", "C77DFF" }, BackgroundTint = "FFB38A" },
+            new Theme { Name = "Forest", Price = 600,  Blocks = new[] { "2D6A4F", "95D5B2", "B7E4C7", "74C69D", "40916C" }, BackgroundTint = "A8D5BA" },
+            new Theme { Name = "Lava",   Price = 700,  Blocks = new[] { "D00000", "FF7B00", "FFBA08", "9D0208", "E85D04" }, BackgroundTint = "FF9E80" },
+            new Theme { Name = "Aurora", Price = 800,  Blocks = new[] { "80FFDB", "72EFDD", "64DFDF", "7400B8", "5E60CE" }, BackgroundTint = "8A7FE0" },
+            new Theme { Name = "Cosmos", Price = 900,  Blocks = new[] { "7B2CBF", "C77DFF", "E0AAFF", "3C096C", "9D4EDD" }, BackgroundTint = "5A3A8C" },
+            new Theme { Name = "Gold",   Price = 1200, Blocks = new[] { "FFD60A", "FFC300", "FFEA00", "E0A800", "FFF3B0" }, BackgroundTint = "FFE27A" },
         };
 
         private static readonly (MissionKind kind, int[] targets, int reward)[] Pool =
@@ -62,6 +68,7 @@ namespace BlockDrop.Core
             (MissionKind.ComboReach, new[] { 2, 3, 4 }, 40),
             (MissionKind.PlayGames, new[] { 2, 3, 5 }, 25),
             (MissionKind.EarnStars, new[] { 2, 3, 5 }, 35),
+            (MissionKind.MultiClear, new[] { 3, 5, 8 }, 35),
         };
 
         public int Coins { get; private set; }
@@ -146,7 +153,8 @@ namespace BlockDrop.Core
             int seed = 17;
             foreach (char c in day) seed = seed * 31 + c;
             var rng = new Random(seed);
-            var picks = new List<int> { 0, 1, 2, 3, 4, 5 };
+            var picks = new List<int>();
+            for (int p = 0; p < Pool.Length; p++) picks.Add(p);
             var result = new Mission[3];
             for (int i = 0; i < 3; i++)
             {

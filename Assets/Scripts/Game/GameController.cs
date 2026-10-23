@@ -659,6 +659,7 @@ namespace BlockDrop.Game
                 _fx.Clear(lines, board.Combo);
                 Track(MissionKind.ClearLines, lines);
                 Track(MissionKind.ComboReach, board.Combo);
+                if (lines >= 2) Track(MissionKind.MultiClear, 1);
                 if (Career) { Celebrate(_meta.Record(Stat.LinesCleared, lines)); Celebrate(_meta.Record(Stat.BestCombo, board.Combo)); }
                 if (_tutorial == 1) { _tutorial = 2; _tutorialStepAt = Time.time; }
                 if (NewLook.On) { NewLookClear(lines, board, gained, burst); AfterMove(); return; }
@@ -1317,14 +1318,19 @@ namespace BlockDrop.Game
             return st;
         }
 
+        private int _themePage;
+
         private void DrawThemes(float w, float h)
         {
             Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "THEMES", _h2, Visuals.Hex("FF8FAB"), 3);
             Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"● {_meta.Coins}", _body, Visuals.Gold, 1.5f);
-            for (int t = 0; t < PlayerMeta.Themes.Length; t++)
+            const int perPage = 5;
+            int pages = (PlayerMeta.Themes.Length + perPage - 1) / perPage;
+            _themePage = Mathf.Clamp(_themePage, 0, pages - 1);
+            for (int t = _themePage * perPage; t < Mathf.Min(PlayerMeta.Themes.Length, (_themePage + 1) * perPage); t++)
             {
                 var th = PlayerMeta.Themes[t];
-                var card = new Rect(w * 0.06f, h * (0.17f + t * 0.125f), w * 0.88f, h * 0.11f);
+                var card = new Rect(w * 0.06f, h * (0.17f + (t - _themePage * perPage) * 0.125f), w * 0.88f, h * 0.11f);
                 Panel(card, _cardStyle);
                 Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.008f, w * 0.4f, h * 0.045f), th.Name.ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
                 float sw = h * 0.035f;
@@ -1338,7 +1344,13 @@ namespace BlockDrop.Game
                     else _fx.Invalid();
                 }
             }
-            if (Btn(Row(w, h * 0.82f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            if (pages > 1)
+            {
+                Outlined(new Rect(0, h * 0.80f, w, h * 0.04f), $"{_themePage + 1} / {pages}", _body, Color.white, 1.2f);
+                if (_themePage > 0 && Btn(new Rect(w * 0.06f, h * 0.80f, w * 0.2f, h * 0.045f), "<", "6E8BFF", "3A4FE0", 0.75f)) _themePage--;
+                if (_themePage < pages - 1 && Btn(new Rect(w * 0.74f, h * 0.80f, w * 0.2f, h * 0.045f), ">", "6E8BFF", "3A4FE0", 0.75f)) _themePage++;
+            }
+            if (Btn(Row(w, h * 0.87f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
         private void DrawLevelSelect(float w, float h)

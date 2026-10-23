@@ -55,6 +55,26 @@ public class MetaTests
         Assert.AreEqual(1, m.Progress[idx]);
     }
 
+    [Test] public void ThemePaletteIsCompleteAndLateThemesPersist()
+    {
+        foreach (var th in PlayerMeta.Themes) Assert.AreEqual(5, th.Blocks.Length, th.Name);
+        Assert.AreEqual(PlayerMeta.Themes.Length, PlayerMeta.Themes.Select(x => x.Name).Distinct().Count());
+        int last = PlayerMeta.Themes.Length - 1;
+        var m = PlayerMeta.Parse("c=5000");
+        Assert.IsTrue(m.BuyOrSelect(last));
+        var back = PlayerMeta.Parse(m.Serialize());
+        Assert.IsTrue(back.Owns(last));
+        Assert.AreEqual(last, back.ThemeIndex);
+    }
+
+    [Test] public void EveryMissionKindAppearsWithinAYear()
+    {
+        var seen = new System.Collections.Generic.HashSet<MissionKind>();
+        for (int d = 0; d < 365; d++)
+            foreach (var x in PlayerMeta.MissionsFor(PlayerMeta.Day(new System.DateTime(2026, 1, 1).AddDays(d)))) seen.Add(x.Kind);
+        Assert.AreEqual(System.Enum.GetValues(typeof(MissionKind)).Length, seen.Count);
+    }
+
     [Test] public void ThemesCostCoinsAndPersist()
     {
         var m = PlayerMeta.Parse("c=200");

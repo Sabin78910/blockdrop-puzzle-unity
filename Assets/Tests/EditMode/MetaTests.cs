@@ -165,7 +165,7 @@ public class ThemeAndStoreTests
         Assert.AreEqual(Store.Products.Length, Store.Products.Select(p => p.Id).Distinct().Count());
         foreach (var p in Store.Products)
         {
-            Assert.IsTrue(p.Coins > 0 || p.Themes.Length > 0 || p.RemoveAds, p.Id);
+            Assert.IsTrue(p.Coins > 0 || p.Themes.Length > 0 || p.RemoveAds || p.Hammers > 0 || p.Shuffles > 0, p.Id);
             Assert.IsTrue(p.Themes.All(t => PlayerMeta.FindTheme(t) >= 0), p.Id + " themes exist");
             Assert.IsTrue(p.Themes.All(t => PlayerMeta.Themes[PlayerMeta.FindTheme(t)].Buyable), p.Id + " never sells an earned theme");
             Assert.IsNotEmpty(Store.Contents(p));

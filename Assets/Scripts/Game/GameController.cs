@@ -37,7 +37,7 @@ namespace BlockDrop.Game
         private float _tutorialStepAt;
         private static string Today => PlayerMeta.Day(DateTime.Now);
         private bool _bestCelebrated, _nameSynced, _paused, _offerRevive, _firstSession;
-        private bool _offerContinue, _levelIntro; // level: the continue card and the start card
+        private bool _offerContinue, _levelIntro, _boosterTray, _hammerMode; // level: the continue card and the start card
         private int _chapterPage, _bonusShown, _coinsEarned, _shuffles;
         private const int ContinueCost = 100, CoinsPerStar = 15, HelpingHandMoves = 3, HelpingHandAfter = 3;
         private readonly IAdProvider _ads = new BetaAdProvider();
@@ -412,7 +412,7 @@ namespace BlockDrop.Game
             _mode = mode;
             _runId++;
             _hint = null; _newBest = false; _aiThinking = false; _finishing = false; _bestCelebrated = false; _offerRevive = false;
-            _offerContinue = false; _levelIntro = false; _bonusShown = 0; _coinsEarned = 0; _shuffles = mode == Mode.Level ? _level.Shuffles : 0;
+            _offerContinue = false; _levelIntro = false; _boosterTray = false; _hammerMode = false; _bonusShown = 0; _coinsEarned = 0; _shuffles = mode == Mode.Level ? _level.Shuffles : 0;
             _shownScore = 0;
             _floaters.Clear();
             _screen = Screen.Playing;
@@ -466,7 +466,10 @@ namespace BlockDrop.Game
                     if (!wasComplete && Collection.Complete(_progress, pic))
                     {
                         _meta.AddCoins(Collection.CompletionReward);
+                        _meta.AddBoosters(Booster.Hammer, PlayerMeta.ChapterBoosters);
+                        _meta.AddBoosters(Booster.Shuffle, PlayerMeta.ChapterBoosters);
                         Toast(Loc.F("PICTURE COMPLETE!  +{0} ●", Collection.CompletionReward), Visuals.Gold);
+                        Toast(Loc.F("CHAPTER GIFT: +{0} HAMMERS, +{0} SHUFFLES", PlayerMeta.ChapterBoosters), Visuals.Hex("FF9BD2"));
                         Confetti(60);
                     }
                     // earned themes: finishing chapters and collecting stars unlock looks no one can buy
@@ -582,6 +585,7 @@ namespace BlockDrop.Game
             if (Input.GetKeyDown(KeyCode.Escape) && _screen != Screen.Menu)
             {
                 if (_screen == Screen.Playing && _offerRevive) DeclineRevive();
+                else if (_screen == Screen.Playing && (_hammerMode || _boosterTray)) { _hammerMode = false; _boosterTray = false; }
                 else if (_screen == Screen.Playing) SetPaused(!_paused); // never throw a run away on an accidental back press
                 else ShowMenu();
                 return;
@@ -611,6 +615,11 @@ namespace BlockDrop.Game
 
             var hand = MainSeat.Dealer.Hand;
             var wp = PointerWorld();
+            if (_hammerMode)
+            {
+                if (Input.GetMouseButtonDown(0)) TryHammer(wp);
+                return;
+            }
             if (Input.GetMouseButtonDown(0))
             {
                 float bestD = 1.9f;
@@ -989,6 +998,74 @@ namespace BlockDrop.Game
             for (int x = 0; x < Size; x++)
                 for (int y = 0; y < Size; y++)
                     if (b.IsFilled(x, y)) _tiles[x, y].color = Visuals.BlockColors[b[x, y]];
+        }
+
+        /// <summary>The tray over the goal chips: hammer, shuffle and hint, each showing what's left or its price.</summary>
+        private void DrawBoosterTray(float w, float h)
+        {
+            var card = new Rect(w * 0.04f, h * 0.083f, w * 0.92f, h * 0.15f);
+            Panel(card, _modalStyle);
+            if (_hammerMode)
+            {
+                Outlined(new Rect(card.x, card.y + h * 0.012f, card.width, h * 0.05f), "Tap a block to smash it", _body, Visuals.Hex("FFE27A"), 1.5f);
+                Outlined(new Rect(card.x, card.y + h * 0.055f, card.width, h * 0.03f), "Ice cracks to stone. Smashed gems count.", _small, new Color(1, 1, 1, 0.8f), 1f);
+                if (Btn(new Rect(card.x + card.width * 0.3f, card.y + h * 0.09f, card.width * 0.4f, h * 0.05f), "CANCEL", "5A4FA8", "3A2F80", 0.75f)) _hammerMode = false;
+                return;
+            }
+            float bw = (card.width - w * 0.08f) / 3f, by = card.y + h * 0.02f, bh = h * 0.11f;
+            for (int k = 0; k < 3; k++)
+            {
+                var r = new Rect(card.x + w * 0.02f + k * (bw + w * 0.02f), by, bw, bh);
+                if (k < 2)
+                {
+                    var b = (Booster)k;
+                    int have = _meta.BoostersOf(b);
+                    string name = Loc.L(b == Booster.Hammer ? "HAMMER" : "SHUFFLE");
+                    string label = have > 0 ? $"{name}\n×{have}" : $"{name}\n{PlayerMeta.BoosterPrice(b)} ●";
+                    bool can = have > 0 || _meta.Coins >= PlayerMeta.BoosterPrice(b);
+                    if (Btn(r, label, can ? (k == 0 ? "FF8FAB" : "6E8BFF") : "4A4370", can ? (k == 0 ? "D9466F" : "3A4FE0") : "2E2850", 0.62f)) UseBooster(b);
+                }
+                else
+                {
+                    GUI.enabled = _hintsLeft > 0;
+                    if (Btn(r, Loc.F("HINT\n×{0}", _hintsLeft), "FFC24B", "F08A1C", 0.62f)) { UseHint(); _boosterTray = false; }
+                    GUI.enabled = true;
+                }
+            }
+        }
+
+        /// <summary>Uses a booster, buying one with coins first if none are left (the price is on the button).</summary>
+        private void UseBooster(Booster b)
+        {
+            if (_meta.BoostersOf(b) == 0 && !_meta.BuyBooster(b)) { _fx.Invalid(); return; }
+            if (b == Booster.Hammer) { _hammerMode = true; SaveMeta(); return; } // spent on the actual smash
+            if (!_meta.UseBooster(b) || !_level.Shuffle()) { _fx.Invalid(); return; }
+            SaveMeta(); SaveRun();
+            _boosterTray = false;
+            RebuildHand();
+            AddFloater("SHUFFLE!", BoardCenter + new Vector3(0, -3.2f, 0), Visuals.Hex("7CF8FF"), 1.2f);
+            _fx.Star();
+        }
+
+        private void TryHammer(Vector3 wp)
+        {
+            int x = Mathf.RoundToInt(wp.x - BoardCenter.x + 3.5f), y = Mathf.RoundToInt(3.5f - (wp.y - BoardCenter.y));
+            var board = _level.Seat.Board;
+            if (x < 0 || y < 0 || x >= Size || y >= Size) return; // a tap outside the board does nothing
+            if (!board.IsFilled(x, y)) { _fx.Invalid(); return; }
+            int cell = board[x, y], gemsBefore = board.Count(Board.Gem), goalsBefore = GoalsMet();
+            if (!_meta.UseBooster(Booster.Hammer) || !_level.Smash(x, y)) { _fx.Invalid(); return; }
+            _hammerMode = false;
+            _boosterTray = false;
+            SaveMeta();
+            var pos = CellPos(x, y);
+            if (!NewLook.ReducedMotion) { Shatter(pos, Visuals.BlockColors[cell]); _shake = 0.12f; }
+            _pop[x, y] = 1f;
+            _fx.Clear(1, 0);
+            if (board.Count(Board.Gem) < gemsBefore) AddFloater("GEM!", pos + new Vector3(0, 0.8f, 0), Visuals.BlockColors[Board.Gem], 1.2f);
+            else AddFloater("SMASH!", pos + new Vector3(0, 0.8f, 0), Color.white, 1.1f);
+            if (GoalsMet() > goalsBefore && !_level.AllGoalsMet) AddFloater("GOAL COMPLETE!", BoardCenter + new Vector3(0, 3.0f, 0), Visuals.Hex("2EE59D"), 1.3f);
+            AfterMove(); // the smash may finish the level
         }
 
         private void UseHint()
@@ -1554,7 +1631,7 @@ namespace BlockDrop.Game
             Outlined(new Rect(0, h * 0.04f, w, h * 0.08f), "SHOP", _h2, Visuals.Gold, 3);
             Outlined(new Rect(0, h * 0.11f, w, h * 0.04f), $"● {_meta.Coins}", _body, Visuals.Gold, 1.5f);
             var products = Store.Products;
-            float ch = h * 0.078f, gap = h * 0.01f, y = h * 0.165f;
+            float ch = h * 0.068f, gap = h * 0.008f, y = h * 0.165f;
             for (int i = 0; i < products.Length; i++, y += ch + gap)
             {
                 var p = products[i];
@@ -1562,9 +1639,9 @@ namespace BlockDrop.Game
                 var card = new Rect(w * 0.06f, y, w * 0.88f, ch);
                 Panel(card, _cardStyle);
                 Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.006f, w * 0.52f, h * 0.035f), Loc.L(p.Title).ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.2f);
-                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.042f, w * 0.56f, h * 0.035f), Store.Contents(p), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft }, Visuals.Gold, 1f);
+                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.036f, w * 0.56f, h * 0.03f), Store.Contents(p), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft }, Visuals.Gold, 1f);
                 if (p.Badge != "") Outlined(new Rect(card.xMax - w * 0.3f, card.y - h * 0.012f, w * 0.26f, h * 0.025f), Loc.L(p.Badge), _small, Visuals.Hex("FF9BD2"), 1.2f);
-                var btn = new Rect(card.xMax - w * 0.3f, card.y + h * 0.017f, w * 0.26f, h * 0.052f);
+                var btn = new Rect(card.xMax - w * 0.3f, card.y + h * 0.011f, w * 0.26f, h * 0.046f);
                 if (owned) { Outlined(btn, "OWNED", _body, Visuals.Hex("2EE59D"), 1.2f); continue; }
                 GUI.enabled = _store.Ready;
                 if (Btn(btn, _store.LocalPrice(p.Id) ?? p.Price, "4BE38A", "1FA45B", 0.7f)) Buy(p);
@@ -1687,7 +1764,12 @@ namespace BlockDrop.Game
         {
             float top = h * 0.03f, bs = h * 0.06f;
             if (Btn(new Rect(w * 0.04f, top, bs * 1.6f, bs), "MENU", "5A4FA8", "3A2F80", 0.7f)) { SetPaused(true); return; }
-            if (_hintsLeft > 0 && Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), Loc.F("HINT {0}", _hintsLeft), "FFC24B", "F08A1C", 0.7f)) UseHint();
+            if (_mode == Mode.Level)
+            {
+                // boosters and the hint share one tray, so the play area stays clear
+                if (Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), _boosterTray ? "CLOSE" : "BOOST", "FFC24B", "F08A1C", 0.7f)) { _boosterTray = !_boosterTray; _hammerMode = false; }
+            }
+            else if (_hintsLeft > 0 && Btn(new Rect(w * 0.96f - bs * 2.1f, top, bs * 2.1f, bs), Loc.F("HINT {0}", _hintsLeft), "FFC24B", "F08A1C", 0.7f)) UseHint();
 
             switch (_mode)
             {
@@ -1724,6 +1806,7 @@ namespace BlockDrop.Game
                         Outlined(new Rect(sx - 20, bar.y - h * 0.026f, 40, h * 0.026f), "★", _small, shown >= s ? Visuals.Gold : new Color(1, 1, 1, 0.5f), 1);
                     }
                     Outlined(new Rect(0, h * 0.218f, w, h * 0.03f), Mathf.RoundToInt(shown).ToString(), _small, Color.white, 1.2f);
+                    if (_boosterTray) DrawBoosterTray(w, h);
                     break;
                 }
                 case Mode.Versus:

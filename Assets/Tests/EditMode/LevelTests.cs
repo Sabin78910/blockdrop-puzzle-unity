@@ -192,3 +192,94 @@ public class LevelTests
         Assert.AreEqual(Board.Gem, resumed.Seat.Board[1, 0]);
     }
 }
+
+public class BoosterTests
+{
+    [Test] public void HammerBreaksOneBlockAndCracksIce()
+    {
+        var b = new Board(8);
+        Assert.IsFalse(b.Smash(0, 0), "nothing to smash");
+        Assert.IsFalse(b.Smash(-1, 9), "off the board");
+        b.SetCell(1, 1, 3);
+        b.SetCell(2, 2, Board.Ice);
+        Assert.IsTrue(b.Smash(1, 1));
+        Assert.IsFalse(b.IsFilled(1, 1));
+        Assert.IsTrue(b.Smash(2, 2));
+        Assert.AreEqual(Board.Stone, b[2, 2], "ice takes two hits");
+        Assert.IsTrue(b.Smash(2, 2));
+        Assert.IsFalse(b.IsFilled(2, 2));
+        Assert.AreEqual(0, b.Score, "smashing never scores");
+    }
+
+    [Test] public void SmashingAGemCountsTowardTheGoalWithoutUsingAMove()
+    {
+        int n = Enumerable.Range(31, 10).First(k => LevelLibrary.Get(k).Goals.Any(g => g.Kind == GoalKind.Gems));
+        var s = new LevelSession(n);
+        var gem = s.Definition.Blockers.First(b => b.cell == Board.Gem);
+        int goal = System.Array.FindIndex(s.Definition.Goals, g => g.Kind == GoalKind.Gems);
+        int moves = s.MovesLeft;
+        Assert.IsTrue(s.Smash(gem.x, gem.y));
+        Assert.AreEqual(1, s.Progress(goal));
+        Assert.AreEqual(moves, s.MovesLeft);
+        Assert.AreEqual(1, s.BoostersUsed);
+    }
+
+    [Test] public void HammeringTheLastStoneWinsTheLevel()
+    {
+        int n = Enumerable.Range(21, 10).First(k => LevelLibrary.Get(k).Goals.Single().Kind == GoalKind.Stones);
+        var s = new LevelSession(n);
+        foreach (var b in s.Definition.Blockers)
+            while (s.Seat.Board.IsFilled(b.x, b.y)) Assert.IsTrue(s.Smash(b.x, b.y));
+        Assert.AreEqual(LevelState.Won, s.State);
+        Assert.AreEqual(s.MaxMoves * LevelLibrary.MoveBonus, s.Bonus, "every move left becomes bonus");
+        Assert.IsFalse(s.Smash(0, 0), "no boosters after the level ends");
+    }
+
+    [Test] public void ShuffleDealsAFittingHandForFree()
+    {
+        var s = new LevelSession(29);
+        var before = s.Seat.Dealer.Hand.ToArray();
+        int moves = s.MovesLeft;
+        Assert.IsTrue(s.Shuffle());
+        Assert.AreEqual(moves, s.MovesLeft);
+        Assert.IsTrue(s.Seat.Dealer.Hand.All(p => p != null && s.Seat.Board.CanPlaceAnywhere(p)));
+        Assert.IsFalse(before.SequenceEqual(s.Seat.Dealer.Hand), "new pieces");
+    }
+
+    [Test] public void BoostersAreGiftedEarnedBoughtAndSaved()
+    {
+        var fresh = PlayerMeta.Parse("c=0");
+        Assert.AreEqual(PlayerMeta.StarterBoosters, fresh.BoostersOf(Booster.Hammer), "existing players get the starter gift too");
+        Assert.IsTrue(fresh.UseBooster(Booster.Hammer));
+        Assert.AreEqual(2, fresh.BoostersOf(Booster.Hammer));
+        var empty = PlayerMeta.Parse("c=120;bo=0,0");
+        Assert.IsFalse(empty.UseBooster(Booster.Shuffle));
+        Assert.IsTrue(empty.BuyBooster(Booster.Shuffle));
+        Assert.AreEqual(20, empty.Coins);
+        Assert.IsFalse(empty.BuyBooster(Booster.Hammer), "150 coins needed");
+        var back = PlayerMeta.Parse(empty.Serialize());
+        Assert.AreEqual(1, back.BoostersOf(Booster.Shuffle));
+        Assert.AreEqual(0, back.BoostersOf(Booster.Hammer));
+        Assert.AreEqual(0, PlayerMeta.Parse("bo=-4,x").BoostersOf(Booster.Hammer));
+    }
+
+    [Test] public void EverySeventhStreakDayGivesAHammer()
+    {
+        var m = PlayerMeta.Parse("bo=0,0");
+        for (int d = 1; d <= 7; d++) m.CheckIn($"2026-10-{d:00}");
+        Assert.AreEqual(7, m.Streak);
+        Assert.AreEqual(1, m.BoostersOf(Booster.Hammer));
+    }
+
+    [Test] public void BoosterBoxGrantsAndCatalogOrderIsStable()
+    {
+        // owned non-consumables are saved by position, so the catalog only ever grows at the end
+        CollectionAssert.AreEqual(new[] { "coins_1200", "coins_3500", "coins_8000", "coins_20000", "remove_ads", "bundle_royal", "bundle_legends", "boosters_10" },
+            Store.Products.Select(p => p.Id));
+        var m = PlayerMeta.Parse("bo=0,0");
+        Assert.IsTrue(m.Grant(Store.Find("boosters_10")));
+        Assert.AreEqual(10, m.BoostersOf(Booster.Hammer));
+        Assert.AreEqual(10, m.BoostersOf(Booster.Shuffle));
+        Assert.AreEqual("10 hammers + 10 shuffles", Store.Contents(Store.Find("boosters_10")));
+    }
+}

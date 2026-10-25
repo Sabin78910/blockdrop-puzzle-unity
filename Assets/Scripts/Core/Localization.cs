@@ -188,6 +188,13 @@ namespace BlockDrop.Core
             ["Pouch of coins"] = ("Bolsa de monedas", "Bolsa de moedas"), ["Chest of coins"] = ("Cofre de monedas", "Baú de moedas"), ["Vault of coins"] = ("Bóveda de monedas", "Cofre de moedas"),
             ["Treasury of coins"] = ("Tesoro de monedas", "Tesouro de moedas"), ["Remove ads"] = ("Quitar anuncios", "Remover anúncios"), ["Royal bundle"] = ("Paquete real", "Pacote real"),
             ["Legends collection"] = ("Colección de leyendas", "Coleção de lendas"), ["{0} theme"] = ("tema {0}", "tema {0}"), ["no ads"] = ("sin anuncios", "sem anúncios"),
+            ["CHAPTER GIFT: +{0} HAMMERS, +{0} SHUFFLES"] = ("REGALO DE CAPÍTULO: +{0} MARTILLOS, +{0} MEZCLAS", "PRESENTE DO CAPÍTULO: +{0} MARTELOS, +{0} EMBARALHADAS"),
+            ["Tap a block to smash it"] = ("Toca un bloque para romperlo", "Toque um bloco para quebrá-lo"),
+            ["Ice cracks to stone. Smashed gems count."] = ("El hielo se vuelve piedra. Las gemas rotas cuentan.", "O gelo vira pedra. Gemas quebradas contam."),
+            ["CANCEL"] = ("CANCELAR", "CANCELAR"), ["HAMMER"] = ("MARTILLO", "MARTELO"), ["SHUFFLE"] = ("MEZCLAR", "EMBARALHAR"),
+            ["HINT\n×{0}"] = ("PISTA\n×{0}", "DICA\n×{0}"), ["SHUFFLE!"] = ("¡MEZCLA!", "EMBARALHADO!"), ["SMASH!"] = ("¡ZAS!", "PÁ!"),
+            ["CLOSE"] = ("CERRAR", "FECHAR"), ["BOOST"] = ("AYUDAS", "AJUDAS"), ["Booster box"] = ("Caja de ayudas", "Caixa de ajudas"),
+            ["{0} hammers"] = ("{0} martillos", "{0} martelos"), ["{0} shuffles"] = ("{0} mezclas", "{0} embaralhadas"),
             ["POPULAR"] = ("POPULAR", "POPULAR"), ["BEST VALUE"] = ("MEJOR VALOR", "MELHOR VALOR"), ["ALL LEGENDARY"] = ("TODOS LOS LEGENDARIOS", "TODOS OS LENDÁRIOS"),
         };
     }

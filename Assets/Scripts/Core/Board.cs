@@ -141,6 +141,15 @@ namespace BlockDrop.Core
             return new PlaceResult(lines, points);
         }
 
+        /// <summary>The hammer booster: breaks one block without scoring. Ice takes the first hit and cracks to stone,
+        /// as it would from a line clear. Returns false for an empty cell or one off the board.</summary>
+        public bool Smash(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= Size || y >= Size || !IsFilled(x, y)) return false;
+            _cells[x, y] = _cells[x, y] == Ice ? Stone : Empty;
+            return true;
+        }
+
         /// <summary>How many cells hold <paramref name="cell"/> (used for level goals: stones left, gems left).</summary>
         public int Count(int cell)
         {

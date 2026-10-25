@@ -9,23 +9,23 @@
  */
 const { LeaderboardsApi } = require("@unity-services/leaderboards-1.1");
 
-const BOARDS = ["Classic", "Daily", "Levels"];
-const MAX_LEVEL_STARS = 30000; // the Levels board ranks total stars; three per level
+const BOARDS = ["Classic", "Daily"];
 const MAX_CELLS = 9;
 const MAX_LINES_PER_PLACEMENT = 6;
 const MAX_PLACEMENTS = 20000;
+// Cells are the limit on lines: clearing a line removes cells that were placed, and the cheapest case
+// (3 rows + 3 columns at once) still removes 39 cells for 6 lines, 6.5 per line. A piece adds at most 9 cells,
+// and the board holds at most 64 to begin with, so 6.5 x lines <= 9 x placements + 64 (all doubled below).
+const START_CELLS_ALLOWANCE = 64;
 
 /** Returns null when the claim is possible under the Board rules, otherwise the reason it is not. */
 function validate({ leaderboardId, score, placements, lines }) {
   if (!BOARDS.includes(leaderboardId)) return "unknown leaderboard";
-  if (leaderboardId === "Levels") {
-    // Stars come from level play, not Board counts: only the range can be checked here.
-    return Number.isSafeInteger(score) && score >= 0 && score <= MAX_LEVEL_STARS ? null : "stars out of range";
-  }
   for (const [name, v] of [["score", score], ["placements", placements], ["lines", lines]])
     if (!Number.isSafeInteger(v) || v < 0) return `${name} must be a non-negative integer`;
   if (placements === 0 || placements > MAX_PLACEMENTS) return "placements out of range";
   if (lines > placements * MAX_LINES_PER_PLACEMENT) return "too many lines for the placements";
+  if (13 * lines > 18 * placements + 2 * START_CELLS_ALLOWANCE) return "too many lines for the cells placed";
   // Every placement scores at least 1, and every cleared line at least 10.
   if (score < placements + 10 * lines) return "score too low for the placements and lines";
   // At most `lines` placements clear anything, so combo never exceeds that; each line is worth

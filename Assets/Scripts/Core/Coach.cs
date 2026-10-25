@@ -156,7 +156,7 @@ namespace BlockDrop.Core
             ["BLOCKY"] = ("BLOCKY", "BLOCKY"),
             ["HOME"] = ("INICIO", "INÍCIO"),
             ["STEP {0} OF {1}"] = ("PASO {0} DE {1}", "PASSO {0} DE {1}"),
-            ["NEXT ★ IN {0}"] = ("PRÓX. ★ EN {0}", "PRÓX. ★ EM {0}"),
+            ["NEXT ★ AT {0}"] = ("PRÓX. ★ EN {0}", "PRÓX. ★ EM {0}"),
             ["ALL STARS!"] = ("¡TODAS LAS ★!", "TODAS AS ★!"),
             ["! MOVES {0}"] = ("! JUGADAS {0}", "! JOGADAS {0}"),
             ["MOVES {0}"] = ("JUGADAS {0}", "JOGADAS {0}"),

@@ -14,10 +14,13 @@ namespace BlockDrop.Game
             Hex("42D2FF"), // sky
             Hex("B57DFF"), // amethyst
             Hex("6B7390"), // stone (level obstacles)
+            Hex("FF4FD8"), // gem (collect it by clearing its line)
+            Hex("A9E4FF"), // ice (two clears: cracks to stone first)
         };
 
-        public static readonly Color BoardPanel = Hex("17216A");
-        public static readonly Color EmptySlot = Hex("2B3C9A");
+        // set by the theme (premium themes recolour the board too); the defaults are the brighter play-build colours
+        public static Color BoardPanel = Hex("17216A");
+        public static Color EmptySlot = Hex("2B3C9A");
         public static readonly Color Gold = Hex("FFD54A");
 
         private static Sprite _tile, _gloss, _slot, _panel, _circle, _background;

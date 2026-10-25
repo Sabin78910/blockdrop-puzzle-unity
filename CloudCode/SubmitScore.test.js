@@ -35,8 +35,7 @@ test("accepts the best possible single placement", () => {
   ok({ score: 9 + 10 * 36, placements: 1, lines: 6 });
 });
 
-test("Levels board takes total stars within range", () => {
-  assert.strictEqual(validate({ leaderboardId: "Levels", score: 120, placements: 0, lines: 0 }), null);
-  assert.notStrictEqual(validate({ leaderboardId: "Levels", score: -1, placements: 0, lines: 0 }), null);
-  assert.notStrictEqual(validate({ leaderboardId: "Levels", score: 30001, placements: 0, lines: 0 }), null);
+test("rejects more lines than the cells placed could ever clear", () => {
+  bad({ score: 100000, placements: 10, lines: 30 }); // 10 pieces add 90 cells, 30 lines remove at least 195
+  ok({ score: 9 * 10 + 10 * 8 * 8 * 5, placements: 10, lines: 8 }); // dense but possible: 8 lines from 10 pieces
 });

@@ -6,7 +6,7 @@ namespace BlockDrop.Core
     /// banner at the start of each chapter. Pure maths so it can be tested; the screen only draws it.</summary>
     public static class LevelMap
     {
-        public const int ChapterSize = LevelLibrary.ChapterSize;
+        public const int ChapterSize = LevelLibrary.PerChapter;
 
         /// <summary>Horizontal position of a level's node, 0..1 across the screen. Same for every player.</summary>
         public static float NodeX(int level) => 0.5f + 0.34f * (float)Math.Sin(level * 0.8);

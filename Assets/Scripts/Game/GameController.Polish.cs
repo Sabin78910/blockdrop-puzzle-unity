@@ -108,15 +108,14 @@ namespace BlockDrop.Game
             {
                 var d = _level.Definition;
                 int score = Score;
-                Panel(new Rect(w * 0.3f, h * 0.083f, w * 0.4f, h * 0.064f), _plateStyle);
-                Panel(new Rect(w * 0.3f, h * 0.2f, w * 0.4f, h * 0.045f), _plateStyle);
-                int toNext = Goal.ToNextStar(score, d.TargetScore, d.TwoStarScore, d.ThreeStarScore);
-                Outlined(new Rect(0, h * 0.247f, w, h * 0.03f), toNext > 0 ? Coach.F("NEXT ★ IN {0}", toNext) : Coach.T("ALL STARS!"),
-                    new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, toNext > 0 ? Color.white : Visuals.Gold, 1.2f);
+                int toNext = Goal.ToNextStar(score, 0, d.TwoStarScore, d.ThreeStarScore);
+                int nextAt = score < d.TwoStarScore ? d.TwoStarScore : d.ThreeStarScore;
+                Outlined(new Rect(w * 0.38f, h * 0.245f + h * 0.022f, w * 0.54f, h * 0.03f), toNext > 0 ? Coach.F("NEXT ★ AT {0}", nextAt) : Coach.T("ALL STARS!"),
+                    new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight }, toNext > 0 ? Visuals.Hex("FFE27A") : Visuals.Gold, 1.2f);
                 if (Goal.LowMoves(_level.MovesLeft) && Event.current.type == EventType.Repaint)
                 {
                     float d2 = h * 0.034f, pulse = 1f + (NewLook.ReducedMotion ? 0f : 0.1f * Mathf.Sin(Time.time * 6f));
-                    var r = new Rect(w * 0.3f - d2 * 0.4f, h * 0.2f + h * 0.0225f - d2 * pulse / 2f, d2 * pulse, d2 * pulse);
+                    var r = new Rect(w * 0.31f - d2 * 0.4f, h * 0.1f - d2 * 0.3f, d2 * pulse, d2 * pulse);
                     var old = GUI.color; GUI.color = Visuals.Hex("FF3D64"); GUI.DrawTexture(r, Visuals.Circle.texture); GUI.color = old;
                     Outlined(r, "!", new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1f);
                 }
@@ -220,36 +219,7 @@ namespace BlockDrop.Game
             for (int k = 3; k < unwon.Count; k++) coins += ach[unwon[k]].Reward;
             if (ahead > 0) Outlined(new Rect(0, y, w, h * 0.03f), Coach.F("MORE TO WIN: {0}   ·   +{1} ●", ahead, coins), new GUIStyle(label) { alignment = TextAnchor.MiddleCenter }, new Color(1, 1, 1, 0.8f), 1f);
 
-            if (Btn(Row(w, Mathf.Min(h * 0.89f, y + h * 0.05f), h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Missions);
-        }
-
-        private bool _victoryRun;
-        private bool ShouldAutoFinish => _mode == Mode.Level && !_victoryRun && !_finishing && _level.GoalMet;
-
-        /// <summary>Once a level's goal is met with moves left, the game plays the rest itself as a quick streak
-        /// (each move with the normal sparkles, praise and clears) so the win lands as a reward, not a wait.
-        /// Input is paused meanwhile; leaving the screen or starting a new run stops it.</summary>
-        private IEnumerator VictoryRun()
-        {
-            int run = _runId;
-            _victoryRun = true;
-            _aiThinking = true;
-            var mid = BoardCenter + new Vector3(0, 0.6f, 0);
-            AddFloater(Coach.T("GOAL REACHED!"), mid + new Vector3(0, 1.4f, 0), Visuals.Hex("FFE27A"), 1.8f);
-            AddFloater(Coach.T("BONUS MOVES!"), mid + new Vector3(0, 0.1f, 0), Color.white, 1.3f);
-            _fx.Win();
-            if (!NewLook.ReducedMotion) Confetti(60);
-            yield return new WaitForSeconds(NewLook.ReducedMotion ? 0.5f : 1.0f);
-            for (int n = 1; run == _runId && _screen == Screen.Playing && _mode == Mode.Level && _level.State == LevelState.Playing; n++)
-            {
-                var seat = _level.Seat;
-                if (!Bot.TryMove(seat.Board, seat.Dealer.Hand, BotLevel.Hard, _rng, out int i, out int x, out int y)) break;
-                AddFloater(Coach.F("BONUS x{0}", n), mid + new Vector3(0, -2.2f, 0), Visuals.Hex("FF9BD2"), 0.9f);
-                PlaceWithEffects(i, x, y);
-                yield return new WaitForSeconds(Mathf.Max(0.16f, 0.5f - 0.04f * n));
-            }
-            _victoryRun = false;
-            if (run == _runId && !_finishing) _aiThinking = false;
+            if (Btn(Row(w, Mathf.Min(h * 0.89f, y + h * 0.05f), h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
         }
 
         /// <summary>A small glittering pop on every placed block, so each drop feels good, not only clears.
@@ -335,7 +305,8 @@ namespace BlockDrop.Game
             if (Btn(new Rect(w * 0.08f, y, half, bh), "CHALLENGE", "6E8BFF", "3A4FE0", 0.95f)) { _codeError = ""; ShowMenu(Screen.Challenge); }
             if (Btn(new Rect(x2, y, half, bh), "RANKINGS", "FFD54A", "D99A00", 0.95f)) { OnlineService.Refresh(_boardTab); if (_boardTab == OnlineService.LevelsBoard) OnlineService.SubmitLevels(_progress.TotalStars); ShowMenu(Screen.Leaderboard); }
             y += bh + gap * 1.5f;
-            if (Btn(Row(w, y, bh * 0.75f, 0.22f), Coach.T("SETTINGS"), "5A4FA8", "3A2F80", 0.8f)) ShowMenu(Screen.Settings);
+            if (Btn(new Rect(w * 0.08f, y, half, bh * 0.75f), "SHOP", "FFD54A", "D99A00", 0.8f)) ShowMenu(Screen.Shop);
+            if (Btn(new Rect(x2, y, half, bh * 0.75f), Coach.T("SETTINGS"), "5A4FA8", "3A2F80", 0.8f)) ShowMenu(Screen.Settings);
             return y + bh * 0.75f + gap;
         }
 
@@ -350,26 +321,43 @@ namespace BlockDrop.Game
         /// <summary>Everything that left the home screen: the other game modes, rankings, and the options.</summary>
         private void DrawSettings(float w, float h)
         {
-            float bh = h * 0.07f, gap = h * 0.012f, half = (w * 0.84f - gap) / 2f, x1 = w * 0.08f, x2 = x1 + half + gap;
-            var label = new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false };
             Outlined(new Rect(0, h * 0.04f, w, h * 0.07f), Coach.T("SETTINGS"), _h2, Color.white, 3);
-            float y = h * 0.13f;
-            Outlined(new Rect(0, y, w, h * 0.03f), Coach.T("OPTIONS"), label, Visuals.Hex("C9A7FF"), 1.2f);
-            y += h * 0.035f;
-            float sh = bh * 0.85f;
-            if (Btn(new Rect(x1, y, half, sh), _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", "5A4FA8", "3A2F80", 0.75f))
+            Outlined(new Rect(0, h * 0.125f, w, h * 0.03f), Coach.T("OPTIONS"), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Visuals.Hex("C9A7FF"), 1.2f);
+            float y = h * 0.17f, rh = h * 0.085f, gap = h * 0.012f;
+            int order = 0;
+            if (ToggleCard(w, ref y, rh, gap, order++, _fx.SoundOn ? "SOUND: ON" : "SOUND: OFF", _fx.SoundOn))
             { _fx.SoundOn = !_fx.SoundOn; PlayerPrefs.SetInt("sound", _fx.SoundOn ? 1 : 0); }
-            if (Btn(new Rect(x2, y, half, sh), _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", "5A4FA8", "3A2F80", 0.75f))
+            if (ToggleCard(w, ref y, rh, gap, order++, _fx.HapticsOn ? "VIBRATE: ON" : "VIBRATE: OFF", _fx.HapticsOn))
             { _fx.HapticsOn = !_fx.HapticsOn; PlayerPrefs.SetInt("haptics", _fx.HapticsOn ? 1 : 0); }
-            y += sh + gap;
             if (NewLook.On)
             {
-                if (Btn(new Rect(x1, y, half, sh), NewLook.ReducedMotion ? "MOTION: REDUCED" : "MOTION: FULL", "5A4FA8", "3A2F80", 0.75f)) NewLook.ToggleMotion();
-                if (Btn(new Rect(x2, y, half, sh), NewLook.PatternsOn ? "PATTERNS: ON" : "PATTERNS: OFF", "5A4FA8", "3A2F80", 0.75f)) NewLook.TogglePatterns();
-                y += sh + gap;
+                if (ToggleCard(w, ref y, rh, gap, order++, NewLook.ReducedMotion ? "MOTION: REDUCED" : "MOTION: FULL", !NewLook.ReducedMotion)) NewLook.ToggleMotion();
+                if (ToggleCard(w, ref y, rh, gap, order++, NewLook.PatternsOn ? "PATTERNS: ON" : "PATTERNS: OFF", NewLook.PatternsOn)) NewLook.TogglePatterns();
             }
-            PlayerButton(Row(w, y, sh, 0.08f));
-            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            // the player name: the whole name on its own card, tap to change it
+            string shown = _localName != "" ? _localName : OnlineService.Ready ? OnlineService.PlayerName.Split('#')[0] : Loc.L("Set your name");
+            var nr = BeginShopCard(new Rect(w * 0.05f, y, w * 0.9f, rh), order++, "5A4FA8", "2A1F70", false);
+            Outlined(new Rect(nr.x + w * 0.05f, nr.y, nr.width * 0.82f, nr.height), Loc.F("PLAYER: {0}", shown), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleLeft }, Color.white, 1.5f);
+            Outlined(new Rect(nr.xMax - nr.width * 0.12f, nr.y, nr.width * 0.08f, nr.height), "▶", new GUIStyle(_body) { wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Gold, 1.2f);
+            bool tapped = GUI.Button(nr, GUIContent.none, GUIStyle.none);
+            EndShopCard();
+            if (tapped) { _nameInput = _localName; _nameMsg = ""; ShowMenu(Screen.Profile); }
+            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
+        }
+
+        /// <summary>One settings row as a card with a switch on the right. Returns true when tapped.</summary>
+        private bool ToggleCard(float w, ref float y, float rh, float gap, int order, string label, bool on)
+        {
+            var r = BeginShopCard(new Rect(w * 0.05f, y, w * 0.9f, rh), order, on ? "6E8BFF" : "5A4FA8", on ? "3A4FE0" : "2A1F70", false);
+            Outlined(new Rect(r.x + w * 0.05f, r.y, r.width * 0.65f, r.height), label, new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleLeft }, Color.white, 1.5f);
+            var track = new Rect(r.xMax - w * 0.2f, r.y + r.height * 0.28f, w * 0.15f, r.height * 0.44f);
+            Panel(track, ShopStyle(on ? "7CF8C0" : "6C6590", on ? "2EE59D" : "463F66"));
+            float d = track.height * 0.8f;
+            Disc(new Rect(on ? track.xMax - d - track.height * 0.1f : track.x + track.height * 0.1f, track.y + track.height * 0.1f, d, d), Color.white);
+            bool tapped = GUI.Button(r, GUIContent.none, GUIStyle.none);
+            EndShopCard();
+            y += rh + gap;
+            return tapped;
         }
 
         // ---------- end of game ----------

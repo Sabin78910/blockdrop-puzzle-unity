@@ -23,7 +23,7 @@ public class LevelMapTests
         Assert.IsTrue(LevelMap.StartsChapter(11));
         Assert.AreEqual(1, LevelMap.ChapterOf(10));
         Assert.AreEqual(2, LevelMap.ChapterOf(11));
-        Assert.AreEqual(100000, LevelMap.ChapterOf(LevelLibrary.Count));
+        Assert.AreEqual(10, LevelMap.ChapterOf(LevelLibrary.Count));
     }
 
     [Test] public void VisibleRangeIsSmallAndStaysInBounds()

@@ -23,6 +23,8 @@ namespace BlockDrop.Game
         public struct Row { public int Rank; public string Name; public long Score; public bool IsMe; }
 
         public static bool Ready { get; private set; }
+        /// <summary>Failed sign-in attempts since the last success (offline phones do not count). Drives the retry backoff.</summary>
+        public static int Failures { get; private set; }
         public static string Status { get; private set; } = "Connecting…";
         public static string PlayerName { get; private set; } = "";
         public static readonly Dictionary<string, List<Row>> Top = new Dictionary<string, List<Row>>();
@@ -53,13 +55,23 @@ namespace BlockDrop.Game
                     await AuthenticationService.Instance.SignInAnonymouslyAsync();
                 PlayerName = await AuthenticationService.Instance.GetPlayerNameAsync(); // auto-generated, e.g. "SwiftFox#1234"
                 Ready = true;
+                Failures = 0;
                 Status = "Online";
+                _ = CloudSync.SyncAsync();
             }
             catch (Exception e)
             {
+                Failures++;
                 Status = "Offline — playing without leaderboards";
                 Debug.LogWarning("Online services unavailable: " + e.Message);
             }
+        }
+
+        /// <summary>Call after the signed-in player changes (Continue with Google switching to an earlier install's player).</summary>
+        public static async Task AfterAccountChangeAsync()
+        {
+            PlayerName = await AuthenticationService.Instance.GetPlayerNameAsync();
+            Top.Clear();
         }
 
         /// <summary>Submits through the SubmitScore Cloud Code script (CloudCode/SubmitScore.js), which checks

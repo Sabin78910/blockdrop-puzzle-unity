@@ -25,6 +25,11 @@ public class LocalizationTests
     {
         var missing = UiLiterals("Assets/Scripts/Game/GameController.cs", "Assets/Scripts/Game/OnlineService.cs")
             .Concat(PlayerMeta.Achievements.SelectMany(a => new[] { a.Name, a.Text }))
+            .Concat(LevelLibrary.Chapters.SelectMany(c => new[] { c.Name, c.Intro }))
+            .Concat(PlayerMeta.Themes.SelectMany(t => new[] { t.Name, t.Tagline }).Where(t => t != ""))
+            .Concat(Store.Products.SelectMany(p => new[] { p.Title, p.Badge }).Where(t => t != ""))
+            .Concat(new[] { "{0} theme", "no ads", "{0} hammers", "{0} shuffles" })
+            .Concat(UiLiterals("Assets/Scripts/Core/Levels.cs").Where(t => t.StartsWith("So close")))
             .Where(t => !Loc.Table.ContainsKey(t)).ToArray();
         Assert.IsEmpty(missing, "Add to Loc.Table: " + string.Join(" | ", missing));
     }

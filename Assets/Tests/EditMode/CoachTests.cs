@@ -187,16 +187,6 @@ namespace BlockDrop.Tests
         }
     
         [Test]
-        public void Level_goal_is_met_only_while_moves_remain()
-        {
-            var level = new LevelSession(1);
-            Assert.IsFalse(level.GoalMet);
-            level.Seat.Board.RestoreScore(level.Definition.TargetScore, 0, 0, 0);
-            Assert.IsTrue(level.GoalMet);
-            Assert.AreEqual(LevelState.Playing, level.State);
-        }
-
-        [Test]
         public void Trophies_list_unwon_closest_first()
         {
             var meta = new PlayerMeta();

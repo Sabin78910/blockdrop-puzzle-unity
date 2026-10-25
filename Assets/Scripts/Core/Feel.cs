@@ -73,9 +73,12 @@ namespace BlockDrop.Core
         /// <summary>Block patterns are opt in: a shape on each colour so colour is never the only cue (docs/FEEL.md).</summary>
         public static bool Patterns(int playerChoice) => playerChoice == 1;
 
-        /// <summary>One distinct shape per block colour (0-4). Level obstacles (stone) and anything else get none.</summary>
+        /// <summary>One distinct shape per block colour (0-4). Plain stone gets none; gems and ice always carry
+        /// a mark (diamond, cross) because their rule differs, so the shape tells it before the colour does.</summary>
         public static BlockPattern PatternFor(int colorIndex) => colorIndex switch
         {
+            Board.Gem => BlockPattern.Diamond,
+            Board.Ice => BlockPattern.Cross,
             0 => BlockPattern.Dot,
             1 => BlockPattern.Stripes,
             2 => BlockPattern.Ring,

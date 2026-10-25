@@ -14,6 +14,8 @@ namespace BlockDrop.Game
             Hex("2EC4F1"), // sky
             Hex("A66CFF"), // amethyst
             Hex("6B7390"), // stone (level obstacles)
+            Hex("FF4FD8"), // gem (collect it by clearing its line)
+            Hex("A9E4FF"), // ice (two clears: cracks to stone first)
         };
 
         public static readonly Color BoardPanel = Hex("101845");

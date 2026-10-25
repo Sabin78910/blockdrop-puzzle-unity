@@ -56,6 +56,7 @@ namespace BlockDrop.Game
                 Ready = true;
                 Failures = 0;
                 Status = "Online";
+                _ = CloudSync.SyncAsync();
             }
             catch (Exception e)
             {
@@ -63,6 +64,13 @@ namespace BlockDrop.Game
                 Status = "Offline — playing without leaderboards";
                 Debug.LogWarning("Online services unavailable: " + e.Message);
             }
+        }
+
+        /// <summary>Call after the signed-in player changes (Continue with Google switching to an earlier install's player).</summary>
+        public static async Task AfterAccountChangeAsync()
+        {
+            PlayerName = await AuthenticationService.Instance.GetPlayerNameAsync();
+            Top.Clear();
         }
 
         /// <summary>Submits through the SubmitScore Cloud Code script (CloudCode/SubmitScore.js), which checks

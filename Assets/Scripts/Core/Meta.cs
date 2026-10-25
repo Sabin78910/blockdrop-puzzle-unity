@@ -226,6 +226,22 @@ namespace BlockDrop.Core
             return true;
         }
 
+        /// <summary>Combines two records of the same player (this phone and the cloud copy) without losing anything earned.
+        /// The record further along (level, then xp, then coins) is the base; themes, achievements, best streak and
+        /// lifetime stats keep the larger/union of both.</summary>
+        public static PlayerMeta Merge(PlayerMeta a, PlayerMeta b)
+        {
+            bool aLeads = a.Level != b.Level ? a.Level > b.Level : a.Xp != b.Xp ? a.Xp > b.Xp : a.Coins >= b.Coins;
+            var lead = aLeads ? a : b;
+            var other = aLeads ? b : a;
+            var m = Parse(lead.Serialize());
+            m.OwnedThemes = lead.OwnedThemes | other.OwnedThemes;
+            m.AchievementMask = lead.AchievementMask | other.AchievementMask;
+            m.BestStreak = Math.Max(lead.BestStreak, other.BestStreak);
+            for (int i = 0; i < m.Stats.Length; i++) m.Stats[i] = Math.Max(lead.Stats[i], other.Stats[i]);
+            return m;
+        }
+
         public string Serialize()
         {
             var sb = new StringBuilder();

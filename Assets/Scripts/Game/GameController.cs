@@ -555,7 +555,13 @@ namespace BlockDrop.Game
             }
             // Keep trying to come online (slow or late network at startup); then push a name chosen offline.
             if (!OnlineService.Ready && Time.unscaledTime >= _nextOnlineTry) { _nextOnlineTry = Time.unscaledTime + RetryBackoff.Delay(OnlineService.Failures, UnityEngine.Random.value); _ = OnlineService.EnsureReady(); }
-            else if (OnlineService.Ready && !_nameSynced)
+            if (_screen != Screen.Playing && CloudSync.TakeRestored())
+            {   // progress came back from the cloud save: reload what the game keeps in memory
+                _progress = Progress.Parse(PlayerPrefs.GetString("progress", ""));
+                _meta = PlayerMeta.Parse(PlayerPrefs.GetString("meta", ""));
+                _best = PlayerPrefs.GetInt("best", 0);
+            }
+            if (OnlineService.Ready && !_nameSynced)
             {
                 _nameSynced = true;
                 if (_localName != "" && OnlineService.PlayerName.Split('#')[0] != _localName) _ = OnlineService.SetNameAsync(_localName);

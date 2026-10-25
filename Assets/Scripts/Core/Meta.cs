@@ -62,7 +62,7 @@ namespace BlockDrop.Core
     {
         public static readonly Theme[] Themes =
         {
-            new Theme { Name = "Jewel",  Price = 0,   Blocks = new[] { "FF4D6D", "FFB627", "2EE59D", "2EC4F1", "A66CFF" }, BackgroundTint = "FFFFFF" },
+            new Theme { Name = "Jewel",  Price = 0,   Blocks = new[] { "FF5C7A", "FFC83D", "3DF2AA", "42D2FF", "B57DFF" }, BackgroundTint = "FFFFFF" },
             new Theme { Name = "Neon",   Price = 150, Blocks = new[] { "FF2E93", "F9F871", "00F5A0", "00D9FF", "B967FF" }, BackgroundTint = "6B5BA8" },
             new Theme { Name = "Candy",  Price = 250, Blocks = new[] { "FF8FAB", "FFD6A5", "9BF6C4", "A0E7FF", "CDB4FF" }, BackgroundTint = "FFC2E2" },
             new Theme { Name = "Ocean",  Price = 350, Blocks = new[] { "00B4D8", "48CAE4", "2EC4B6", "0077B6", "90E0EF" }, BackgroundTint = "8FD3FF" },

@@ -38,6 +38,10 @@ namespace BlockDrop.Core
     /// say something about the player.</summary>
     public enum ThemeTier { Starter, Premium, Legendary, Exclusive }
 
+    /// <summary>Level helpers. Earned in play (a starter gift, every chapter, every 7th streak day) or bought with
+    /// coins. They give the player a choice at the hardest moment instead of a wall.</summary>
+    public enum Booster { Hammer, Shuffle }
+
     public sealed class Theme
     {
         public string Name;
@@ -91,6 +95,26 @@ namespace BlockDrop.Core
         };
 
         public int Coins { get; private set; }
+
+        public const int StarterBoosters = 3, ChapterBoosters = 2;
+        public readonly int[] Boosters = { StarterBoosters, StarterBoosters };
+        public static int BoosterPrice(Booster b) => b == Booster.Hammer ? 150 : 100;
+        public int BoostersOf(Booster b) => Boosters[(int)b];
+        public void AddBoosters(Booster b, int n) { if (n > 0) Boosters[(int)b] += n; }
+
+        public bool UseBooster(Booster b)
+        {
+            if (Boosters[(int)b] <= 0) return false;
+            Boosters[(int)b]--;
+            return true;
+        }
+
+        public bool BuyBooster(Booster b)
+        {
+            if (!Spend(BoosterPrice(b))) return false;
+            Boosters[(int)b]++;
+            return true;
+        }
         public void AddCoins(int amount) { if (amount > 0) Coins += amount; }
 
         /// <summary>Pays <paramref name="amount"/> coins if the player has them.</summary>
@@ -203,6 +227,7 @@ namespace BlockDrop.Core
             Streak = consecutive ? Streak + 1 : 1;
             BestStreak = Math.Max(BestStreak, Streak);
             LastCheckIn = today;
+            if (Streak % 7 == 0) AddBoosters(Booster.Hammer, 1); // a weekly treat on top of the coins
             int reward = StreakReward(Streak);
             Coins += reward;
             return reward;
@@ -301,6 +326,8 @@ namespace BlockDrop.Core
                 if (t >= 0) OwnedThemes |= 1 << t;
             }
             if (product.RemoveAds) NoAds = true;
+            AddBoosters(Booster.Hammer, product.Hammers);
+            AddBoosters(Booster.Shuffle, product.Shuffles);
             return true;
         }
 
@@ -309,7 +336,7 @@ namespace BlockDrop.Core
             var sb = new StringBuilder();
             sb.Append($"c={Coins};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
             sb.Append($"p={Progress[0]},{Progress[1]},{Progress[2]};k={(Claimed[0] ? 1 : 0)}{(Claimed[1] ? 1 : 0)}{(Claimed[2] ? 1 : 0)};");
-            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)}");
+            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};bo={Boosters[0]},{Boosters[1]}");
             return sb.ToString();
         }
 
@@ -343,6 +370,11 @@ namespace BlockDrop.Core
                     case "x": m.Xp = Math.Max(0, n); break;
                     case "a": m.AchievementMask = n; break;
                     case "pu": m.Purchases = n; break;
+                    case "bo":
+                        var bs = v.Split(',');
+                        for (int i = 0; i < m.Boosters.Length && i < bs.Length; i++)
+                            if (int.TryParse(bs[i], out int count)) m.Boosters[i] = Math.Max(0, count);
+                        break;
                     case "na": m.NoAds = n == 1; break;
                     case "st":
                         var ss = v.Split(',');

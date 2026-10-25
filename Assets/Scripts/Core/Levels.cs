@@ -301,6 +301,26 @@ namespace BlockDrop.Core
 
         public bool CanContinue => State == LevelState.Lost && Continues < MaxContinues;
 
+        /// <summary>Boosters used this attempt. They never cost a move.</summary>
+        public int BoostersUsed { get; private set; }
+
+        /// <summary>Hammer: breaks one block (a gem broken this way counts as collected, like Candy Crush's lollipop).</summary>
+        public bool Smash(int x, int y)
+        {
+            if (State != LevelState.Playing || !Seat.Board.Smash(x, y)) return false;
+            BoostersUsed++;
+            return true;
+        }
+
+        /// <summary>Shuffle: a fresh hand that fits, without using a move.</summary>
+        public bool Shuffle()
+        {
+            if (State != LevelState.Playing) return false;
+            Seat.Reshuffle();
+            BoostersUsed++;
+            return true;
+        }
+
         /// <summary>Five more moves. Paid for with coins in the game.</summary>
         public bool Continue()
         {

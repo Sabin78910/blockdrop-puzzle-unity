@@ -100,6 +100,13 @@ namespace BlockDrop.Core
             return !Out;
         }
 
+        /// <summary>The shuffle booster: swaps the hand for fresh pieces that fit the board.</summary>
+        public void Reshuffle()
+        {
+            Dealer.Redeal(p => Board.CanPlaceAnywhere(p));
+            Out = Board.IsGameOver(Dealer.Hand);
+        }
+
         /// <summary>Resumes a saved game's counters; board and hand are restored separately.</summary>
         public void RestoreCounters(int moves, int revives)
         {

@@ -5,7 +5,7 @@ namespace BlockDrop.Core
     public sealed class Product
     {
         public string Id, Title, Price, Badge = "";
-        public int Coins;
+        public int Coins, Hammers, Shuffles;
         public string[] Themes = Array.Empty<string>();
         public bool RemoveAds, Consumable;
     }
@@ -23,7 +23,9 @@ namespace BlockDrop.Core
             new Product { Id = "coins_20000", Title = "Treasury of coins", Price = "$19.99", Coins = 20000, Consumable = true, Badge = "BEST VALUE" },
             new Product { Id = "remove_ads",  Title = "Remove ads",       Price = "$2.99",  RemoveAds = true },
             new Product { Id = "bundle_royal", Title = "Royal bundle",    Price = "$7.99",  Coins = 2000, Themes = new[] { "Royal Gold" }, RemoveAds = true },
-            new Product { Id = "bundle_legends", Title = "Legends collection", Price = "$24.99", Coins = 10000, Themes = new[] { "Aurora", "Galaxy", "Diamond", "Royal Gold" }, RemoveAds = true, Badge = "ALL LEGENDARY" },
+            new Product { Id = "bundle_legends", Title = "Legends collection", Price = "$24.99", Coins = 10000, Hammers = 10, Shuffles = 10, Themes = new[] { "Aurora", "Galaxy", "Diamond", "Royal Gold" }, RemoveAds = true, Badge = "ALL LEGENDARY" },
+            // append only: owned non-consumables are saved as bits by position
+            new Product { Id = "boosters_10", Title = "Booster box", Price = "$3.99", Hammers = 10, Shuffles = 10, Consumable = true },
         };
 
         public static Product Find(string id) => Array.Find(Products, p => p.Id == id);
@@ -33,6 +35,8 @@ namespace BlockDrop.Core
         {
             var parts = new System.Collections.Generic.List<string>();
             if (p.Coins > 0) parts.Add(p.Coins.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " ●");
+            if (p.Hammers > 0) parts.Add(Loc.F("{0} hammers", p.Hammers));
+            if (p.Shuffles > 0) parts.Add(Loc.F("{0} shuffles", p.Shuffles));
             foreach (var t in p.Themes) parts.Add(Loc.F("{0} theme", Loc.L(t)));
             if (p.RemoveAds) parts.Add(Loc.L("no ads"));
             return string.Join(" + ", parts);

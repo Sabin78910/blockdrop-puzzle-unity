@@ -66,6 +66,14 @@ namespace BlockDrop.Core
 
         public int Coins { get; private set; }
         public void AddCoins(int amount) { if (amount > 0) Coins += amount; }
+
+        /// <summary>Pays <paramref name="amount"/> coins if the player has them.</summary>
+        public bool Spend(int amount)
+        {
+            if (amount < 0 || Coins < amount) return false;
+            Coins -= amount;
+            return true;
+        }
         public int Streak { get; private set; }
         public int BestStreak { get; private set; }
         public string LastCheckIn { get; private set; } = "";

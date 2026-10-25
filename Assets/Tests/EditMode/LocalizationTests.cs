@@ -23,6 +23,8 @@ public class LocalizationTests
     {
         var missing = UiLiterals("Assets/Scripts/Game/GameController.cs", "Assets/Scripts/Game/OnlineService.cs")
             .Concat(PlayerMeta.Achievements.SelectMany(a => new[] { a.Name, a.Text }))
+            .Concat(LevelLibrary.Chapters.SelectMany(c => new[] { c.Name, c.Intro }))
+            .Concat(UiLiterals("Assets/Scripts/Core/Levels.cs").Where(t => t.StartsWith("So close")))
             .Where(t => !Loc.Table.ContainsKey(t)).ToArray();
         Assert.IsEmpty(missing, "Add to Loc.Table: " + string.Join(" | ", missing));
     }

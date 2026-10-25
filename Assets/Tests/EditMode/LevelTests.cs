@@ -1,0 +1,194 @@
+using System.Linq;
+using BlockDrop.Core;
+using NUnit.Framework;
+
+public class LevelTests
+{
+    private static LevelSession PlayOut(int number, int seed, int bonus = 0)
+    {
+        var s = new LevelSession(number, bonus);
+        var rng = new System.Random(seed);
+        while (s.State == LevelState.Playing && Playtester.TryMove(s.Seat.Board, s.Seat.Dealer.Hand, rng, out int i, out int x, out int y))
+            Assert.IsTrue(s.TryPlace(i, x, y), $"level {number}: playtester move rejected");
+        return s;
+    }
+
+    [Test] public void BakedTableMatchesTheTuner()
+    {
+        // the phone reads LevelTable; it must be what the playtester tuning produces (run tools/LevelTuner)
+        foreach (int n in new[] { 1, 14, 39, 45, 77, 100 })
+        {
+            var baked = LevelLibrary.Get(n);
+            var tuned = Playtester.Tune(n).Definition;
+            Assert.AreEqual(tuned.MaxMoves, baked.MaxMoves, $"level {n} moves");
+            Assert.AreEqual(tuned.TwoStarScore, baked.TwoStarScore, $"level {n} two stars");
+            Assert.AreEqual(tuned.ThreeStarScore, baked.ThreeStarScore, $"level {n} three stars");
+            CollectionAssert.AreEqual(tuned.Blockers, baked.Blockers, $"level {n} blockers");
+            CollectionAssert.AreEqual(tuned.Goals.Select(g => (g.Kind, g.Target)), baked.Goals.Select(g => (g.Kind, g.Target)), $"level {n} goals");
+        }
+    }
+
+    [Test] public void EveryLevelIsWellFormed()
+    {
+        Assert.AreEqual(LevelLibrary.Count, LevelLibrary.Chapters.Length * LevelLibrary.PerChapter);
+        for (int n = 1; n <= LevelLibrary.Count; n++)
+        {
+            var d = LevelLibrary.Get(n);
+            Assert.AreSame(d, LevelLibrary.Get(n), "cached");
+            Assert.IsNotEmpty(d.Goals, $"level {n}");
+            Assert.IsTrue(d.Goals.All(g => g.Target > 0), $"level {n}: every goal has something to do");
+            Assert.That(d.MaxMoves, Is.InRange(8, Playtester.MoveCap), $"level {n} moves");
+            Assert.LessOrEqual(d.MaxMoves, Playtester.LongestLevel(d.Tier) + 6, $"level {n} is snack sized");
+            Assert.Greater(d.ThreeStarScore, d.TwoStarScore, $"level {n} stars");
+            for (int i = 0; i < 8; i++)
+            {
+                Assert.LessOrEqual(d.Blockers.Count(b => b.y == i), 5, $"level {n} row {i}");
+                Assert.LessOrEqual(d.Blockers.Count(b => b.x == i), 5, $"level {n} column {i}");
+            }
+            if (d.Chapter.Goals.Contains(GoalKind.Gems)) Assert.GreaterOrEqual(d.Blockers.Count(b => b.cell == Board.Gem), 2, $"level {n} gems");
+        }
+    }
+
+    [Test] public void EachChapterIntroducesSomethingAndDifficultyIsASawtooth()
+    {
+        for (int c = 0; c < LevelLibrary.Chapters.Length; c++)
+        {
+            int first = c * LevelLibrary.PerChapter + 1;
+            Assert.IsNotNull(LevelLibrary.Get(first).Intro, $"chapter {c + 1} explains its new idea");
+            Assert.IsNull(LevelLibrary.Get(first + 1).Intro);
+            // every spike is followed by relief, and a chapter ends on a relief level
+            for (int k = 0; k < LevelLibrary.PerChapter - 1; k++)
+            {
+                int n = first + k;
+                if (LevelLibrary.TierFor(n) == LevelTier.SuperHard || (LevelLibrary.TierFor(n) == LevelTier.Hard && LevelLibrary.TierFor(n + 1) != LevelTier.SuperHard))
+                    Assert.AreEqual(LevelTier.Relief, LevelLibrary.TierFor(n + 1), $"level {n + 1} after a spike");
+            }
+            Assert.AreEqual(LevelTier.Relief, LevelLibrary.TierFor(first + LevelLibrary.PerChapter - 1));
+            Assert.Less(LevelLibrary.TargetWinRate(first + 8), LevelLibrary.TargetWinRate(first + 9), "relief is easier than the boss");
+        }
+        Assert.GreaterOrEqual(LevelLibrary.TargetWinRate(LevelLibrary.Count - 1), 0.40, "hard should feel like almost, never a wall");
+        // the old curve became a wall after level 26: now the late chapters are tuned like the early ones
+        Assert.AreEqual(LevelTier.Relief, LevelLibrary.TierFor(30));
+    }
+
+    [Test] public void EveryLevelIsWinnableByASimulatedPlayer()
+    {
+        for (int n = 1; n <= LevelLibrary.Count; n++)
+        {
+            bool won = Enumerable.Range(0, 12).Any(seed => PlayOut(n, seed).State == LevelState.Won);
+            Assert.IsTrue(won, $"level {n}: no simulated player won in 12 tries");
+        }
+    }
+
+    [Test] public void WinsTheMomentGoalsAreMetAndSpareMovesBecomeBonus()
+    {
+        var s = PlayOut(1, 3);
+        Assert.AreEqual(LevelState.Won, s.State);
+        Assert.IsTrue(s.AllGoalsMet);
+        Assert.AreEqual(s.MovesLeft * LevelLibrary.MoveBonus, s.Bonus);
+        Assert.AreEqual(s.Seat.Board.Score + s.Bonus, s.FinalScore);
+        Assert.That(s.Stars, Is.InRange(1, 3));
+        Assert.IsFalse(s.TryPlace(0, 0, 0), "no moves after the level ends");
+    }
+
+    [Test] public void AStuckHandIsReshuffledSoOnlyMovesCanLoseALevel()
+    {
+        for (int n = 40; n <= 50; n++)
+        {
+            var s = PlayOut(n, 5);
+            if (s.State == LevelState.Lost) Assert.AreEqual(0, s.MovesLeft, $"level {n} lost with moves left");
+        }
+    }
+
+    [Test] public void LevelHandsAlwaysFitWhenDealt()
+    {
+        var def = LevelLibrary.Get(29); // a super-hard level full of stones
+        var seat = LevelLibrary.NewSeat(def);
+        Assert.IsTrue(seat.Dealer.Hand.All(p => p != null && seat.Board.CanPlaceAnywhere(p)), "first hand, dealt after the stones");
+        var rng = new System.Random(2);
+        for (int k = 0; k < 30 && !seat.Out; k++)
+        {
+            bool fresh = seat.Dealer.Hand.Count(p => p != null) == 1;
+            Assert.IsTrue(Playtester.TryMove(seat.Board, seat.Dealer.Hand, rng, out int i, out int x, out int y));
+            seat.TryPlace(i, x, y);
+            if (fresh) Assert.IsTrue(seat.Dealer.Hand.All(p => seat.Board.CanPlaceAnywhere(p)), "every piece of a new hand fits");
+        }
+    }
+
+    private static void RunOutOfMoves(LevelSession s, int lines)
+    {
+        s.Seat.Board.RestoreScore(0, 0, 0, lines);
+        s.Seat.RestoreCounters(s.MaxMoves, 0);
+    }
+
+    [Test] public void LosingOffersTwoContinues()
+    {
+        var s = new LevelSession(11); // a lines level
+        RunOutOfMoves(s, 0);
+        Assert.AreEqual(LevelState.Lost, s.State);
+        int before = s.MaxMoves;
+        Assert.IsTrue(s.Continue());
+        Assert.AreEqual(before + LevelSession.ContinueMoves, s.MaxMoves);
+        Assert.AreEqual(LevelSession.ContinueMoves, s.MovesLeft);
+        Assert.AreEqual(LevelState.Playing, s.State);
+        RunOutOfMoves(s, 0);
+        Assert.IsTrue(s.Continue());
+        RunOutOfMoves(s, 0);
+        Assert.IsFalse(s.CanContinue, "two continues at most");
+        Assert.IsFalse(s.Continue());
+    }
+
+    [Test] public void NearMissOnlyWhenReallyClose()
+    {
+        var s = new LevelSession(11);
+        var goal = s.Definition.Goals[0];
+        Assert.AreEqual(GoalKind.Lines, goal.Kind);
+        Assert.IsNull(s.NearMiss(), "nothing while playing");
+        RunOutOfMoves(s, goal.Target - 1);
+        Assert.AreEqual("So close! Just 1 more line.", s.NearMiss());
+        var far = new LevelSession(11);
+        RunOutOfMoves(far, 0);
+        Assert.IsNull(far.NearMiss(), "never fake an almost");
+    }
+
+    [Test] public void HelpingHandAddsVisibleMoves()
+    {
+        var plain = new LevelSession(9);
+        var helped = new LevelSession(9, 3);
+        Assert.AreEqual(plain.MaxMoves + 3, helped.MaxMoves);
+        Assert.AreEqual(3, helped.ExtraMoves);
+    }
+
+    [Test] public void ProgressRecordsNewStarsAndFrontier()
+    {
+        var p = new Progress();
+        Assert.IsTrue(p.IsUnlocked(1));
+        Assert.IsFalse(p.IsUnlocked(2));
+        Assert.AreEqual(2, p.Record(1, 2));
+        Assert.AreEqual(0, p.Record(1, 1), "keeps best, nothing new");
+        Assert.AreEqual(1, p.Record(1, 3), "one new star");
+        Assert.AreEqual(2, p.Frontier);
+        var q = Progress.Parse(p.Serialize());
+        Assert.AreEqual(3, q.StarsFor(1));
+        Assert.AreEqual(LevelLibrary.Count, p.Serialize().Length);
+        Assert.IsTrue(Progress.Parse("garbage!!").IsUnlocked(1));
+        Assert.AreEqual(2, Progress.Parse("322").StarsFor(3), "old 30-level saves still load");
+    }
+
+    [Test] public void SavedLevelKeepsExtraMovesAndSpecialBlocks()
+    {
+        var level = new LevelSession(45, 3);
+        level.Seat.Board.SetCell(0, 0, Board.Ice);
+        level.Seat.Board.SetCell(1, 0, Board.Gem);
+        var g = SavedGame.Parse(SavedGame.Capture("Level", level.Seat, false, 45, "2026-10-25", 2, level.ExtraMoves, 1).Serialize());
+        Assert.IsNotNull(g);
+        Assert.AreEqual(3, g.Extra);
+        Assert.AreEqual(1, g.Continues);
+        var resumed = new LevelSession(g.Level);
+        g.ApplyTo(resumed.Seat);
+        resumed.RestoreExtra(g.Extra, g.Continues);
+        Assert.AreEqual(level.MaxMoves, resumed.MaxMoves);
+        Assert.AreEqual(Board.Ice, resumed.Seat.Board[0, 0]);
+        Assert.AreEqual(Board.Gem, resumed.Seat.Board[1, 0]);
+    }
+}

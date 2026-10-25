@@ -18,8 +18,9 @@ namespace BlockDrop.Game
             Hex("A9E4FF"), // ice (two clears: cracks to stone first)
         };
 
-        public static readonly Color BoardPanel = Hex("101845");
-        public static readonly Color EmptySlot = Hex("1E2A6B");
+        // set by the theme (premium themes recolour the board too)
+        public static Color BoardPanel = Hex("101845");
+        public static Color EmptySlot = Hex("1E2A6B");
         public static readonly Color Gold = Hex("FFD54A");
 
         private static Sprite _tile, _gloss, _slot, _panel, _circle, _background;

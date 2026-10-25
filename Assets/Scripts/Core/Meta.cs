@@ -33,12 +33,23 @@ namespace BlockDrop.Core
         public int Target, Reward;
     }
 
+    /// <summary>Starter themes are cheap, premium ones are a goal for a few weeks of play, legendary ones are the
+    /// long-term prize (or a direct purchase). Exclusive themes cannot be bought at all: they are earned, so they
+    /// say something about the player.</summary>
+    public enum ThemeTier { Starter, Premium, Legendary, Exclusive }
+
     public sealed class Theme
     {
         public string Name;
         public int Price;
         public string[] Blocks;   // 5 hex colours
         public string BackgroundTint;
+        public ThemeTier Tier;
+        public string Panel = "101845", Slot = "1E2A6B"; // board and empty cell colours
+        public int ChapterReward; // exclusive: earned by finishing this chapter
+        public int StarsReward;   // exclusive: earned with this many level stars
+        public string Tagline = "";
+        public bool Buyable => Tier != ThemeTier.Exclusive;
     }
 
     /// <summary>Fair, skill-based progression: daily streak, three daily missions, coins and cosmetic
@@ -52,6 +63,21 @@ namespace BlockDrop.Core
             new Theme { Name = "Candy",  Price = 250, Blocks = new[] { "FF8FAB", "FFD6A5", "9BF6C4", "A0E7FF", "CDB4FF" }, BackgroundTint = "FFC2E2" },
             new Theme { Name = "Ocean",  Price = 350, Blocks = new[] { "00B4D8", "48CAE4", "2EC4B6", "0077B6", "90E0EF" }, BackgroundTint = "8FD3FF" },
             new Theme { Name = "Sunset", Price = 500, Blocks = new[] { "FF6B35", "F7C59F", "EF476F", "FFD166", "C77DFF" }, BackgroundTint = "FFB38A" },
+            // premium: a board that changes too, not only the blocks
+            new Theme { Name = "Forest", Price = 1200, Tier = ThemeTier.Premium, Blocks = new[] { "7BC950", "E9C46A", "2A9D8F", "F4A261", "B5E48C" }, BackgroundTint = "6FBF73", Panel = "14301F", Slot = "21482F", Tagline = "Calm greens and warm wood" },
+            new Theme { Name = "Arcade", Price = 1500, Tier = ThemeTier.Premium, Blocks = new[] { "FF006E", "FFBE0B", "3A86FF", "8338EC", "06FFA5" }, BackgroundTint = "3B2A6E", Panel = "0B0B1A", Slot = "1A1A33", Tagline = "Neon on midnight black" },
+            new Theme { Name = "Sakura", Price = 1800, Tier = ThemeTier.Premium, Blocks = new[] { "FFB7C5", "FF8FAB", "FFE5EC", "C9ADA7", "F2A7C3" }, BackgroundTint = "FFD1DC", Panel = "4A1E33", Slot = "6B2E4B", Tagline = "Spring blossom pinks" },
+            new Theme { Name = "Midnight", Price = 2200, Tier = ThemeTier.Premium, Blocks = new[] { "4CC9F0", "4361EE", "B8C0FF", "F72585", "7209B7" }, BackgroundTint = "283593", Panel = "0A0F2C", Slot = "141B45", Tagline = "City lights after dark" },
+            new Theme { Name = "Desert", Price = 2500, Tier = ThemeTier.Premium, Blocks = new[] { "E76F51", "F4A261", "E9C46A", "2A9D8F", "D4A373" }, BackgroundTint = "E8B97A", Panel = "3D2416", Slot = "5A3824", Tagline = "Terracotta and gold sand" },
+            // legendary: the long-term prize
+            new Theme { Name = "Aurora", Price = 5000, Tier = ThemeTier.Legendary, Blocks = new[] { "00F5D4", "00BBF9", "9B5DE5", "F15BB5", "FEE440" }, BackgroundTint = "1B4D5C", Panel = "06131F", Slot = "0F2433", Tagline = "Northern lights on every block" },
+            new Theme { Name = "Galaxy", Price = 6500, Tier = ThemeTier.Legendary, Blocks = new[] { "C77DFF", "7B2CBF", "E0AAFF", "48BFE3", "FF70A6" }, BackgroundTint = "2D1B69", Panel = "0D0221", Slot = "1E0B45", Tagline = "Deep space violet" },
+            new Theme { Name = "Diamond", Price = 8000, Tier = ThemeTier.Legendary, Blocks = new[] { "E0FBFC", "B9E6FF", "FFFFFF", "C2DFE3", "9DB4C0" }, BackgroundTint = "AFC8D6", Panel = "1D2D44", Slot = "2E4460", Tagline = "Ice-clear luxury" },
+            new Theme { Name = "Royal Gold", Price = 9000, Tier = ThemeTier.Legendary, Blocks = new[] { "FFD700", "FFC300", "F5E6A8", "D4AF37", "FFF1B5" }, BackgroundTint = "4A2368", Panel = "1F0B33", Slot = "35154F", Tagline = "Solid gold on royal purple" },
+            // exclusive: earned, never sold
+            new Theme { Name = "Glacier", Tier = ThemeTier.Exclusive, ChapterReward = 5, Blocks = new[] { "A9E4FF", "6EC1E4", "DFF6FF", "3E92CC", "B8F2E6" }, BackgroundTint = "7FB7D9", Panel = "0E2A3D", Slot = "173F5A", Tagline = "Finish chapter 5" },
+            new Theme { Name = "Crown Jewels", Tier = ThemeTier.Exclusive, ChapterReward = 10, Blocks = new[] { "E0115F", "0F52BA", "50C878", "FFD700", "9966CC" }, BackgroundTint = "3D155F", Panel = "140626", Slot = "2A0F45", Tagline = "Finish all 100 levels" },
+            new Theme { Name = "Starlight", Tier = ThemeTier.Exclusive, StarsReward = 250, Blocks = new[] { "FFF3B0", "FFD6FF", "BDE0FE", "CAFFBF", "FFC6FF" }, BackgroundTint = "22223B", Panel = "0B0B1E", Slot = "1A1A38", Tagline = "Earn 250 level stars" },
         };
 
         private static readonly (MissionKind kind, int[] targets, int reward)[] Pool =
@@ -226,6 +252,7 @@ namespace BlockDrop.Core
             if (theme < 0 || theme >= Themes.Length) return false;
             if (!Owns(theme))
             {
+                if (!Themes[theme].Buyable) return false;
                 if (Coins < Themes[theme].Price) return false;
                 Coins -= Themes[theme].Price;
                 OwnedThemes |= 1 << theme;
@@ -234,12 +261,55 @@ namespace BlockDrop.Core
             return true;
         }
 
+        /// <summary>Exclusive themes earned by finishing chapters or collecting stars. Returns newly unlocked indexes.</summary>
+        public List<int> UnlockEarnedThemes(int chaptersComplete, int totalStars)
+        {
+            var got = new List<int>();
+            for (int i = 0; i < Themes.Length; i++)
+            {
+                var t = Themes[i];
+                if (t.Tier != ThemeTier.Exclusive || Owns(i)) continue;
+                bool earned = (t.ChapterReward > 0 && chaptersComplete >= t.ChapterReward) || (t.StarsReward > 0 && totalStars >= t.StarsReward);
+                if (!earned) continue;
+                OwnedThemes |= 1 << i;
+                got.Add(i);
+            }
+            return got;
+        }
+
+        public static int FindTheme(string name) => Array.FindIndex(Themes, t => t.Name == name);
+
+        /// <summary>Non-consumable store products already granted (bit per <see cref="Store.Products"/> index).</summary>
+        public int Purchases { get; private set; }
+        public bool NoAds { get; private set; }
+
+        /// <summary>Delivers a confirmed purchase. Consumables (coin packs) stack; a non-consumable is granted once,
+        /// so a restore on a new phone never pays out twice.</summary>
+        public bool Grant(Product product)
+        {
+            int i = Array.IndexOf(Store.Products, product);
+            if (i < 0) return false;
+            if (!product.Consumable)
+            {
+                if ((Purchases & (1 << i)) != 0) return false;
+                Purchases |= 1 << i;
+            }
+            Coins += product.Coins;
+            foreach (var name in product.Themes)
+            {
+                int t = FindTheme(name);
+                if (t >= 0) OwnedThemes |= 1 << t;
+            }
+            if (product.RemoveAds) NoAds = true;
+            return true;
+        }
+
         public string Serialize()
         {
             var sb = new StringBuilder();
             sb.Append($"c={Coins};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
             sb.Append($"p={Progress[0]},{Progress[1]},{Progress[2]};k={(Claimed[0] ? 1 : 0)}{(Claimed[1] ? 1 : 0)}{(Claimed[2] ? 1 : 0)};");
-            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)}");
+            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)}");
             return sb.ToString();
         }
 
@@ -272,6 +342,8 @@ namespace BlockDrop.Core
                     case "v": m.Level = Math.Max(1, n); break;
                     case "x": m.Xp = Math.Max(0, n); break;
                     case "a": m.AchievementMask = n; break;
+                    case "pu": m.Purchases = n; break;
+                    case "na": m.NoAds = n == 1; break;
                     case "st":
                         var ss = v.Split(',');
                         for (int i = 0; i < m.Stats.Length && i < ss.Length; i++) int.TryParse(ss[i], out m.Stats[i]);

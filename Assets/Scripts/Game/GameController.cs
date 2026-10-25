@@ -12,7 +12,7 @@ namespace BlockDrop.Game
     /// vs-AI, 2-player, challenge codes and online leaderboards. Fully playable offline.</summary>
     public sealed class GameController : MonoBehaviour
     {
-        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection }
+        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection, Shop }
         private enum Mode { Classic, Daily, Level, Versus, VsAi, Challenge }
 
         private const int Size = 8;
@@ -41,6 +41,10 @@ namespace BlockDrop.Game
         private int _chapterPage, _bonusShown, _coinsEarned, _shuffles;
         private const int ContinueCost = 100, CoinsPerStar = 15, HelpingHandMoves = 3, HelpingHandAfter = 3;
         private readonly IAdProvider _ads = new BetaAdProvider();
+        private readonly IStoreProvider _store = new BetaStoreProvider();
+        private ThemeTier _themeTab;
+        private SpriteRenderer _panel, _miniPanel;
+        private readonly List<SpriteRenderer> _slots = new List<SpriteRenderer>();
         private AdPolicy _adPolicy;
         private TouchScreenKeyboard _kb;
         private string _pieceMsg = "";
@@ -146,7 +150,7 @@ namespace BlockDrop.Game
 
             _boardRoot = new GameObject("Board");
             _boardRoot.transform.SetParent(_world, false);
-            var panel = NewSprite("Panel", Visuals.Panel, _boardRoot.transform, BoardCenter, 1, -20, Visuals.BoardPanel);
+            var panel = _panel = NewSprite("Panel", Visuals.Panel, _boardRoot.transform, BoardCenter, 1, -20, Visuals.BoardPanel);
             panel.drawMode = SpriteDrawMode.Sliced; panel.size = new Vector2(8.7f, 8.7f);
             var rim = NewSprite("Rim", Visuals.Panel, _boardRoot.transform, BoardCenter + new Vector3(0, -0.12f, 0), 1, -21, new Color(0, 0, 0, 0.45f));
             rim.drawMode = SpriteDrawMode.Sliced; rim.size = new Vector2(8.9f, 8.9f);
@@ -160,7 +164,7 @@ namespace BlockDrop.Game
                 for (int y = 0; y < Size; y++)
                 {
                     var p = CellPos(x, y);
-                    NewSprite("slot", Visuals.Slot, _boardRoot.transform, p, 0.94f, -5, Visuals.EmptySlot);
+                    _slots.Add(NewSprite("slot", Visuals.Slot, _boardRoot.transform, p, 0.94f, -5, Visuals.EmptySlot));
                     _tiles[x, y] = NewSprite("tile", Visuals.Tile, _boardRoot.transform, p, 0.94f, 0, Color.white);
                     _gloss[x, y] = NewSprite("gloss", Visuals.Gloss, _tiles[x, y].transform, Vector3.zero, 1f, 1, Color.white);
                     _marks[x, y] = NewSprite("mark", null, _tiles[x, y].transform, Vector3.zero, 1f, 2, Color.white); // above the gloss
@@ -169,7 +173,7 @@ namespace BlockDrop.Game
 
             _miniRoot = new GameObject("MiniBoard");
             _miniRoot.transform.SetParent(_world, false);
-            var mp = NewSprite("MiniPanel", Visuals.Panel, _miniRoot.transform, MiniCenter, 1, -20, Visuals.BoardPanel);
+            var mp = _miniPanel = NewSprite("MiniPanel", Visuals.Panel, _miniRoot.transform, MiniCenter, 1, -20, Visuals.BoardPanel);
             mp.drawMode = SpriteDrawMode.Sliced; mp.size = new Vector2(MiniCell * 8 + 0.3f, MiniCell * 8 + 0.3f);
             _miniTiles = new SpriteRenderer[Size, Size];
             for (int x = 0; x < Size; x++)
@@ -294,6 +298,11 @@ namespace BlockDrop.Game
             var t = PlayerMeta.Themes[_meta.ThemeIndex];
             for (int i = 0; i < 5; i++) Visuals.BlockColors[i] = Visuals.Hex(t.Blocks[i]);
             _background.color = Visuals.Hex(t.BackgroundTint);
+            Visuals.BoardPanel = Visuals.Hex(t.Panel);
+            Visuals.EmptySlot = Visuals.Hex(t.Slot);
+            if (_panel != null) _panel.color = Visuals.BoardPanel;
+            if (_miniPanel != null) _miniPanel.color = Visuals.BoardPanel;
+            foreach (var s in _slots) s.color = Visuals.EmptySlot;
             for (int i = 0; i < _decos.Count; i++)
             {
                 var sr = _decos[i].T.GetComponent<SpriteRenderer>();
@@ -459,6 +468,12 @@ namespace BlockDrop.Game
                         _meta.AddCoins(Collection.CompletionReward);
                         Toast(Loc.F("PICTURE COMPLETE!  +{0} ●", Collection.CompletionReward), Visuals.Gold);
                         Confetti(60);
+                    }
+                    // earned themes: finishing chapters and collecting stars unlock looks no one can buy
+                    foreach (int theme in _meta.UnlockEarnedThemes(Collection.CompletedPictures(_progress), _progress.TotalStars))
+                    {
+                        Toast(Loc.F("EXCLUSIVE THEME UNLOCKED: {0}!", Loc.L(PlayerMeta.Themes[theme].Name).ToUpperInvariant()), Visuals.Hex("7CF8FF"));
+                        _fx.Star();
                     }
                 }
             }
@@ -1215,6 +1230,7 @@ namespace BlockDrop.Game
                 case Screen.Themes: DrawThemes(w, h); break;
                 case Screen.Trophies: DrawTrophies(w, h); break;
                 case Screen.Collection: DrawCollection(w, h); break;
+                case Screen.Shop: DrawShop(w, h); break;
             }
             GUI.enabled = true;
             DrawFloaters(w);
@@ -1274,7 +1290,7 @@ namespace BlockDrop.Game
         private void MaybeInterstitial()
         {
             double now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            bool removeAds = PlayerPrefs.GetInt("removeAds", 0) == 1;
+            bool removeAds = PlayerPrefs.GetInt("removeAds", 0) == 1 || _meta.NoAds;
             if (!_adPolicy.ShouldShowInterstitial(Today, now, removeAds, _firstSession)) return;
             _ads.Show(AdKind.Interstitial, shown =>
             {
@@ -1479,28 +1495,99 @@ namespace BlockDrop.Game
             return st;
         }
 
+        /// <summary>Themes in four tiers. Starter and premium are coin goals, legendary is the long-term prize,
+        /// exclusive looks are earned and show how far along the player is.</summary>
         private void DrawThemes(float w, float h)
         {
-            Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "THEMES", _h2, Visuals.Hex("FF8FAB"), 3);
-            Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"● {_meta.Coins}", _body, Visuals.Gold, 1.5f);
+            Outlined(new Rect(0, h * 0.04f, w, h * 0.08f), "THEMES", _h2, Visuals.Hex("FF8FAB"), 3);
+            Outlined(new Rect(0, h * 0.11f, w, h * 0.04f), $"● {_meta.Coins}", _body, Visuals.Gold, 1.5f);
+            string[] tabs = { "STARTER", "PREMIUM", "LEGENDARY", "EXCLUSIVE" };
+            float tw = w * 0.88f / tabs.Length;
+            for (int k = 0; k < tabs.Length; k++)
+            {
+                bool on = (int)_themeTab == k;
+                if (Btn(new Rect(w * 0.06f + k * tw, h * 0.16f, tw - w * 0.01f, h * 0.05f), tabs[k], on ? "FFD54A" : "5A4FA8", on ? "D99A00" : "3A2F80", 0.55f)) _themeTab = (ThemeTier)k;
+            }
+            int row = 0;
             for (int t = 0; t < PlayerMeta.Themes.Length; t++)
             {
                 var th = PlayerMeta.Themes[t];
-                var card = new Rect(w * 0.06f, h * (0.17f + t * 0.125f), w * 0.88f, h * 0.11f);
+                if (th.Tier != _themeTab) continue;
+                var card = new Rect(w * 0.06f, h * (0.23f + row++ * 0.12f), w * 0.88f, h * 0.108f);
+                if (th.Tier == ThemeTier.Legendary && Event.current.type == EventType.Repaint)
+                {
+                    var old = GUI.color; GUI.color = Visuals.Gold; // a gold frame for the long-term prizes
+                    GUI.DrawTexture(new Rect(card.x - 3, card.y - 3, card.width + 6, card.height + 6), Texture2D.whiteTexture);
+                    GUI.color = old;
+                }
                 Panel(card, _cardStyle);
-                Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.008f, w * 0.4f, h * 0.045f), th.Name.ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
-                float sw = h * 0.035f;
-                for (int k = 0; k < 5; k++) Panel(new Rect(card.x + w * 0.05f + k * (sw + 6), card.y + h * 0.058f, sw, sw), Swatch(Visuals.Hex(th.Blocks[k])));
-                var btn = new Rect(card.xMax - w * 0.32f, card.y + h * 0.025f, w * 0.28f, h * 0.06f);
+                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.006f, w * 0.5f, h * 0.04f), Loc.L(th.Name).ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, th.Tier == ThemeTier.Legendary ? Visuals.Gold : Color.white, 1.2f);
+                if (th.Tagline != "") Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.04f, w * 0.52f, h * 0.025f), Loc.L(th.Tagline), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false }, new Color(1, 1, 1, 0.7f), 1f);
+                // a little board in the theme's own colours
+                float sw = h * 0.028f;
+                var board = new Rect(card.x + w * 0.04f, card.y + h * 0.068f, 5 * (sw + 4) + 6, sw + 6);
+                if (Event.current.type == EventType.Repaint) { var old = GUI.color; GUI.color = Visuals.Hex(th.Panel); GUI.DrawTexture(board, Texture2D.whiteTexture); GUI.color = old; }
+                for (int k = 0; k < 5; k++) Panel(new Rect(board.x + 3 + k * (sw + 4), board.y + 3, sw, sw), Swatch(Visuals.Hex(th.Blocks[k])));
+                var btn = new Rect(card.xMax - w * 0.32f, card.y + h * 0.024f, w * 0.28f, h * 0.06f);
                 bool owned = _meta.Owns(t), selected = _meta.ThemeIndex == t;
                 if (selected) Outlined(btn, "IN USE", _body, Visuals.Hex("2EE59D"), 1.2f);
+                else if (!owned && !th.Buyable) Outlined(btn, ExclusiveProgress(th), _small, Visuals.Hex("7CF8FF"), 1.2f);
                 else if (Btn(btn, owned ? "USE" : $"{th.Price} ●", owned ? "6E8BFF" : _meta.Coins >= th.Price ? "FFD54A" : "4A4370", owned ? "3A4FE0" : _meta.Coins >= th.Price ? "D99A00" : "2E2850", 0.75f))
                 {
-                    if (_meta.BuyOrSelect(t)) { ApplyTheme(); SaveMeta(); _fx.Star(); if (!owned) Confetti(25); }
+                    if (_meta.BuyOrSelect(t)) { ApplyTheme(); SaveMeta(); _fx.Star(); if (!owned) Confetti(th.Tier == ThemeTier.Legendary ? 70 : 25); }
                     else _fx.Invalid();
                 }
             }
-            if (Btn(Row(w, h * 0.82f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            float by = h * 0.86f, bw = w * 0.4f;
+            if (Btn(new Rect(w * 0.07f, by, bw, h * 0.07f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            if (Btn(new Rect(w * 0.53f, by, bw, h * 0.07f), "SHOP", "FFD54A", "D99A00")) ShowMenu(Screen.Shop);
+        }
+
+        /// <summary>Distance to an earned theme, so the goal always shows how far away it is.</summary>
+        private string ExclusiveProgress(Theme th) => th.ChapterReward > 0
+            ? Loc.F("{0}/{1} CHAPTERS", Mathf.Min(Collection.CompletedPictures(_progress), th.ChapterReward), th.ChapterReward)
+            : $"{Mathf.Min(_progress.TotalStars, th.StarsReward)}/{th.StarsReward} ★";
+
+        /// <summary>Real-money shop. Each card says exactly what is inside; nothing is random and nothing expires.</summary>
+        private void DrawShop(float w, float h)
+        {
+            Outlined(new Rect(0, h * 0.04f, w, h * 0.08f), "SHOP", _h2, Visuals.Gold, 3);
+            Outlined(new Rect(0, h * 0.11f, w, h * 0.04f), $"● {_meta.Coins}", _body, Visuals.Gold, 1.5f);
+            var products = Store.Products;
+            float ch = h * 0.078f, gap = h * 0.01f, y = h * 0.165f;
+            for (int i = 0; i < products.Length; i++, y += ch + gap)
+            {
+                var p = products[i];
+                bool owned = !p.Consumable && (_meta.Purchases & (1 << i)) != 0;
+                var card = new Rect(w * 0.06f, y, w * 0.88f, ch);
+                Panel(card, _cardStyle);
+                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.006f, w * 0.52f, h * 0.035f), Loc.L(p.Title).ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.2f);
+                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.042f, w * 0.56f, h * 0.035f), Store.Contents(p), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft }, Visuals.Gold, 1f);
+                if (p.Badge != "") Outlined(new Rect(card.xMax - w * 0.3f, card.y - h * 0.012f, w * 0.26f, h * 0.025f), Loc.L(p.Badge), _small, Visuals.Hex("FF9BD2"), 1.2f);
+                var btn = new Rect(card.xMax - w * 0.3f, card.y + h * 0.017f, w * 0.26f, h * 0.052f);
+                if (owned) { Outlined(btn, "OWNED", _body, Visuals.Hex("2EE59D"), 1.2f); continue; }
+                GUI.enabled = _store.Ready;
+                if (Btn(btn, _store.LocalPrice(p.Id) ?? p.Price, "4BE38A", "1FA45B", 0.7f)) Buy(p);
+                GUI.enabled = true;
+            }
+            if (!_store.Ready) Outlined(new Rect(w * 0.06f, h * 0.8f, w * 0.88f, h * 0.04f), "Purchases open when Block Drop launches on Google Play.", _small, new Color(1, 1, 1, 0.75f), 1f);
+            float by = h * 0.86f, bw = w * 0.4f;
+            if (Btn(new Rect(w * 0.07f, by, bw, h * 0.07f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.Themes);
+            GUI.enabled = _store.Ready;
+            if (Btn(new Rect(w * 0.53f, by, bw, h * 0.07f), "RESTORE", "6E8BFF", "3A4FE0", 0.8f)) _store.Restore(id => { var p = Store.Find(id); if (p != null && _meta.Grant(p)) { SaveMeta(); ApplyTheme(); } });
+            GUI.enabled = true;
+        }
+
+        private void Buy(Product p)
+        {
+            _store.Buy(p.Id, ok =>
+            {
+                if (!ok || !_meta.Grant(p)) { _fx.Invalid(); return; }
+                SaveMeta();
+                Toast(Loc.F("THANK YOU! {0}", Store.Contents(p)), Visuals.Gold);
+                _fx.Win();
+                Confetti(p.Coins >= 8000 || p.Themes.Length > 0 ? 90 : 50); // scaled to the purchase
+            });
         }
 
         private void OpenLevels()

@@ -554,7 +554,7 @@ namespace BlockDrop.Game
                 return;
             }
             // Keep trying to come online (slow or late network at startup); then push a name chosen offline.
-            if (!OnlineService.Ready && Time.unscaledTime >= _nextOnlineTry) { _nextOnlineTry = Time.unscaledTime + 5f; _ = OnlineService.EnsureReady(); }
+            if (!OnlineService.Ready && Time.unscaledTime >= _nextOnlineTry) { _nextOnlineTry = Time.unscaledTime + RetryBackoff.Delay(OnlineService.Failures, UnityEngine.Random.value); _ = OnlineService.EnsureReady(); }
             else if (OnlineService.Ready && !_nameSynced)
             {
                 _nameSynced = true;

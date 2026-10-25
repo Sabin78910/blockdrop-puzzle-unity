@@ -34,3 +34,8 @@ test("rejects scores the rules cannot reach", () => {
 test("accepts the best possible single placement", () => {
   ok({ score: 9 + 10 * 36, placements: 1, lines: 6 });
 });
+
+test("rejects more lines than the cells placed could ever clear", () => {
+  bad({ score: 100000, placements: 10, lines: 30 }); // 10 pieces add 90 cells, 30 lines remove at least 195
+  ok({ score: 9 * 10 + 10 * 8 * 8 * 5, placements: 10, lines: 8 }); // dense but possible: 8 lines from 10 pieces
+});

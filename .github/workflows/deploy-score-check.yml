@@ -1,0 +1,71 @@
+name: Deploy score check (Unity Cloud)
+
+# Run by hand from the Actions tab: "check" tells you what is live; then "script", then, once the build that calls
+# SubmitScore is live, "policy". See CloudCode/README.md.
+# Needs repo secrets UGS_KEY_ID and UGS_SECRET_KEY from a Unity Cloud service account.
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "check = list what is live (changes nothing); script = publish SubmitScore; policy = block direct leaderboard writes"
+        required: true
+        type: choice
+        options: [check, script, policy]
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: 98f08cb5-e4b2-4b53-9bc4-1d4cd0e3a5eb
+  ENVIRONMENT: production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whether SubmitScore is live (read only)
+        if: inputs.step == 'check'
+        env:
+          KEY_ID: ${{ secrets.UGS_KEY_ID }}
+          SECRET: ${{ secrets.UGS_SECRET_KEY }}
+        run: |
+          auth="Authorization: Basic $(printf '%s:%s' "$KEY_ID" "$SECRET" | base64 -w0)"
+          env_id=$(curl -fsS -H "$auth" "https://services.api.unity.com/unity/v1/projects/$PROJECT_ID/environments" \
+            | jq -r --arg n "$ENVIRONMENT" '.results[] | select(.name == $n) | .id')
+          test -n "$env_id" || { echo "No '$ENVIRONMENT' environment found"; exit 1; }
+          curl -fsS -H "$auth" "https://cloud-code.services.api.unity.com/v1/projects/$PROJECT_ID/environments/$env_id/scripts" \
+            | tee scripts.json
+          if jq -e '.results[]? | select(.name == "SubmitScore")' scripts.json >/dev/null; then
+            echo "RESULT: SubmitScore IS live in $ENVIRONMENT"
+          else
+            echo "RESULT: SubmitScore is NOT live in $ENVIRONMENT. Run this workflow with step = script."
+            exit 1
+          fi
+
+      - name: Publish the SubmitScore Cloud Code script
+        if: inputs.step == 'script'
+        env:
+          UGS_CLI_SERVICE_KEY_ID: ${{ secrets.UGS_KEY_ID }}
+          UGS_CLI_SERVICE_SECRET_KEY: ${{ secrets.UGS_SECRET_KEY }}
+          UGS_CLI_PROJECT_ID: ${{ env.PROJECT_ID }}
+          UGS_CLI_ENVIRONMENT_NAME: ${{ env.ENVIRONMENT }}
+        run: |
+          npm install -g ugs
+          ugs deploy CloudCode/SubmitScore.js
+
+      - name: Block direct player writes to leaderboards
+        if: inputs.step == 'policy'
+        env:
+          KEY_ID: ${{ secrets.UGS_KEY_ID }}
+          SECRET: ${{ secrets.UGS_SECRET_KEY }}
+        run: |
+          auth="Authorization: Basic $(printf '%s:%s' "$KEY_ID" "$SECRET" | base64 -w0)"
+          env_id=$(curl -fsS -H "$auth" "https://services.api.unity.com/unity/v1/projects/$PROJECT_ID/environments" \
+            | jq -r --arg n "$ENVIRONMENT" '.results[] | select(.name == $n) | .id')
+          test -n "$env_id" || { echo "No '$ENVIRONMENT' environment found"; exit 1; }
+          curl -fsS -X PATCH -H "$auth" -H "Content-Type: application/json" \
+            --data @CloudCode/project-policy.json \
+            "https://services.api.unity.com/access/v1/projects/$PROJECT_ID/environments/$env_id/resource-policy"
+          echo "Policy applied to $ENVIRONMENT ($env_id)"

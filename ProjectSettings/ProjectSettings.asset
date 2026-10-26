@@ -641,7 +641,8 @@ PlayerSettings:
   webWasm2023: 1
   webEnableSubmoduleStrippingCompatibility: 0
   webProgressiveAssetLoading: 0
-  scriptingDefineSymbols: {}
+  scriptingDefineSymbols:
+    Android: BLOCKDROP_GPGS
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

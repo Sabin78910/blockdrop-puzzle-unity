@@ -6,7 +6,8 @@
     "Unity.Services.Authentication",
     "Unity.Services.Leaderboards",
     "Unity.Services.CloudCode",
-    "Unity.Services.CloudSave"
+    "Unity.Services.CloudSave",
+    "Google.Play.Games"
   ],
   "autoReferenced": true
 }

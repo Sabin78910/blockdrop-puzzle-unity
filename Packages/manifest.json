@@ -42,6 +42,17 @@
     "com.unity.services.authentication": "3.8.0",
     "com.unity.services.leaderboards": "2.3.4",
     "com.unity.services.cloudcode": "2.7.1",
-    "com.unity.services.cloudsave": "3.2.0"
-  }
+    "com.unity.services.cloudsave": "3.2.0",
+    "com.google.play.games": "2.3.0"
+  },
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.google.play.games",
+        "com.google.external-dependency-manager"
+      ]
+    }
+  ]
 }

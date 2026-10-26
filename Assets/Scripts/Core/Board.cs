@@ -13,6 +13,9 @@ namespace BlockDrop.Core
     public sealed class Board
     {
         public const int Empty = -1;
+        /// <summary>Level blockers. Blocks a player places use colours 0-4; these never come from a hand.
+        /// Stone clears with its line; a gem is a stone worth collecting; ice takes two clears (first it cracks to stone).</summary>
+        public const int Stone = 5, Gem = 6, Ice = 7, MaxCell = Ice;
         public readonly int Size;
         private readonly int[,] _cells;
         public int Score { get; private set; }
@@ -113,8 +116,13 @@ namespace BlockDrop.Core
                 if (row) rows.Add(i);
                 if (col) cols.Add(i);
             }
-            foreach (int y in rows) for (int x = 0; x < Size; x++) _cells[x, y] = Empty;
-            foreach (int x in cols) for (int y = 0; y < Size; y++) _cells[x, y] = Empty;
+            // mark first so a cell where a row and column cross is only hit once (ice cracks once per move)
+            var hit = new bool[Size, Size];
+            foreach (int y in rows) for (int x = 0; x < Size; x++) hit[x, y] = true;
+            foreach (int x in cols) for (int y = 0; y < Size; y++) hit[x, y] = true;
+            for (int x = 0; x < Size; x++)
+                for (int y = 0; y < Size; y++)
+                    if (hit[x, y]) _cells[x, y] = _cells[x, y] == Ice ? Stone : Empty;
 
             int lines = rows.Count + cols.Count;
             int points = piece.Cells.Length;
@@ -131,6 +139,25 @@ namespace BlockDrop.Core
             Placements++;
             LinesCleared += lines;
             return new PlaceResult(lines, points);
+        }
+
+        /// <summary>The hammer booster: breaks one block without scoring. Ice takes the first hit and cracks to stone,
+        /// as it would from a line clear. Returns false for an empty cell or one off the board.</summary>
+        public bool Smash(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= Size || y >= Size || !IsFilled(x, y)) return false;
+            _cells[x, y] = _cells[x, y] == Ice ? Stone : Empty;
+            return true;
+        }
+
+        /// <summary>How many cells hold <paramref name="cell"/> (used for level goals: stones left, gems left).</summary>
+        public int Count(int cell)
+        {
+            int n = 0;
+            for (int x = 0; x < Size; x++)
+                for (int y = 0; y < Size; y++)
+                    if (_cells[x, y] == cell) n++;
+            return n;
         }
 
         public bool IsGameOver(IEnumerable<Piece> hand)

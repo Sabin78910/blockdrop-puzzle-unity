@@ -128,7 +128,7 @@ namespace BlockDrop.Game
 
         private static Sprite _tile, _gloss, _background;
 
-        public static readonly Color CameraBackground = Visuals.Hex("0B0A2E");
+        public static readonly Color CameraBackground = Visuals.Hex("14104F");
 
         /// <summary>Lit jewel block, grayscale so the theme tints it: a light face from the top-left,
         /// a crisp bright rim on top, a deeper shaded lip at the bottom and a soft contact shadow.</summary>
@@ -175,7 +175,7 @@ namespace BlockDrop.Game
             return t;
         }
 
-        /// <summary>Jewel night sky: a violet glow at the top fading to deep navy (#3A2590 → #1C1356 → #0B0A2E).
+        /// <summary>Jewel night sky: a violet glow at the top fading to deep navy (#6A47E8 → #302298 → #14104F).
         /// Same size and pixels-per-unit as the old background, so the camera fit is unchanged.</summary>
         public static Sprite Background => _background ??= Make(BuildBackground(512, 1024), 512);
 
@@ -183,7 +183,7 @@ namespace BlockDrop.Game
         {
             var t = NewTex(w, h);
             t.filterMode = FilterMode.Bilinear;
-            Color glow = Visuals.Hex("3A2590"), mid = Visuals.Hex("1C1356"), deep = Visuals.Hex("0B0A2E");
+            Color glow = Visuals.Hex("6A47E8"), mid = Visuals.Hex("302298"), deep = Visuals.Hex("14104F");
             var px = new Color[w * h];
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)

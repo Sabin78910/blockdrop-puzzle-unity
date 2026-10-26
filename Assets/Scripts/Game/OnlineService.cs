@@ -18,6 +18,7 @@ namespace BlockDrop.Game
         // Leaderboard IDs must match the Unity Cloud dashboard exactly (case-sensitive).
         public const string ClassicBoard = "Classic";
         public const string DailyBoard = "Daily";
+        public const string LevelsBoard = "Levels"; // total level stars
 
         public struct Row { public int Rank; public string Name; public long Score; public bool IsMe; }
 
@@ -79,6 +80,7 @@ namespace BlockDrop.Game
         {
             try
             {
+                if (IsPreview) return; // test builds never post to the live leaderboard
                 await EnsureReady();
                 if (!Ready || result.Score <= 0) return;
                 var args = new Dictionary<string, object>
@@ -91,6 +93,31 @@ namespace BlockDrop.Game
                 await RefreshAsync(board);
             }
             catch (Exception e) { Debug.LogWarning($"Score submit failed ({board}): {e.Message}"); }
+        }
+
+        /// <summary>The Preview Cloud Build target installs as com.sabin.blockdrop.preview.</summary>
+        public static bool IsPreview => Application.identifier.EndsWith("preview", StringComparison.Ordinal);
+
+        private static int _levelsSent;
+
+        /// <summary>Posts the player's total level stars to the Levels board when they have grown (never from preview
+        /// builds), then reloads that board. Called after a level win and when Rankings opens, so stars earned
+        /// before the board existed still appear.</summary>
+        public static async void SubmitLevels(int totalStars)
+        {
+            try
+            {
+                await EnsureReady();
+                if (!Ready) return;
+                if (!IsPreview && totalStars > _levelsSent)
+                {
+                    var args = new Dictionary<string, object> { ["leaderboardId"] = LevelsBoard, ["score"] = totalStars, ["placements"] = 0, ["lines"] = 0 };
+                    var reply = await CloudCodeService.Instance.CallEndpointAsync<SubmitReply>("SubmitScore", args);
+                    if (reply.accepted) _levelsSent = totalStars; else Debug.LogWarning($"Stars rejected: {reply.reason}");
+                }
+                await RefreshAsync(LevelsBoard);
+            }
+            catch (Exception e) { Debug.LogWarning($"Stars submit failed: {e.Message}"); }
         }
 
         [Serializable] private class SubmitReply { public bool accepted; public string reason; }

@@ -37,7 +37,7 @@ namespace BlockDrop.EditorTools
             PlayerSettings.Android.minSdkVersion = (AndroidSdkVersions)26;
             PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)36;
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
-            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64; // ARMv7 keeps budget 32-bit phones eligible on Play
             PlayerSettings.Android.forceInternetPermission = true; // online leaderboards (optional at runtime)
             bool icons = ConfigureIcons();
             EnsureScene();
@@ -74,6 +74,20 @@ namespace BlockDrop.EditorTools
             EditorUserBuildSettings.buildAppBundle = true;
             IncludeSymbolsInBundle();
             Debug.Log("PreExportAppBundle: building .aab for Google Play");
+        }
+
+        /// <summary>Unity Build Automation "Pre-export method" for the Preview target: an installable .apk with its own
+        /// app id, name and version code, so it installs next to the Play version without touching it. Never set this
+        /// on the Play Release target.</summary>
+        public static void PreExportPreview()
+        {
+            EditorUserBuildSettings.buildAppBundle = false;
+            PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.sabin.blockdrop.preview");
+            PlayerSettings.productName = "Block Drop Preview";
+            PlayerSettings.bundleVersion = "preview";
+            // Unity Build Automation numbers each build; reuse it so a newer preview always installs over an older one.
+            PlayerSettings.Android.bundleVersionCode = int.TryParse(System.Environment.GetEnvironmentVariable("UCB_BUILD_NUMBER"), out int n) && n > 0 ? n : 1;
+            Debug.Log("PreExportPreview: building com.sabin.blockdrop.preview .apk");
         }
 
         /// <summary>Puts IL2CPP symbol tables inside the .aab so Play Console's Android vitals shows readable

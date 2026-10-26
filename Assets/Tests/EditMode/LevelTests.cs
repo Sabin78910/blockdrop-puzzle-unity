@@ -102,6 +102,28 @@ public class LevelTests
         }
     }
 
+    [Test] public void TurnedShapesKeepTheirBlocksAndNoPictureRepeats()
+    {
+        foreach (var shape in LevelLibrary.Layouts.Concat(LevelLibrary.TwistLayouts))
+            for (int pose = 0; pose < 8; pose++)
+            {
+                var turned = LevelLibrary.Orient(shape, pose);
+                Assert.AreEqual(shape.Sum(r => r.Count(c => c == '#')), turned.Sum(r => r.Count(c => c == '#')), "stones kept");
+                Assert.AreEqual(shape.Sum(r => r.Count(c => c == '*')), turned.Sum(r => r.Count(c => c == '*')), "specials kept");
+                for (int i = 0; i < 8; i++)
+                {
+                    Assert.LessOrEqual(turned[i].Count(c => c != '.'), 5, "row " + i);
+                    Assert.LessOrEqual(turned.Count(r => r[i] != '.'), 5, "column " + i);
+                }
+            }
+        // no two levels may open on the same board, so every level looks new
+        var seen = new System.Collections.Generic.HashSet<string>();
+        int repeats = 0;
+        for (int n = 1; n <= LevelLibrary.Count; n++)
+            if (!seen.Add(string.Join(";", LevelLibrary.Get(n).Blockers))) repeats++;
+        Assert.LessOrEqual(repeats, 3, "only a fully symmetric drawing may come back as the same board");
+    }
+
     [Test] public void EachChapterIntroducesSomethingAndDifficultyIsASawtooth()
     {
         for (int c = 0; c < LevelLibrary.Chapters.Length; c++)

@@ -53,6 +53,39 @@ public class MetaTests
         Assert.IsFalse(m.Claimed[0], "new day resets missions");
     }
 
+    [Test] public void DailyChestOpensOnceAfterAllThreeMissionsAreClaimed()
+    {
+        var m = new PlayerMeta();
+        const string day = "2026-10-26";
+        var missions = PlayerMeta.MissionsFor(day);
+        Assert.IsFalse(m.ChestReady(day));
+        for (int i = 0; i < 3; i++)
+        {
+            m.Track(missions[i].Kind, missions[i].Target, day);
+            Assert.IsFalse(m.ChestReady(day), "not before the third claim");
+            Assert.IsTrue(m.Claim(i, day));
+        }
+        int coins = m.Coins, hammers = m.Boosters[0], shuffles = m.Boosters[1];
+        Assert.IsTrue(m.ChestReady(day));
+        Assert.IsTrue(m.ClaimChest(day));
+        Assert.AreEqual(coins + PlayerMeta.ChestCoins, m.Coins);
+        Assert.AreEqual(hammers + 1, m.Boosters[0]);
+        Assert.AreEqual(shuffles + 1, m.Boosters[1]);
+        Assert.IsFalse(m.ClaimChest(day), "only once a day");
+        Assert.IsTrue(PlayerMeta.Parse(m.Serialize()).ChestClaimed, "saved");
+        Assert.IsFalse(m.ChestClaimed && m.ClaimedCount("2026-10-27") > 0, "a new day starts empty");
+        Assert.IsFalse(m.ChestClaimed, "the chest is closed again on a new day");
+    }
+
+    [Test] public void DailyAndAiMissionsAppearAndReadWell()
+    {
+        var kinds = Enumerable.Range(0, 120).Select(d => $"2026-{1 + d / 28 % 12:00}-{1 + d % 28:00}").SelectMany(d => PlayerMeta.MissionsFor(d)).ToList();
+        Assert.IsTrue(kinds.Any(x => x.Kind == MissionKind.PlayDaily), "the Daily challenge shows up as a mission");
+        Assert.IsTrue(kinds.Any(x => x.Kind == MissionKind.BeatAi), "so does beating the AI");
+        Assert.AreEqual("Beat the AI once", new Mission { Kind = MissionKind.BeatAi, Target = 1 }.Text);
+        Assert.AreEqual("Beat the AI 2 times", new Mission { Kind = MissionKind.BeatAi, Target = 2 }.Text);
+    }
+
     [Test] public void ComboMissionTracksBestNotSum()
     {
         var m = new PlayerMeta();

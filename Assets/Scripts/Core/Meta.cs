@@ -5,7 +5,7 @@ using System.Text;
 
 namespace BlockDrop.Core
 {
-    public enum MissionKind { ClearLines, ScorePoints, PlaceBlocks, ComboReach, PlayGames, EarnStars }
+    public enum MissionKind { ClearLines, ScorePoints, PlaceBlocks, ComboReach, PlayGames, EarnStars, PlayDaily, BeatAi }
 
     public sealed class Mission
     {
@@ -19,6 +19,8 @@ namespace BlockDrop.Core
             MissionKind.PlaceBlocks => Loc.F("Place {0} pieces", Target),
             MissionKind.ComboReach => Loc.F("Reach a x{0} combo", Target),
             MissionKind.PlayGames => Loc.F("Finish {0} games", Target),
+            MissionKind.PlayDaily => Loc.L("Play today's Daily challenge"),
+            MissionKind.BeatAi => Target == 1 ? Loc.L("Beat the AI once") : Loc.F("Beat the AI {0} times", Target),
             _ => Loc.F("Earn {0} level stars", Target),
         };
     }
@@ -92,6 +94,8 @@ namespace BlockDrop.Core
             (MissionKind.ComboReach, new[] { 2, 3, 4 }, 40),
             (MissionKind.PlayGames, new[] { 2, 3, 5 }, 25),
             (MissionKind.EarnStars, new[] { 2, 3, 5 }, 35),
+            (MissionKind.PlayDaily, new[] { 1 }, 40),
+            (MissionKind.BeatAi, new[] { 1, 2, 3 }, 40),
         };
 
         public int Coins { get; private set; }
@@ -130,6 +134,9 @@ namespace BlockDrop.Core
         public string MissionDay { get; private set; } = "";
         public readonly int[] Progress = new int[3];
         public readonly bool[] Claimed = new bool[3];
+        /// <summary>Today's chest: opens once all three missions are claimed.</summary>
+        public bool ChestClaimed;
+        public const int ChestCoins = 50;
         public int OwnedThemes { get; private set; } = 1; // bit mask, Jewel owned
         public int ThemeIndex { get; private set; }
 
@@ -204,7 +211,7 @@ namespace BlockDrop.Core
             int seed = 17;
             foreach (char c in day) seed = seed * 31 + c;
             var rng = new Random(seed);
-            var picks = new List<int> { 0, 1, 2, 3, 4, 5 };
+            var picks = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7 };
             var result = new Mission[3];
             for (int i = 0; i < 3; i++)
             {
@@ -245,6 +252,20 @@ namespace BlockDrop.Core
             MissionDay = today;
             Array.Clear(Progress, 0, 3);
             Array.Clear(Claimed, 0, 3);
+            ChestClaimed = false;
+        }
+
+        public int ClaimedCount(string today) { RollMissions(today); return (Claimed[0] ? 1 : 0) + (Claimed[1] ? 1 : 0) + (Claimed[2] ? 1 : 0); }
+        public bool ChestReady(string today) => ClaimedCount(today) == 3 && !ChestClaimed;
+
+        /// <summary>Finishing all three missions always pays the same chest: coins, a hammer and a shuffle.</summary>
+        public bool ClaimChest(string today)
+        {
+            if (!ChestReady(today)) return false;
+            ChestClaimed = true;
+            Coins += ChestCoins;
+            AddBoosters(Booster.Hammer, 1); AddBoosters(Booster.Shuffle, 1);
+            return true;
         }
 
         /// <summary>Records progress. ComboReach tracks the best value instead of a sum.</summary>
@@ -349,6 +370,7 @@ namespace BlockDrop.Core
             for (int i = 0; i < m.Stats.Length; i++) m.Stats[i] = Math.Max(lead.Stats[i], other.Stats[i]);
             m.Purchases = lead.Purchases | other.Purchases;
             m.NoAds = lead.NoAds || other.NoAds;
+            if (lead.MissionDay == other.MissionDay) m.ChestClaimed = lead.ChestClaimed || other.ChestClaimed; // a chest opened on one device stays opened on both
             return m;
         }
 
@@ -357,7 +379,7 @@ namespace BlockDrop.Core
             var sb = new StringBuilder();
             sb.Append($"c={Coins};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
             sb.Append($"p={Progress[0]},{Progress[1]},{Progress[2]};k={(Claimed[0] ? 1 : 0)}{(Claimed[1] ? 1 : 0)}{(Claimed[2] ? 1 : 0)};");
-            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};bo={Boosters[0]},{Boosters[1]}");
+            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};bo={Boosters[0]},{Boosters[1]}");
             return sb.ToString();
         }
 
@@ -387,6 +409,7 @@ namespace BlockDrop.Core
                     case "k":
                         for (int i = 0; i < 3 && i < v.Length; i++) m.Claimed[i] = v[i] == '1';
                         break;
+                    case "dc": m.ChestClaimed = v == "1"; break;
                     case "v": m.Level = Math.Max(1, n); break;
                     case "x": m.Xp = Math.Max(0, n); break;
                     case "a": m.AchievementMask = n; break;

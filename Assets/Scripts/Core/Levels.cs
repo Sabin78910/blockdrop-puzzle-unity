@@ -182,7 +182,7 @@ namespace BlockDrop.Core
             var chapter = RulesFor(number);
             var tier = TierFor(number);
             var rng = new Random(number * 104729);
-            var layout = IsTwist(number) ? TwistLayouts[(number - 1) / PerChapter % TwistLayouts.Length] : Layouts[((number - 1) * 7 + 1) % Layouts.Length];
+            var layout = LayoutFor(number);
             var stones = new List<(int, int)>();
             var specials = new List<(int, int)>();
             for (int y = 0; y < 8; y++)
@@ -227,6 +227,39 @@ namespace BlockDrop.Core
             }
             blockers.Sort();
             return new LevelDefinition { Number = number, Seed = 1000 + number * 7919, Tier = tier, Blockers = blockers.ToArray() };
+        }
+
+        /// <summary>The hand-drawn shape for a level. Shapes repeat after 24 levels (6 for twists), so each repeat is
+        /// turned or flipped (8 ways): the player never meets the same picture in the same pose twice.</summary>
+        public static string[] LayoutFor(int number)
+        {
+            if (IsTwist(number))
+            {
+                int chapter = (number - 1) / PerChapter;
+                return Orient(TwistLayouts[chapter % TwistLayouts.Length], chapter / TwistLayouts.Length);
+            }
+            int i = (number - 1) * 7 + 1;
+            return Orient(Layouts[i % Layouts.Length], (number - 1) / Layouts.Length);
+        }
+
+        /// <summary>Pose 0 is the drawing as written; 1-3 turn it a quarter each time, 4-7 mirror those.</summary>
+        public static string[] Orient(string[] layout, int pose)
+        {
+            pose = ((pose % 8) + 8) % 8;
+            var rows = new string[8];
+            for (int y = 0; y < 8; y++)
+            {
+                var row = new char[8];
+                for (int x = 0; x < 8; x++)
+                {
+                    int sx = x, sy = y;
+                    if (pose >= 4) sx = 7 - sx;
+                    for (int t = 0; t < pose % 4; t++) { int nx = 7 - sy, ny = sx; sx = nx; sy = ny; }
+                    row[x] = layout[sy][sx];
+                }
+                rows[y] = new string(row);
+            }
+            return rows;
         }
 
         private static void Shuffle<T>(List<T> list, Random rng)

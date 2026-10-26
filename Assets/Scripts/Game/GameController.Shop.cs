@@ -64,7 +64,7 @@ namespace BlockDrop.Game
         private void Pill(Rect r, string text, string top, string bottom, Color textColor)
         {
             Panel(r, ShopStyle(top, bottom));
-            Outlined(r, text, new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, textColor, 1f);
+            Outlined(r, text, new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, textColor, textColor.grayscale < 0.45f ? 0f : 1f);
         }
 
         private static void Disc(Rect r, Color c)
@@ -147,6 +147,7 @@ namespace BlockDrop.Game
         {
             bool owned = !p.Consumable && (_meta.Purchases & (1 << index)) != 0;
             if (owned) { Pill(r, "OWNED", "2EE59D", "13A86E", Color.white); return; }
+            if (!_store.Ready) { Pill(r, _store.LocalPrice(p.Id) ?? p.Price, "8E86C9", "6B63A8", new Color(1, 1, 1, 0.95f)); return; }
             GUI.enabled = _store.Ready;
             if (Btn(r, _store.LocalPrice(p.Id) ?? p.Price, hero ? "FFD54A" : "4BE38A", hero ? "D99A00" : "1FA45B", hero ? 0.85f : 0.7f)) { _shopBurstFrom = r.center; Buy(p); }
             GUI.enabled = true;
@@ -228,7 +229,7 @@ namespace BlockDrop.Game
 
             var P = Store.Products;
             // heights as fractions of the screen; scaled down together if the safe area is short
-            float heroH = 0.135f, tierH = 0.175f, labelH = 0.024f, royalH = 0.085f, legendsH = 0.115f, singleH = 0.105f, gap = 0.008f;
+            float heroH = 0.135f, tierH = 0.175f, labelH = 0.024f, royalH = 0.092f, legendsH = 0.122f, singleH = 0.105f, gap = 0.008f;
             float need = heroH + tierH + labelH + royalH + legendsH + singleH + gap * 5;
             float avail = 0.845f - 0.172f, s = Mathf.Min(1f, avail / need);
             float y = h * 0.172f, x = w * 0.05f, fw = w * 0.9f;
@@ -260,28 +261,37 @@ namespace BlockDrop.Game
                 var (idx, top, bottom, _) = tiers[k];
                 var p = P[idx];
                 var cr = BeginShopCard(new Rect(x + k * (cw + w * 0.015f), y, cw, th), order++, top, bottom, p.Badge != "");
-                CoinPile(new Rect(cr.x + cr.width * 0.12f, cr.y + cr.height * 0.1f, cr.width * 0.76f, cr.height * 0.38f), rows[k]);
-                Outlined(new Rect(cr.x, cr.y + cr.height * 0.48f, cr.width, cr.height * 0.16f), p.Coins.ToString("N0", CultureInfo.InvariantCulture), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Color.white, 1.8f);
                 int bonus = CoinBonusPercent(p);
-                if (bonus > 0) Pill(new Rect(cr.x + cr.width * 0.2f, cr.y + cr.height * 0.64f, cr.width * 0.6f, cr.height * 0.11f), Loc.F("+{0}% MORE", bonus), "FFFFFF", "DCD3FF", Visuals.Hex("3A1B8F"));
-                else Pill(new Rect(cr.x + cr.width * 0.2f, cr.y + cr.height * 0.64f, cr.width * 0.6f, cr.height * 0.11f), "STARTER", "FFFFFF", "DCD3FF", Visuals.Hex("3A1B8F"));
-                PriceButton(new Rect(cr.x + cr.width * 0.08f, cr.y + cr.height * 0.78f, cr.width * 0.84f, cr.height * 0.19f), p, idx, false);
-                if (p.Badge != "") Pill(new Rect(cr.x + cr.width * 0.12f, cr.y - h * 0.008f, cr.width * 0.76f, h * 0.02f), p.Badge, "FF4FD8", "C21A9B", Color.white);
+                // one ribbon slot at the top of every card, so the three tiers line up: badge, bonus or "starter"
+                string ribbon = p.Badge != "" ? p.Badge : bonus > 0 ? Loc.F("+{0}% MORE", bonus) : "STARTER";
+                Pill(new Rect(cr.x + cr.width * 0.08f, cr.y + cr.height * 0.045f, cr.width * 0.84f, cr.height * 0.115f), ribbon, p.Badge != "" ? "FF4FD8" : "FFFFFF", p.Badge != "" ? "C21A9B" : "DCD3FF", p.Badge != "" ? Color.white : Visuals.Hex("3A1B8F"));
+                CoinPile(new Rect(cr.x + cr.width * 0.12f, cr.y + cr.height * 0.18f, cr.width * 0.76f, cr.height * 0.26f), rows[k]);
+                Outlined(new Rect(cr.x, cr.y + cr.height * 0.45f, cr.width, cr.height * 0.14f), p.Coins.ToString("N0", CultureInfo.InvariantCulture), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Color.white, 1.8f);
+                if (p.Badge != "" && bonus > 0) Outlined(new Rect(cr.x, cr.y + cr.height * 0.6f, cr.width, cr.height * 0.12f), Loc.F("+{0}% MORE", bonus), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Hex("FFF3B0"), 1.1f);
+                PriceButton(new Rect(cr.x + cr.width * 0.08f, cr.y + cr.height * 0.77f, cr.width * 0.84f, cr.height * 0.19f), p, idx, false);
                 EndShopCard();
             }
             y += th + h * gap;
 
             // ---- bundles ----
+            float ly = y + h * labelH * s * 0.5f;
             Outlined(new Rect(0, y, w, h * labelH * s), "BUNDLES", new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Hex("C9A7FF"), 1.2f);
+            if (Event.current.type == EventType.Repaint)
+            {
+                var lineOld = GUI.color; GUI.color = new Color(0.79f, 0.65f, 1f, 0.45f);
+                GUI.DrawTexture(new Rect(x, ly, w * 0.22f, 2f), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(x + fw - w * 0.22f, ly, w * 0.22f, 2f), Texture2D.whiteTexture);
+                GUI.color = lineOld;
+            }
             y += h * (labelH * s + gap * 0.5f);
             foreach (var (idx, top, bottom, hh) in new[] { (5, "6A33D1", "C98A12", royalH), (6, "3A1B8F", "FF7A1C", legendsH) })
             {
                 var p = P[idx];
                 bool owned = (_meta.Purchases & (1 << idx)) != 0;
                 var br = BeginShopCard(new Rect(x, y, fw, h * hh * s), order++, top, bottom, true, owned);
-                float textW = br.width * 0.62f;
-                Outlined(new Rect(br.x + br.width * 0.04f, br.y + br.height * 0.05f, textW, br.height * 0.3f), Loc.L(p.Title).ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.5f);
-                DrawContentChips(new Rect(br.x + br.width * 0.04f, br.y + br.height * 0.36f, textW, br.height * 0.6f), Store.ContentParts(p), Visuals.Hex("FFF3B0"));
+                float textW = br.width * 0.58f;
+                Outlined(new Rect(br.x + br.width * 0.05f, br.y + br.height * 0.06f, textW, br.height * 0.28f), Loc.L(p.Title).ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.5f);
+                DrawContentChips(new Rect(br.x + br.width * 0.05f, br.y + br.height * 0.38f, textW, br.height * 0.54f), Store.ContentParts(p), Visuals.Hex("FFF3B0"));
                 if (p.Badge != "") Pill(new Rect(br.xMax - br.width * 0.3f, br.y + br.height * 0.07f, br.width * 0.27f, br.height * 0.2f), p.Badge, "FFE27A", "FFB627", Visuals.Hex("5A2A00"));
                 PriceButton(new Rect(br.xMax - br.width * 0.3f, br.y + br.height * 0.34f, br.width * 0.27f, br.height * 0.44f), p, idx, true);
                 EndShopCard();

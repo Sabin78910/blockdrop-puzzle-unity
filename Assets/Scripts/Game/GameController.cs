@@ -523,6 +523,8 @@ namespace BlockDrop.Game
             }
             if (_mode == Mode.VsAi) good = _versus.Winner == 0;
             Track(MissionKind.PlayGames, 1);
+            if (_mode == Mode.Daily) Track(MissionKind.PlayDaily, 1);
+            if (_mode == Mode.VsAi && _versus.Winner == 0) Track(MissionKind.BeatAi, 1);
             _adPolicy.OnGameEnded(Today, _newBest);
             PlayerPrefs.SetString("ads", _adPolicy.Serialize());
             if (_mode == Mode.Level && _level.State == LevelState.Won) Track(MissionKind.EarnStars, _level.Stars);
@@ -1600,19 +1602,67 @@ namespace BlockDrop.Game
                 var bar = new Rect(card.x + w * 0.05f, card.y + h * 0.075f, card.width * 0.52f, h * 0.024f);
                 Panel(bar, _barBackStyle);
                 float f = (float)prog / ms[i].Target;
-                if (f > 0.04f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * f), bar.height), _barFillStyle);
-                Outlined(new Rect(bar.x, bar.y + h * 0.03f, bar.width, h * 0.035f), $"{prog} / {ms[i].Target}", new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft }, new Color(1, 1, 1, 0.9f), 1);
+                // a finished mission fills the whole bar in green, so it never reads as empty on the gold card
+                if (f > 0.04f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * f), bar.height), ready || done ? Swatch(Visuals.Hex("12B070")) : _barFillStyle);
+                Outlined(new Rect(bar.x, bar.y + h * 0.03f, bar.width, h * 0.035f), ready ? Loc.L("READY TO CLAIM!") : $"{prog} / {ms[i].Target}", new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, fontStyle = ready ? FontStyle.Bold : FontStyle.Normal, wordWrap = false }, ready ? Color.white : new Color(1, 1, 1, 0.9f), 1);
                 var btn = new Rect(card.xMax - w * 0.3f, card.y + h * 0.065f, w * 0.26f, h * 0.06f);
-                if (done) Pill(new Rect(btn.x, btn.y + btn.height * 0.1f, btn.width, btn.height * 0.8f), "DONE ✓", "FFFFFF", "C9F7E4", Visuals.Hex("0E6B48"));
-                else if (ready) { if (Btn(btn, $"+{ms[i].Reward} ●", "FFD54A", "D99A00", 0.75f) && _meta.Claim(i, Today)) { _fx.Win(); Confetti(25); _shopBurstFrom = btn.center; _shopBurstAt = Time.unscaledTime; SaveMeta(); } }
-                else Pill(new Rect(btn.x, btn.y + btn.height * 0.1f, btn.width, btn.height * 0.8f), $"+{ms[i].Reward} ●", "FFFFFF", "DCD3FF", Visuals.Hex("3A1B8F"));
+                var chip = new Rect(btn.x, btn.y + btn.height * 0.1f, btn.width, btn.height * 0.8f);
+                if (done) Pill(chip, "DONE ✓", "FFFFFF", "C9F7E4", Visuals.Hex("0E6B48"));
+                else if (ready)
+                {
+                    // a pulsing CLAIM button with the reward and the same coin icon as every other reward chip
+                    float pulse = NewLook.ReducedMotion ? 1f : 1f + 0.04f * Mathf.Sin(Time.unscaledTime * 5f);
+                    var cb = new Rect(btn.center.x - btn.width * pulse / 2f, btn.center.y - btn.height * pulse / 2f, btn.width * pulse, btn.height * pulse);
+                    if (Btn(cb, Loc.L("CLAIM"), "4BE38A", "1FA45B", 0.8f) && _meta.Claim(i, Today)) { _fx.Win(); Confetti(25); _shopBurstFrom = btn.center; _shopBurstAt = Time.unscaledTime; SaveMeta(); }
+                    RewardChip(new Rect(cb.x, cb.y - h * 0.032f, cb.width, h * 0.03f), ms[i].Reward, Color.white);
+                }
+                else { Pill(chip, "", "FFFFFF", "DCD3FF", Visuals.Hex("3A1B8F")); RewardChip(chip, ms[i].Reward, Visuals.Hex("3A1B8F")); }
                 EndShopCard();
             }
             DrawShopCoinBurst(w, h);
-            Outlined(new Rect(w * 0.08f, h * 0.68f, w * 0.84f, h * 0.08f), "New missions every day. Coins unlock themes; they never buy an advantage.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
+            DrawDailyChest(w, h);
+            Outlined(new Rect(w * 0.08f, h * 0.755f, w * 0.84f, h * 0.045f), "New missions every day. Coins unlock themes; they never buy an advantage.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
             int got = 0; for (int i = 0; i < PlayerMeta.Achievements.Length; i++) if (_meta.HasAchievement(i)) got++;
-            if (Btn(Row(w, h * 0.765f, h * 0.065f), Loc.F("TROPHIES  {0}/{1}", got, PlayerMeta.Achievements.Length), "7CF8FF", "1C8FE0", 0.85f)) ShowMenu(Screen.Trophies);
-            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
+            if (Btn(Row(w, h * 0.81f, h * 0.06f), Loc.F("TROPHIES  {0}/{1}", got, PlayerMeta.Achievements.Length), "7CF8FF", "1C8FE0", 0.85f)) ShowMenu(Screen.Trophies);
+            if (Btn(Row(w, h * 0.89f, h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
+        }
+
+        /// <summary>Under the three missions: a chest that fills as each one is claimed and opens for a fixed prize.</summary>
+        private void DrawDailyChest(float w, float h)
+        {
+            int n = _meta.ClaimedCount(Today);
+            var r = new Rect(w * 0.05f, h * 0.693f, w * 0.9f, h * 0.056f);
+            bool ready = _meta.ChestReady(Today), opened = _meta.ChestClaimed;
+            if (ready)
+            {
+                float pulse = NewLook.ReducedMotion ? 1f : 1f + 0.02f * Mathf.Sin(Time.unscaledTime * 5f);
+                var rb = new Rect(r.center.x - r.width * pulse / 2f, r.center.y - r.height * pulse / 2f, r.width * pulse, r.height * pulse);
+                if (Btn(rb, Loc.L("OPEN CHEST") + "  +" + PlayerMeta.ChestCoins, "4BE38A", "1FA45B", 0.8f) && _meta.ClaimChest(Today)) { _fx.Win(); Confetti(60); _shopBurstFrom = rb.center; _shopBurstAt = Time.unscaledTime; SaveMeta(); }
+                return;
+            }
+            Panel(r, _barBackStyle);
+            float pad = r.height * 0.18f, bw = r.width * 0.34f;
+            Outlined(new Rect(r.x + pad * 1.5f, r.y, r.width * 0.5f, r.height), opened ? Loc.L("CHEST OPENED ✓") : Loc.L("DAILY CHEST"), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleLeft }, opened ? Visuals.Hex("2EE59D") : Visuals.Hex("FFE27A"), 1.2f);
+            for (int i = 0; i < 3; i++)
+            {
+                var seg = new Rect(r.xMax - pad * 1.5f - bw + i * (bw / 3f), r.center.y - r.height * 0.15f, bw / 3f - 4f, r.height * 0.3f);
+                Panel(seg, i < n || opened ? Swatch(Visuals.Hex("12B070")) : _barBackStyle);
+            }
+        }
+
+        /// <summary>"+N" and a gold coin, drawn as a picture so every reward chip shows the same icon whatever the font.</summary>
+        private void RewardChip(Rect r, int amount, Color text)
+        {
+            float d = r.height * 0.62f;
+            var st = new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleRight };
+            var label = new Rect(r.x, r.y, r.width * 0.5f + d * 0.1f, r.height);
+            Outlined(label, "+" + amount, st, text, 0f);
+            if (Event.current.type != EventType.Repaint) return;
+            var coin = new Rect(label.xMax + d * 0.35f, r.center.y - d / 2f, d, d);
+            var old = GUI.color;
+            GUI.color = Visuals.Hex("C98A00"); GUI.DrawTexture(new Rect(coin.x - 1, coin.y - 1, d + 2, d + 2), Visuals.Circle.texture);
+            GUI.color = Visuals.Gold; GUI.DrawTexture(coin, Visuals.Circle.texture);
+            GUI.color = old;
         }
 
         private void DrawTrophies(float w, float h) => DrawTrophiesPolish(w, h);
@@ -1884,17 +1934,22 @@ namespace BlockDrop.Game
                         if (f > 0.02f) Panel(new Rect(pb.x, pb.y, Mathf.Max(pb.height, pb.width * f), pb.height), _barFillStyle);
                         Outlined(new Rect(chip.x + pad, chip.y, chip.width - 2 * pad, chip.height - pbH - pad), (met ? "✓ " : "") + GoalChip(i), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.85f)) }, met ? Visuals.Hex("2EE59D") : Color.white, 1.2f);
                     }
-                    // score bar: the two star marks sit right on it, the score and the next star hang under it
+                    // score bar: the three stars sit right on it, the score and the next star hang under it
                     float shown = _shownScore + _bonusShown;
                     var bar = new Rect(w * 0.08f, h * 0.245f, w * 0.84f, h * 0.018f);
                     Panel(bar, _barBackStyle);
                     float sf = Mathf.Clamp01(shown / Mathf.Max(1, d.ThreeStarScore));
                     if (sf > 0.04f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * sf), bar.height), _barFillStyle);
-                    foreach (var star in new[] { d.TwoStarScore, d.ThreeStarScore })
+                    // three stars: the first is for winning, the second and third sit at their score marks (kept apart so they never crowd)
+                    float starW = h * 0.06f, minGap = h * 0.065f;
+                    float x3 = bar.xMax, x2 = Mathf.Min(bar.x + bar.width * Mathf.Clamp01((float)d.TwoStarScore / Mathf.Max(1, d.ThreeStarScore)), x3 - minGap);
+                    float x1 = Mathf.Min(bar.x + starW * 0.3f, x2 - minGap);
+                    var starStyle = new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.7f), font = null, fontStyle = FontStyle.Bold };
+                    for (int si = 0; si < 3; si++)
                     {
-                        float sx = bar.x + bar.width * Mathf.Clamp01((float)star / Mathf.Max(1, d.ThreeStarScore));
-                        bool got = shown >= star;
-                        Outlined(new Rect(sx - h * 0.03f, bar.y - h * 0.04f, h * 0.06f, h * 0.04f), got ? "★" : "☆", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.7f), font = null, fontStyle = FontStyle.Bold }, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
+                        float sx = si == 0 ? x1 : si == 1 ? x2 : x3;
+                        bool got = si == 0 ? _level.AllGoalsMet : shown >= (si == 1 ? d.TwoStarScore : d.ThreeStarScore);
+                        Outlined(new Rect(sx - starW / 2f, bar.y - h * 0.04f, starW, h * 0.04f), got ? "★" : "☆", starStyle, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
                     }
                     Outlined(new Rect(bar.x, bar.yMax + h * 0.004f, bar.width * 0.3f, h * 0.03f), Mathf.RoundToInt(shown).ToString(), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
                     if (_boosterTray) DrawBoosterTray(w, h);
@@ -2101,7 +2156,26 @@ namespace BlockDrop.Game
                 PlayerPrefs.SetString("lang", Loc.Code(Loc.Current));
                 PlayerPrefs.Save();
             }
-            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
+            // "Continue with Google" only exists in builds that have Google Play Games set up (AccountLink.Available), so everywhere else this row is simply absent
+            if (AccountLink.Available)
+            {
+                var gr = Row(w, h * 0.755f, h * 0.07f);
+                if (AccountLink.Linked) Pill(gr, Loc.L("GOOGLE CONNECTED ✓"), "FFFFFF", "C9F7E4", Visuals.Hex("0E6B48"));
+                else if (Btn(gr, _googleBusy ? Loc.L("CONNECTING…") : Loc.L("CONTINUE WITH GOOGLE"), "4C8DF6", "2B5FD0", 0.7f) && !_googleBusy) ContinueWithGoogle();
+                if (_googleMsg != "") Outlined(new Rect(w * 0.05f, h * 0.83f, w * 0.9f, h * 0.03f), _googleMsg, new GUIStyle(_small) { wordWrap = false }, Visuals.Hex("FFE27A"), 1.2f);
+            }
+            if (Btn(Row(w, h * 0.89f, h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
+        }
+
+        private bool _googleBusy;
+        private string _googleMsg = "";
+
+        private async void ContinueWithGoogle()
+        {
+            _googleBusy = true; _googleMsg = "";
+            string err = await AccountLink.ContinueAsync();
+            _googleBusy = false;
+            _googleMsg = err ?? Loc.L("Connected! Your progress is saved to your Google account.");
         }
 
         private async void SaveName()

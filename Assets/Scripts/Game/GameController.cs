@@ -1569,9 +1569,33 @@ namespace BlockDrop.Game
         {
             GUI.enabled = true;
             var card = new Rect(w * 0.05f, h * 0.26f, w * 0.9f, h * 0.45f);
-            Modal(w, h, card);
             bool calm = NewLook.ReducedMotion;
             float t = Time.unscaledTime;
+            // framed card: dim the screen, a gold rim, the deep violet panel, then slow light rays behind the reward
+            if (Event.current.type == EventType.Repaint)
+            {
+                var dim = GUI.color; GUI.color = new Color(0, 0, 0, 0.66f);
+                GUI.DrawTexture(new Rect(-w, -h, w * 3, h * 3), Texture2D.whiteTexture); GUI.color = dim;
+            }
+            Panel(new Rect(card.x - w * 0.012f, card.y - w * 0.012f, card.width + w * 0.024f, card.height + w * 0.024f), ShopStyle("FFE27A", "C9780A"));
+            Panel(card, _modalStyle);
+            if (Event.current.type == EventType.Repaint)
+            {
+                var pivot = new Vector2(card.width / 2f, h * 0.11f);
+                GUI.BeginClip(card);
+                var keep = GUI.matrix; var tint = GUI.color;
+                for (int i = 0; i < 14; i++)
+                {
+                    GUI.matrix = keep;
+                    GUIUtility.RotateAroundPivot((calm ? 0f : t * 6f) + i * (360f / 14f), pivot);
+                    GUI.color = new Color(1f, 0.85f, 0.35f, 0.07f);
+                    GUI.DrawTexture(new Rect(pivot.x - card.width * 0.035f, pivot.y - card.height, card.width * 0.07f, card.height), Texture2D.whiteTexture);
+                }
+                GUI.matrix = keep; GUI.color = tint;
+                GUI.EndClip();
+            }
+            float sinceCollect = _welcomeCollectAt < 0f ? -1f : Time.unscaledTime - _welcomeCollectAt;
+            if (sinceCollect > 0.75f) { _welcomeReward = 0; _welcomeCollectAt = -1f; return; }
             // ribbon title
             var rib = new Rect(card.x + card.width * 0.14f, card.y - h * 0.022f, card.width * 0.72f, h * 0.058f);
             Panel(rib, ShopStyle("FFE27A", "E0900A"));
@@ -1597,7 +1621,8 @@ namespace BlockDrop.Game
             {
                 var c = new Rect(card.x + padX + (day - 1) * cell + (cell - cs) / 2f, cy, cs, cs);
                 bool done = day < today, now = day == today, big = day == 7;
-                float pop = now && !calm ? 1f + 0.07f * Mathf.Sin(t * 5f) : 1f;
+                float pop = (now && !calm ? 1f + 0.07f * Mathf.Sin(t * 5f) : 1f) * (big ? 1.1f : 1f);
+                if (now) { var tag = new Rect(c.center.x - cell * 0.42f, c.y - h * 0.03f, cell * 0.84f, h * 0.022f); Panel(tag, ShopStyle("FFE27A", "E0900A")); Outlined(tag, Loc.L("TODAY"), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Max(7, Mathf.RoundToInt(_small.fontSize * 0.6f)) }, Visuals.Hex("5A2A00"), 0f); }
                 var cr = new Rect(c.center.x - c.width * pop / 2f, c.center.y - c.height * pop / 2f, c.width * pop, c.height * pop);
                 Panel(cr, ShopStyle(done ? "2EE59D" : now ? "FFE27A" : big ? "B07CFF" : "5A4FA8", done ? "13805A" : now ? "E08A00" : big ? "5B2DB0" : "2F2670"));
                 Outlined(cr, done ? "✓" : big ? "★" : day.ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false, font = null }, now ? Visuals.Hex("5A2A00") : Color.white, now ? 0f : 1.5f);
@@ -1614,8 +1639,17 @@ namespace BlockDrop.Game
             Outlined(new Rect(card.x + w * 0.04f, cy + cs + h * 0.104f, card.width - w * 0.08f, h * 0.03f), Loc.F("{0} of 7 days this week", today), new GUIStyle(_small) { wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, new Color(1, 1, 1, 0.65f), 1f);
             float bp = calm ? 1f : 1f + 0.03f * Mathf.Sin(t * 4f);
             var bb = new Rect(card.center.x - card.width * 0.3f * bp, card.yMax - h * 0.088f - h * 0.0325f * (bp - 1f), card.width * 0.6f * bp, h * 0.065f * bp);
-            if (Btn(bb, "COLLECT", "4BE38A", "1FA45B")) _welcomeReward = 0;
+            if (sinceCollect < 0f && Btn(bb, "COLLECT", "4BE38A", "1FA45B"))
+            {
+                // pay out with a coin burst from the button, then close once the coins have flown
+                _welcomeCollectAt = Time.unscaledTime; _shopBurstFrom = bb.center; _shopBurstAt = Time.unscaledTime;
+                _fx.Win(); Confetti(30);
+                if (calm) { _welcomeReward = 0; _welcomeCollectAt = -1f; }
+            }
+            DrawShopCoinBurst(w, h);
         }
+
+        private float _welcomeCollectAt = -1f;
 
         private void DrawMissions(float w, float h)
         {

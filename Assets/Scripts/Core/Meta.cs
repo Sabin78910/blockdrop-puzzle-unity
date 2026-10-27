@@ -458,7 +458,7 @@ namespace BlockDrop.Core
             var sb = new StringBuilder();
             sb.Append($"c={Coins};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
             sb.Append($"p={Progress[0]},{Progress[1]},{Progress[2]};k={(Claimed[0] ? 1 : 0)}{(Claimed[1] ? 1 : 0)}{(Claimed[2] ? 1 : 0)};");
-            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};rp={string.Join(",", RankPoints)};rk={string.Join(",", RankPeak)};dd={DailyRankDay};ws={AiWinStreak};bo={Boosters[0]},{Boosters[1]}");
+            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};rp={string.Join(",", RankPoints)};rk={string.Join(",", RankPeak)};dd={DailyRankDay};ws={AiWinStreak};bo={Boosters[0]},{Boosters[1]};sf={StreakFreezes}");
             return sb.ToString();
         }
 
@@ -501,6 +501,7 @@ namespace BlockDrop.Core
                     case "rp": ParseInts(v, m.RankPoints); break;
                     case "rk": ParseInts(v, m.RankPeak); break;
                     case "dd": m.DailyRankDay = v; break;
+                    case "sf": m.StreakFreezes = Math.Clamp(n, 0, MaxStreakFreezes); break;
                     case "ws": m.AiWinStreak = Math.Max(0, n); break;
                     case "na": m.NoAds = n == 1; break;
                     case "st":

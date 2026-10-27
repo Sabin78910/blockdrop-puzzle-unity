@@ -294,6 +294,7 @@ namespace BlockDrop.Core
             ["RANKS"] = "श्रेणी",
             ["RANK UP: {0}!   +{1} ●"] = "श्रेणी वृद्धि: {0}!   +{1} ●",
             ["RANK UP!  +{0} ●{1}"] = "श्रेणी वृद्धि!  +{0} ●{1}",
+            ["STREAK SAVED!  Day {0} kept"] = "स्ट्रिक जोगियो!  दिन {0} कायम",
             ["  +1 HAMMER  +1 SHUFFLE"] = "  +१ हथौडा  +१ मिसाउ",
             ["Daily rank counts once a day. Come back tomorrow!"] = "दैनिक श्रेणी दिनमा एकपटक मात्र गनिन्छ। भोलि फर्कनुहोस्!",
             ["This AI is too easy for your rank. Try a harder one!"] = "यो AI तपाईंको श्रेणीका लागि धेरै सजिलो छ। कठिन प्रयास गर्नुहोस्!",

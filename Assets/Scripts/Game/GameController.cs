@@ -120,6 +120,7 @@ namespace BlockDrop.Game
             _firstSession = sessions == 1;
             _welcomeReward = _meta.CheckIn(Today);
             Celebrate(_meta.Record(Stat.BestStreak, _meta.Streak));
+            if (_meta.FreezeUsedToday) Toast(Loc.F("STREAK SAVED!  Day {0} kept", _meta.Streak), Visuals.Hex("7CF8FF"));
             _tutorial = PlayerPrefs.GetInt("tutorial", 0);
             SaveMeta();
             _world = new GameObject("World").transform;

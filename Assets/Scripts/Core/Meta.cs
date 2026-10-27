@@ -129,6 +129,18 @@ namespace BlockDrop.Core
             return true;
         }
         public int Streak { get; private set; }
+
+        /// <summary>Streak shields: one is spent automatically when exactly one day was missed.</summary>
+        public const int MaxStreakFreezes = 2, StreakFreezePrice = 120;
+        public int StreakFreezes { get; private set; }
+        /// <summary>True when the last <see cref="CheckIn"/> was kept alive by a shield.</summary>
+        public bool FreezeUsedToday { get; private set; }
+        public bool BuyStreakFreeze()
+        {
+            if (StreakFreezes >= MaxStreakFreezes || !Spend(StreakFreezePrice)) return false;
+            StreakFreezes++;
+            return true;
+        }
         public int BestStreak { get; private set; }
         public string LastCheckIn { get; private set; } = "";
         public string MissionDay { get; private set; } = "";
@@ -282,12 +294,19 @@ namespace BlockDrop.Core
         public int CheckIn(string today)
         {
             if (today == LastCheckIn) return 0;
-            bool consecutive = DateTime.TryParseExact(LastCheckIn, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var last)
-                && DateTime.ParseExact(today, "yyyy-MM-dd", CultureInfo.InvariantCulture) == last.AddDays(1);
+            FreezeUsedToday = false;
+            bool hasLast = DateTime.TryParseExact(LastCheckIn, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var last);
+            var now = DateTime.ParseExact(today, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+            bool consecutive = hasLast && now == last.AddDays(1);
+            if (!consecutive && hasLast && now == last.AddDays(2) && Streak > 0 && StreakFreezes > 0)
+            {
+                StreakFreezes--; // the missed day is covered
+                FreezeUsedToday = consecutive = true;
+            }
             Streak = consecutive ? Streak + 1 : 1;
             BestStreak = Math.Max(BestStreak, Streak);
             LastCheckIn = today;
-            if (Streak % 7 == 0) AddBoosters(Booster.Hammer, 1); // a weekly treat on top of the coins
+            if (Streak % 7 == 0) { AddBoosters(Booster.Hammer, 1); StreakFreezes = Math.Min(MaxStreakFreezes, StreakFreezes + 1); } // a weekly treat on top of the coins
             int reward = StreakReward(Streak);
             Coins += reward;
             return reward;
@@ -420,6 +439,7 @@ namespace BlockDrop.Core
             m.OwnedThemes = lead.OwnedThemes | other.OwnedThemes;
             m.AchievementMask = lead.AchievementMask | other.AchievementMask;
             m.BestStreak = Math.Max(lead.BestStreak, other.BestStreak);
+            m.StreakFreezes = Math.Max(lead.StreakFreezes, other.StreakFreezes);
             for (int i = 0; i < m.Stats.Length; i++) m.Stats[i] = Math.Max(lead.Stats[i], other.Stats[i]);
             m.Purchases = lead.Purchases | other.Purchases;
             for (int i = 0; i < m.RankPoints.Length; i++)
@@ -438,7 +458,7 @@ namespace BlockDrop.Core
             var sb = new StringBuilder();
             sb.Append($"c={Coins};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
             sb.Append($"p={Progress[0]},{Progress[1]},{Progress[2]};k={(Claimed[0] ? 1 : 0)}{(Claimed[1] ? 1 : 0)}{(Claimed[2] ? 1 : 0)};");
-            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};rp={string.Join(",", RankPoints)};rk={string.Join(",", RankPeak)};dd={DailyRankDay};ws={AiWinStreak};bo={Boosters[0]},{Boosters[1]}");
+            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};rp={string.Join(",", RankPoints)};rk={string.Join(",", RankPeak)};dd={DailyRankDay};ws={AiWinStreak};bo={Boosters[0]},{Boosters[1]};sf={StreakFreezes}");
             return sb.ToString();
         }
 
@@ -481,6 +501,7 @@ namespace BlockDrop.Core
                     case "rp": ParseInts(v, m.RankPoints); break;
                     case "rk": ParseInts(v, m.RankPeak); break;
                     case "dd": m.DailyRankDay = v; break;
+                    case "sf": m.StreakFreezes = Math.Clamp(n, 0, MaxStreakFreezes); break;
                     case "ws": m.AiWinStreak = Math.Max(0, n); break;
                     case "na": m.NoAds = n == 1; break;
                     case "st":

@@ -119,6 +119,7 @@ namespace BlockDrop.Core
             ["RANKS"] = ("RANGOS", "RANKS"),
             ["RANK UP: {0}!   +{1} ●"] = ("¡SUBES DE RANGO: {0}!   +{1} ●", "SUBIU DE RANK: {0}!   +{1} ●"),
             ["RANK UP!  +{0} ●{1}"] = ("¡RANGO NUEVO!  +{0} ●{1}", "NOVO RANK!  +{0} ●{1}"),
+            ["STREAK SAVED!  Day {0} kept"] = ("¡RACHA SALVADA!  Día {0} mantenido", "SEQUÊNCIA SALVA!  Dia {0} mantido"),
             ["  +1 HAMMER  +1 SHUFFLE"] = ("  +1 MARTILLO  +1 MEZCLA", "  +1 MARTELO  +1 EMBARALHAR"),
             ["Daily rank counts once a day. Come back tomorrow!"] = ("El rango diario cuenta una vez al día. ¡Vuelve mañana!", "O rank diário conta uma vez por dia. Volte amanhã!"),
             ["This AI is too easy for your rank. Try a harder one!"] = ("Esta IA es muy fácil para tu rango. ¡Prueba una más difícil!", "Esta IA é fácil demais para o seu rank. Tente uma mais difícil!"),

@@ -224,4 +224,39 @@ public class ThemeAndStoreTests
         Assert.AreEqual(50, m.Coins);
         Assert.IsFalse(m.Spend(-5));
     }
+
+    [Test] public void FreezeCoversExactlyOneMissedDay()
+    {
+        var m = new PlayerMeta();
+        m.CheckIn("2026-10-09"); m.CheckIn("2026-10-10");
+        m.AddCoins(PlayerMeta.StreakFreezePrice);
+        Assert.IsTrue(m.BuyStreakFreeze());
+        m.CheckIn("2026-10-12");
+        Assert.AreEqual(3, m.Streak, "one missed day is covered");
+        Assert.IsTrue(m.FreezeUsedToday);
+        Assert.AreEqual(0, m.StreakFreezes);
+        m.CheckIn("2026-10-15");
+        Assert.AreEqual(1, m.Streak, "no shield left, two missed days reset");
+        Assert.IsFalse(m.FreezeUsedToday);
+    }
+
+    [Test] public void FreezeDoesNotCoverTwoMissedDaysAndIsCapped()
+    {
+        var m = new PlayerMeta();
+        m.AddCoins(1000);
+        Assert.IsTrue(m.BuyStreakFreeze()); Assert.IsTrue(m.BuyStreakFreeze());
+        Assert.IsFalse(m.BuyStreakFreeze(), "capped at two");
+        m.CheckIn("2026-10-09");
+        m.CheckIn("2026-10-12");
+        Assert.AreEqual(1, m.Streak);
+        Assert.AreEqual(2, m.StreakFreezes, "not spent on a longer gap");
+    }
+
+    [Test] public void FreezeSurvivesSaveAndSeventhDayGrantsOne()
+    {
+        var m = new PlayerMeta();
+        for (int d = 1; d <= 7; d++) m.CheckIn($"2026-10-{d:00}");
+        Assert.AreEqual(1, m.StreakFreezes);
+        Assert.AreEqual(1, PlayerMeta.Parse(m.Serialize()).StreakFreezes);
+    }
 }

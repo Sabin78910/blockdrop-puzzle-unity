@@ -142,6 +142,7 @@ namespace BlockDrop.Core
             ["LEGEND"] = ("LEYENDA", "LENDA"),
             ["KING  #{0}"] = ("REY  #{0}", "REI  #{0}"),
             ["Link your Google account to chase the KING title (top 100)."] = ("Vincula tu cuenta de Google para optar al título de REY (top 100).", "Vincule sua conta Google para disputar o título de REI (top 100)."),
+            ["King"] = ("Rey", "Rei"),
             ["TROPHIES  {0}/{1}"] = ("TROFEOS  {0}/{1}", "TROFÉUS  {0}/{1}"), ["LEVEL {0}   ·   {1}/{2} XP"] = ("NIVEL {0}   ·   {1}/{2} XP", "NÍVEL {0}   ·   {1}/{2} XP"),
             ["HINT {0}"] = ("PISTA {0}", "DICA {0}"), ["LEVEL {0}"] = ("NIVEL {0}", "NÍVEL {0}"), ["MOVES LEFT  {0}"] = ("MOVIMIENTOS  {0}", "JOGADAS  {0}"),
             ["PLAYER {0}"] = ("JUGADOR {0}", "JOGADOR {0}"), ["AI ({0})"] = ("IA ({0})", "IA ({0})"),

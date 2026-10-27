@@ -317,6 +317,7 @@ namespace BlockDrop.Core
             ["LEGEND"] = "दन्तेकथा",
             ["KING  #{0}"] = "राजा  #{0}",
             ["Link your Google account to chase the KING title (top 100)."] = "राजा उपाधि (शीर्ष १००) का लागि आफ्नो Google खाता जोड्नुहोस्।",
+            ["King"] = "राजा",
             ["TROPHIES  {0}/{1}"] = "ट्रफी  {0}/{1}",
             ["LEVEL {0}   ·   {1}/{2} XP"] = "स्तर {0}   ·   {1}/{2} XP",
             ["HINT {0}"] = "सङ्केत {0}",

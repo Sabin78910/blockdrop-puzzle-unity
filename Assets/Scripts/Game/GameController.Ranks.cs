@@ -78,6 +78,69 @@ namespace BlockDrop.Game
                 Outlined(new Rect(w * 0.03f, h * 0.83f, w * 0.94f, h * 0.035f), Loc.L("Link your Google account to chase the KING title (top 100)."), st, Visuals.Hex("7CF8FF"), 1.2f);
         }
 
+        private RankTrack _ladderTrack;
+
+        private void PlayTrack(RankTrack track)
+        {
+            if (track == RankTrack.Classic) { if (!ResumeRun(Mode.Classic)) StartMode(Mode.Classic); }
+            else if (track == RankTrack.Daily) StartMode(Mode.Daily);
+            else if (track == RankTrack.Level) ShowMenu(Screen.LevelSelect);
+            else ShowMenu(Screen.AiSelect);
+        }
+
+        /// <summary>Every rank from lowest to highest for one mode: passed ranks ticked, the current rank glowing with
+        /// its progress bar, the ranks ahead dimmed with the points they start at, and KING (top 100) at the end.</summary>
+        private void DrawLadder(float w, float h)
+        {
+            var track = _ladderTrack;
+            int p = _meta.RankPoints[(int)track], step = Ranks.StepOf(track, p), cur = Ranks.TierOf(step);
+            Outlined(new Rect(0, h * 0.05f, w, h * 0.07f), Loc.F("{0} LADDER", Loc.L(TrackName(track))), _h2, Visuals.Hex("7CF8FF"), 3);
+            float tw = w * 0.9f / 4f;
+            for (int i = 0; i < 4; i++)
+            {
+                bool on = i == (int)_ladderTrack;
+                if (Btn(new Rect(w * 0.05f + i * tw + 2f, h * 0.13f, tw - 4f, h * 0.045f), TrackName((RankTrack)i), on ? "FFD54A" : "5A4FA8", on ? "D99A00" : "3A2F80", 0.6f)) _ladderTrack = (RankTrack)i;
+            }
+            float y = h * 0.195f, gap = h * 0.006f, small = h * 0.056f, big = h * 0.1f;
+            int n = Ranks.Tiers.Length;
+            for (int ti = 0; ti <= n; ti++)
+            {
+                bool king = ti == n, now = !king && ti == cur, passed = !king && ti < cur, kingNow = king && OnlineService.IsKing;
+                float rh = now || kingNow ? big : small;
+                string hex = king ? "FFD54A" : Ranks.TierColors[ti];
+                var col = Visuals.Hex(hex);
+                string top = now || kingNow ? "6E8BFF" : passed ? "3A4A8F" : "2B2470", bottom = now || kingNow ? "3A4FE0" : passed ? "26306B" : "1C1650";
+                var card = BeginShopCard(new Rect(w * 0.05f, y, w * 0.9f, rh), ti, top, bottom, now || kingNow, !now && !kingNow && !passed);
+                float d = small * 0.62f;
+                Disc(new Rect(card.x + w * 0.035f, card.y + (small - d) / 2f, d, d), new Color(col.r, col.g, col.b, passed || now || kingNow ? 1f : 0.45f));
+                Outlined(new Rect(card.x + w * 0.035f, card.y + (small - d) / 2f, d, d), king ? "K" : (ti + 1).ToString(), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.2f);
+                float tx = card.x + w * 0.035f + d + w * 0.03f;
+                string name = king ? Loc.L("KING") : Loc.L(Ranks.Tiers[ti].ToUpperInvariant());
+                var left = new GUIStyle(_body) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
+                var right = new GUIStyle(_small) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, wordWrap = false };
+                string req = king ? Loc.L("TOP 100") : Loc.F("{0} RP", Ranks.PointsFor(track, Ranks.FirstStepOf(ti)).ToString("N0"));
+                string status = passed ? "✓" : now ? Loc.L("YOU ARE HERE") : kingNow ? Loc.F("KING  #{0}", OnlineService.KingRank) : "";
+                Outlined(new Rect(tx, card.y, card.width * 0.5f, small), name + (now ? "  ·  " + Ranks.Display(step).Substring(Mathf.Min(Ranks.Display(step).Length, Loc.L(Ranks.Tiers[ti].ToUpperInvariant()).Length)).Trim() : ""), left, passed ? new Color(1, 1, 1, 0.75f) : col, 1.4f);
+                Outlined(new Rect(card.xMax - card.width * 0.42f, card.y, card.width * 0.4f, small), status != "" ? status : req, right, now || kingNow ? Visuals.Gold : passed ? Visuals.Hex("7CF8C0") : new Color(1, 1, 1, 0.7f), 1.2f);
+                if (now)
+                {
+                    var bar = new Rect(tx, card.y + small * 0.98f, card.xMax - tx - w * 0.04f, h * 0.014f);
+                    Panel(bar, _barBackStyle);
+                    float f = Ranks.Fill(track, p);
+                    if (f > 0.02f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * f), bar.height), Swatch(col));
+                    string next = Ranks.ToNext(track, p) > 0 ? Loc.F("{0} RP to {1}", Ranks.ToNext(track, p), Ranks.Display(step + 1)) : Loc.L("Top rank reached!");
+                    Outlined(new Rect(tx, bar.yMax + h * 0.004f, bar.width, h * 0.03f), $"{p:N0} RP   ·   {next}", new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft }, Color.white, 1f);
+                }
+                else if (king && !kingNow)
+                    Outlined(new Rect(tx, card.y + small * 0.62f, card.width - (tx - card.x) - w * 0.03f, h * 0.025f), Loc.L("Server ranked. Reach Legend and link Google."), new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.7f)) }, new Color(1, 1, 1, 0.7f), 1f);
+                EndShopCard();
+                y += rh + gap;
+            }
+            float by = h * 0.9f, half = w * 0.43f;
+            if (Btn(new Rect(w * 0.05f, by, half, h * 0.06f), "PLAY", "4BE38A", "1FA45B", 0.9f)) PlayTrack(track);
+            if (Btn(new Rect(w * 0.95f - half, by, half, h * 0.06f), "BACK", "5A4FA8", "3A2F80", 0.9f)) GoBack();
+        }
+
         private void DrawRanks(float w, float h)
         {
             if (Time.unscaledTime - _kingAsked > 30f) { _kingAsked = Time.unscaledTime; OnlineService.RefreshKing(); }
@@ -104,16 +167,10 @@ namespace BlockDrop.Game
                 Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.118f, card.width - w * 0.08f, h * 0.025f), next, new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft }, Color.white, 1f);
                 bool tapped = GUI.Button(card, GUIContent.none, GUIStyle.none);
                 EndShopCard();
-                if (tapped)
-                {
-                    if (track == RankTrack.Classic) { if (!ResumeRun(Mode.Classic)) StartMode(Mode.Classic); }
-                    else if (track == RankTrack.Daily) StartMode(Mode.Daily);
-                    else if (track == RankTrack.Level) ShowMenu(Screen.LevelSelect);
-                    else ShowMenu(Screen.AiSelect);
-                }
+                if (tapped) { _ladderTrack = track; ShowMenu(Screen.Ladder); }
             }
             DrawKingLine(w, h);
-            Outlined(new Rect(w * 0.05f, h * 0.862f, w * 0.9f, h * 0.03f), "Tap a mode to play it.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
+            Outlined(new Rect(w * 0.05f, h * 0.862f, w * 0.9f, h * 0.03f), "Tap a mode to see its full ladder.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
             if (Btn(Row(w, h * 0.9f, h * 0.06f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
         }
     }

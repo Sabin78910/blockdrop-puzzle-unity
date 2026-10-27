@@ -12,7 +12,7 @@ namespace BlockDrop.Game
     /// vs-AI, 2-player, challenge codes and online leaderboards. Fully playable offline.</summary>
     public sealed partial class GameController : MonoBehaviour
     {
-        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection, Settings, Shop, Ranks }
+        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection, Settings, Shop, Ranks, Ladder }
         private enum Mode { Classic, Daily, Level, Versus, VsAi, Challenge }
 
         private const int Size = 8;
@@ -454,7 +454,7 @@ namespace BlockDrop.Game
             if (_screen == Screen.Playing) ClearRun(); // finished or quit: nothing to resume
             SetPaused(false);
             _screen = screen;
-            if (screen == Screen.Shop || screen == Screen.Themes || screen == Screen.Missions || screen == Screen.Ranks) _shopOpened = Time.unscaledTime;
+            if (screen == Screen.Shop || screen == Screen.Themes || screen == Screen.Missions || screen == Screen.Ranks || screen == Screen.Ladder) _shopOpened = Time.unscaledTime;
             if (screen == Screen.LevelSelect) { _mapBottom = -1; _mapVel = 0; _mapDown = _mapTapped = false; _mapPick = 0; } // reopen the map on the player's current level
             _boardRoot.SetActive(false);
             _miniRoot.SetActive(false);
@@ -1410,6 +1410,7 @@ namespace BlockDrop.Game
                 case Screen.Settings: DrawSettings(w, h); break;
                 case Screen.Shop: DrawShop(w, h); break;
                 case Screen.Ranks: DrawRanks(w, h); break;
+                case Screen.Ladder: DrawLadder(w, h); break;
             }
             GUI.enabled = true;
             DrawFloaters(w);

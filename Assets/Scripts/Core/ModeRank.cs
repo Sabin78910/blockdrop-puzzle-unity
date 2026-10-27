@@ -28,7 +28,7 @@ namespace BlockDrop.Core
     {
         public static readonly string[] Tiers = { "Bronze", "Silver", "Gold", "Diamond", "Crown", "Master", "Champion", "Legend" };
         static readonly string[] Divisions = { "V", "IV", "III", "II", "I" };
-        static readonly string[] TierColors = { "D98B4F", "C7D2E8", "FFD54A", "6FC8FF", "FF9BD2", "C77DFF", "5FE0D0", "FF6B8B" };
+        public static readonly string[] TierColors = { "D98B4F", "C7D2E8", "FFD54A", "6FC8FF", "FF9BD2", "C77DFF", "5FE0D0", "FF6B8B" };
         /// <summary>Points where each rank begins.</summary>
         static readonly int[] TierStarts = { 0, 600, 1500, 2800, 4500, 6500, 8500, 11000 };
 
@@ -55,7 +55,7 @@ namespace BlockDrop.Core
         }
 
         public static int TierOf(int step) => step < DividedTiers * DivisionsPerTier ? step / DivisionsPerTier : DividedTiers + (step - DividedTiers * DivisionsPerTier);
-        static int FirstStepOf(int tier) => tier < DividedTiers ? tier * DivisionsPerTier : DividedTiers * DivisionsPerTier + (tier - DividedTiers);
+        public static int FirstStepOf(int tier) => tier < DividedTiers ? tier * DivisionsPerTier : DividedTiers * DivisionsPerTier + (tier - DividedTiers);
         public static string TierName(int step) => Tiers[TierOf(step)];
         public static string TierColor(int step) => TierColors[TierOf(step)];
 

@@ -142,4 +142,15 @@ public class RankTests
         Assert.AreEqual(60, m.RankPoints[(int)RankTrack.Level]);
         Assert.AreEqual(60, PlayerMeta.Parse(m.Serialize()).RankPoints[(int)RankTrack.Level]);
     }
+
+    [Test] public void EveryTierHasAStartThatOwnsItsFirstStep()
+    {
+        for (int tier = 0; tier < Ranks.Tiers.Length; tier++)
+        {
+            int first = Ranks.FirstStepOf(tier);
+            Assert.AreEqual(tier, Ranks.TierOf(first));
+            Assert.AreEqual(tier, Ranks.TierOf(Ranks.StepOf(RankTrack.Classic, Ranks.PointsFor(RankTrack.Classic, first))));
+        }
+        Assert.AreEqual(Ranks.Tiers.Length, Ranks.TierColors.Length);
+    }
 }

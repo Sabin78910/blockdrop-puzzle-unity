@@ -1560,30 +1560,61 @@ namespace BlockDrop.Game
             }
             PlayerButton(Row(w, y + h * 0.045f, h * 0.06f, 0.18f));
 
-            if (_welcomeReward > 0)
+            if (_welcomeReward > 0) DrawStreakPopup(w, h);
+        }
+
+        /// <summary>The daily streak card: a gold ribbon, a glowing reward, and the week as a path of tiles where the
+        /// finished days are green, today pulses and day 7 is the big purple prize.</summary>
+        private void DrawStreakPopup(float w, float h)
+        {
+            GUI.enabled = true;
+            var card = new Rect(w * 0.05f, h * 0.26f, w * 0.9f, h * 0.45f);
+            Modal(w, h, card);
+            bool calm = NewLook.ReducedMotion;
+            float t = Time.unscaledTime;
+            // ribbon title
+            var rib = new Rect(card.x + card.width * 0.14f, card.y - h * 0.022f, card.width * 0.72f, h * 0.058f);
+            Panel(rib, ShopStyle("FFE27A", "E0900A"));
+            Outlined(rib, Loc.F("DAY {0} STREAK!", _meta.Streak), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Hex("5A2A00"), 0f);
+            // glowing reward: a soft halo behind a gold coin and the amount
+            float ry = card.y + h * 0.075f, rh = h * 0.07f;
+            float glow = calm ? 1f : 1f + 0.08f * Mathf.Sin(t * 3f);
+            Disc(new Rect(card.center.x - rh * 1.7f * glow, ry + rh / 2f - rh * 1.1f * glow, rh * 3.4f * glow, rh * 2.2f * glow), new Color(1f, 0.82f, 0.25f, 0.13f));
+            var amountStyle = new GUIStyle(_h2) { wordWrap = false, alignment = TextAnchor.MiddleLeft };
+            string amount = "+" + _welcomeReward;
+            float aw = amountStyle.CalcSize(new GUIContent(amount)).x, coinD = rh * 0.8f, gap = coinD * 0.25f;
+            float gx = card.center.x - (aw + gap + coinD) / 2f;
+            Outlined(new Rect(gx, ry, aw + 4f, rh), amount, amountStyle, Visuals.Gold, 3);
+            GoldCoin(new Rect(gx + aw + gap, ry + (rh - coinD) / 2f, coinD, coinD));
+
+            // the week as a path
+            int today = PlayerMeta.LadderDay(_meta.Streak);
+            float padX = card.width * 0.04f, cell = (card.width - padX * 2f) / 7f, cs = cell * 0.8f, cy = card.y + h * 0.175f;
+            var track = new Rect(card.x + padX + cell / 2f, cy + cs / 2f - h * 0.004f, cell * 6f, h * 0.008f);
+            Panel(track, _barBackStyle);
+            if (today > 1) Panel(new Rect(track.x, track.y, cell * (today - 1), track.height), Swatch(Visuals.Hex("2EE59D")));
+            for (int day = 1; day <= 7; day++)
             {
-                GUI.enabled = true;
-                var card = new Rect(w * 0.05f, h * 0.28f, w * 0.9f, h * 0.38f);
-                Modal(w, h, card);
-                Outlined(new Rect(card.x, card.y + h * 0.015f, card.width, h * 0.055f), Loc.F("DAY {0} STREAK!", _meta.Streak), new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.8f) }, Visuals.Hex("FF9B5E"), 3);
-                Outlined(new Rect(card.x, card.y + h * 0.07f, card.width, h * 0.06f), $"+{_welcomeReward} ●", _h2, Visuals.Gold, 3);
-                // the weekly ladder: days done, today, and what is still ahead (day 7 is the big one)
-                int today = PlayerMeta.LadderDay(_meta.Streak);
-                float cell = card.width / 7f, cs = cell * 0.78f, cy = card.y + h * 0.145f;
-                for (int day = 1; day <= 7; day++)
-                {
-                    var c = new Rect(card.x + (day - 1) * cell + (cell - cs) / 2f, cy, cs, cs);
-                    bool done = day < today, now = day == today, big = day == 7;
-                    float pop = now && !NewLook.ReducedMotion ? 1f + 0.06f * Mathf.Sin(Time.unscaledTime * 5f) : 1f;
-                    var cr = new Rect(c.center.x - c.width * pop / 2f, c.center.y - c.height * pop / 2f, c.width * pop, c.height * pop);
-                    Panel(cr, ShopStyle(done ? "2EE59D" : now ? "FFE27A" : big ? "B07CFF" : "5A4FA8", done ? "13805A" : now ? "E08A00" : big ? "5B2DB0" : "2F2670"));
-                    Outlined(cr, done ? "✓" : big ? "★" : day.ToString(), new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter, wordWrap = false, font = null }, Color.white, 1.5f);
-                    int rw = PlayerMeta.StreakReward(Mathf.Max(1, _meta.Streak - today + day));
-                    Outlined(new Rect(c.x - cell * 0.1f, c.yMax + h * 0.004f, c.width + cell * 0.2f, h * 0.026f), "+" + rw, new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter, wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, day == today ? Visuals.Gold : new Color(1, 1, 1, 0.7f), 1f);
-                }
-                Outlined(new Rect(card.x + w * 0.04f, cy + cs + h * 0.04f, card.width - w * 0.08f, h * 0.04f), today == 7 ? Loc.L("Day 7 prize: a free hammer!") : Loc.F("Come back tomorrow for +{0}", PlayerMeta.StreakReward(_meta.Streak + 1)), _small, Color.white, 1.2f);
-                if (Btn(new Rect(card.x + card.width * 0.2f, card.yMax - h * 0.085f, card.width * 0.6f, h * 0.065f), "COLLECT", "4BE38A", "1FA45B")) _welcomeReward = 0;
+                var c = new Rect(card.x + padX + (day - 1) * cell + (cell - cs) / 2f, cy, cs, cs);
+                bool done = day < today, now = day == today, big = day == 7;
+                float pop = now && !calm ? 1f + 0.07f * Mathf.Sin(t * 5f) : 1f;
+                var cr = new Rect(c.center.x - c.width * pop / 2f, c.center.y - c.height * pop / 2f, c.width * pop, c.height * pop);
+                Panel(cr, ShopStyle(done ? "2EE59D" : now ? "FFE27A" : big ? "B07CFF" : "5A4FA8", done ? "13805A" : now ? "E08A00" : big ? "5B2DB0" : "2F2670"));
+                Outlined(cr, done ? "✓" : big ? "★" : day.ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = false, font = null }, now ? Visuals.Hex("5A2A00") : Color.white, now ? 0f : 1.5f);
+                // the reward under every tile, with the same coin icon
+                int rw = PlayerMeta.StreakReward(Mathf.Max(1, _meta.Streak - today + day));
+                float ly = c.yMax + h * 0.008f, ld = h * 0.018f;
+                var lab = new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter, wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.72f)) };
+                Outlined(new Rect(c.x - cell * 0.15f, ly, c.width + cell * 0.3f, h * 0.024f), rw.ToString(), lab, now ? Visuals.Gold : new Color(1, 1, 1, done ? 0.5f : 0.85f), 1f);
+                GoldCoin(new Rect(c.center.x - ld / 2f, ly + h * 0.026f, ld, ld));
             }
+            // what comes next
+            string next = today == 7 ? Loc.L("Day 7 prize: a free hammer!") : Loc.F("Come back tomorrow for +{0}", PlayerMeta.StreakReward(_meta.Streak + 1));
+            Outlined(new Rect(card.x + w * 0.04f, cy + cs + h * 0.07f, card.width - w * 0.08f, h * 0.036f), next, new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.2f);
+            Outlined(new Rect(card.x + w * 0.04f, cy + cs + h * 0.104f, card.width - w * 0.08f, h * 0.03f), Loc.F("{0} of 7 days this week", today), new GUIStyle(_small) { wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, new Color(1, 1, 1, 0.65f), 1f);
+            float bp = calm ? 1f : 1f + 0.03f * Mathf.Sin(t * 4f);
+            var bb = new Rect(card.center.x - card.width * 0.3f * bp, card.yMax - h * 0.088f - h * 0.0325f * (bp - 1f), card.width * 0.6f * bp, h * 0.065f * bp);
+            if (Btn(bb, "COLLECT", "4BE38A", "1FA45B")) _welcomeReward = 0;
         }
 
         private void DrawMissions(float w, float h)

@@ -196,9 +196,9 @@ namespace BlockDrop.Core
         }
 
         // ---- mode ranks (Classic, Daily, VS AI) ----
-        public readonly int[] RankPoints = new int[3];
+        public readonly int[] RankPoints = new int[4];
         /// <summary>Highest step ever reached per track, so a trophy dip and climb never pays a reward twice.</summary>
-        public readonly int[] RankPeak = new int[3];
+        public readonly int[] RankPeak = new int[4];
         public string DailyRankDay { get; private set; } = "";
         public int AiWinStreak { get; private set; }
 
@@ -224,6 +224,8 @@ namespace BlockDrop.Core
             AddBoosters(Booster.Shuffle, r.Shuffles);
             return r;
         }
+
+        public RankResult RankLevel(int starsBefore, int starsNow) => AwardRank(RankTrack.Level, Ranks.LevelGain(starsBefore, starsNow));
 
         public RankResult RankClassic(int score) => AwardRank(RankTrack.Classic, Ranks.ClassicGain(score));
 

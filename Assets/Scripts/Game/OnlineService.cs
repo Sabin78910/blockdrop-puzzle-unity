@@ -139,6 +139,13 @@ namespace BlockDrop.Game
             ["track"] = track.ToString(), ["score"] = result.Score, ["placements"] = result.Placements, ["lines"] = result.LinesCleared,
         });
 
+        /// <summary>A level win. The server keeps the best stars per level and pays only for progress, so replays cannot
+        /// be ground for rank. (Needs the "Level" track in SubmitRank, see CloudCode/SUBMITRANK.md.)</summary>
+        public static void SubmitRankLevel(int number, int stars) => SendRank(new Dictionary<string, object>
+        {
+            ["track"] = RankTrack.Level.ToString(), ["level"] = number, ["stars"] = stars,
+        });
+
         /// <summary>A decided VS AI match (ties are not sent).</summary>
         public static void SubmitRankVs(BotLevel bot, bool won) => SendRank(new Dictionary<string, object>
         {

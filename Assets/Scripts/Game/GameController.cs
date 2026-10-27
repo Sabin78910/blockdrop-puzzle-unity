@@ -2059,7 +2059,8 @@ namespace BlockDrop.Game
         private void DrawResult(float w, float h)
         {
             float t = Time.time - _resultTime;
-            Panel(new Rect(w * 0.06f, h * 0.14f, w * 0.88f, h * 0.62f), _cardStyle);
+            float rankExtra = _mode == Mode.Level && _rankResult != null ? h * 0.105f : 0f; // room for the rank bar on a level win
+            Panel(new Rect(w * 0.06f, h * 0.14f, w * 0.88f, h * 0.62f + rankExtra), _cardStyle);
             float y = h * 0.17f;
             switch (_mode)
             {
@@ -2093,7 +2094,8 @@ namespace BlockDrop.Game
                     if (won && _coinsEarned > 0) scoreLine += $"   +{_coinsEarned} ●";
                     Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), scoreLine, _body, Color.white, 1.5f);
                     if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
-                    float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
+                    if (rankExtra > 0f) DrawRankBlock(w, h, t, y + h * 0.3f);
+                    float by = y + h * 0.3f + rankExtra, bh = h * 0.07f, gap = h * 0.015f;
                     if (won && _level.Definition.Number < LevelLibrary.Count)
                     {
                         // Winning rolls straight on to the next level after a short celebration; any button below takes over.

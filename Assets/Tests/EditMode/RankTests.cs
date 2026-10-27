@@ -128,4 +128,18 @@ public class RankTests
         Assert.AreEqual(5000, merged.RankPoints[(int)RankTrack.Classic]);
         Assert.AreEqual(a.RankPoints[(int)RankTrack.VsAi], merged.RankPoints[(int)RankTrack.VsAi]);
     }
+
+    [Test] public void LevelRankPaysOnlyForProgress()
+    {
+        Assert.AreEqual(60, Ranks.LevelGain(0, 1));   // first clear 20 + 1 star 40
+        Assert.AreEqual(140, Ranks.LevelGain(0, 3));
+        Assert.AreEqual(80, Ranks.LevelGain(1, 3));
+        Assert.AreEqual(0, Ranks.LevelGain(3, 3), "replaying a three-star level pays nothing");
+        Assert.AreEqual(0, Ranks.LevelGain(2, 1));
+        var m = new PlayerMeta();
+        Assert.AreEqual(60, m.RankLevel(0, 1).Delta);
+        Assert.AreEqual(0, m.RankLevel(1, 1).Delta);
+        Assert.AreEqual(60, m.RankPoints[(int)RankTrack.Level]);
+        Assert.AreEqual(60, PlayerMeta.Parse(m.Serialize()).RankPoints[(int)RankTrack.Level]);
+    }
 }

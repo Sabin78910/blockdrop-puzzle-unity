@@ -3,7 +3,7 @@ using System;
 namespace BlockDrop.Core
 {
     /// <summary>The three open-ended modes each get their own ladder, so there is always a next rank to reach.</summary>
-    public enum RankTrack { Classic, Daily, VsAi }
+    public enum RankTrack { Classic, Daily, VsAi, Level }
 
     /// <summary>What one game did to a ladder; the result screen animates from <see cref="Before"/> to <see cref="After"/>.</summary>
     public sealed class RankResult
@@ -102,6 +102,16 @@ namespace BlockDrop.Core
             int cap = level == BotLevel.Easy ? EasyCap : level == BotLevel.Medium ? MediumCap : int.MaxValue;
             if (trophies >= cap) { capped = true; return 0; }
             return win + Math.Min(10, 2 * Math.Max(0, winStreak));
+        }
+
+        public const int LevelFirstClear = 20, LevelPerStar = 40;
+
+        /// <summary>RP for a level win. Only progress pays: 40 per star beyond the best so far, plus 20 for the first
+        /// clear. Replaying a finished level pays nothing, so easy early levels can't be ground for rank.</summary>
+        public static int LevelGain(int starsBefore, int starsNow)
+        {
+            starsBefore = Math.Max(0, starsBefore); starsNow = Math.Min(3, Math.Max(0, starsNow));
+            return Math.Max(0, starsNow - starsBefore) * LevelPerStar + (starsBefore == 0 && starsNow > 0 ? LevelFirstClear : 0);
         }
 
         // ---- one-time rewards for reaching a step ----

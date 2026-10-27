@@ -106,7 +106,7 @@ namespace BlockDrop.Game
             for (int ti = 0; ti <= n; ti++)
             {
                 bool king = ti == n, now = !king && ti == cur, passed = !king && ti < cur, kingNow = king && OnlineService.IsKing;
-                float rh = now || kingNow ? big : small;
+                float rh = now || kingNow ? big : king ? h * 0.075f : small;
                 string hex = king ? "FFD54A" : Ranks.TierColors[ti];
                 var col = Visuals.Hex(hex);
                 string top = now || kingNow ? "6E8BFF" : passed ? "3A4A8F" : "2B2470", bottom = now || kingNow ? "3A4FE0" : passed ? "26306B" : "1C1650";
@@ -116,12 +116,12 @@ namespace BlockDrop.Game
                 Outlined(new Rect(card.x + w * 0.035f, card.y + (small - d) / 2f, d, d), king ? "K" : (ti + 1).ToString(), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.2f);
                 float tx = card.x + w * 0.035f + d + w * 0.03f;
                 string name = king ? Loc.L("KING") : Loc.L(Ranks.Tiers[ti].ToUpperInvariant());
-                var left = new GUIStyle(_body) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
-                var right = new GUIStyle(_small) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, wordWrap = false };
+                var left = new GUIStyle(_body) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_body.fontSize * 0.85f)) };
+                var right = new GUIStyle(_small) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * (now || kingNow ? 0.7f : 0.85f))) };
                 string req = king ? Loc.L("TOP 100") : Loc.F("{0} RP", Ranks.PointsFor(track, Ranks.FirstStepOf(ti)).ToString("N0"));
                 string status = passed ? "✓" : now ? Loc.L("YOU ARE HERE") : kingNow ? Loc.F("KING  #{0}", OnlineService.KingRank) : "";
-                Outlined(new Rect(tx, card.y, card.width * 0.5f, small), name + (now ? "  ·  " + Ranks.Display(step).Substring(Mathf.Min(Ranks.Display(step).Length, Loc.L(Ranks.Tiers[ti].ToUpperInvariant()).Length)).Trim() : ""), left, passed ? new Color(1, 1, 1, 0.75f) : col, 1.4f);
-                Outlined(new Rect(card.xMax - card.width * 0.42f, card.y, card.width * 0.4f, small), status != "" ? status : req, right, now || kingNow ? Visuals.Gold : passed ? Visuals.Hex("7CF8C0") : new Color(1, 1, 1, 0.7f), 1.2f);
+                Outlined(new Rect(tx, card.y, card.width * 0.46f, small), name + (now ? "  ·  " + Ranks.Display(step).Substring(Mathf.Min(Ranks.Display(step).Length, Loc.L(Ranks.Tiers[ti].ToUpperInvariant()).Length)).Trim() : ""), left, passed ? new Color(1, 1, 1, 0.75f) : col, 1.4f);
+                Outlined(new Rect(card.xMax - card.width * 0.3f - w * 0.03f, card.y, card.width * 0.3f, small), status != "" ? status : req, right, now || kingNow ? Visuals.Gold : passed ? Visuals.Hex("7CF8C0") : new Color(1, 1, 1, 0.7f), 1.2f);
                 if (now)
                 {
                     var bar = new Rect(tx, card.y + small * 0.98f, card.xMax - tx - w * 0.04f, h * 0.014f);
@@ -132,7 +132,7 @@ namespace BlockDrop.Game
                     Outlined(new Rect(tx, bar.yMax + h * 0.004f, bar.width, h * 0.03f), $"{p:N0} RP   ·   {next}", new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft }, Color.white, 1f);
                 }
                 else if (king && !kingNow)
-                    Outlined(new Rect(tx, card.y + small * 0.62f, card.width - (tx - card.x) - w * 0.03f, h * 0.025f), Loc.L("Server ranked. Reach Legend and link Google."), new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.7f)) }, new Color(1, 1, 1, 0.7f), 1f);
+                    Outlined(new Rect(tx, card.y + small * 0.72f, card.width - (tx - card.x) - w * 0.03f, h * 0.025f), Loc.L("Server ranked. Reach Legend and link Google."), new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.7f)) }, new Color(1, 1, 1, 0.7f), 1f);
                 EndShopCard();
                 y += rh + gap;
             }

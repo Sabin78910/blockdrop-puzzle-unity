@@ -83,7 +83,7 @@ public class RankTests
         var m = new PlayerMeta();
         m.AwardRank(RankTrack.VsAi, Ranks.PointsFor(RankTrack.VsAi, 7) + 1); // Silver III, Silver starts at step 5
         int floor = Ranks.PointsFor(RankTrack.VsAi, 5);
-        for (int i = 0; i < 40; i++) m.RankVs(BotLevel.Hard, 1);
+        for (int i = 0; i < 100; i++) m.RankVs(BotLevel.Hard, 1);
         Assert.AreEqual(floor, m.RankPoints[(int)RankTrack.VsAi]);
         int coins = m.Coins;
         m.RankVs(BotLevel.Hard, 0); m.RankVs(BotLevel.Hard, 1);

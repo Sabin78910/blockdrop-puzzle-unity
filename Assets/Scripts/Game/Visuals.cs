@@ -131,6 +131,24 @@ namespace BlockDrop.Game
 
         public static Sprite Circle => _circle ??= MakeSprite(BuildCircle(64), 64);
 
+        /// <summary>A hard-edged, smooth-rimmed disc for coins and badges (the soft <see cref="Circle"/> is for glows).</summary>
+        private static Sprite _crisp;
+        public static Sprite CrispCircle => _crisp ??= MakeSprite(BuildCrisp(128), 128);
+
+        private static Texture2D BuildCrisp(int n)
+        {
+            var t = NewTex(n, n);
+            var px = new Color[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float d = new Vector2(x + 0.5f - n / 2f, y + 0.5f - n / 2f).magnitude;
+                    px[y * n + x] = new Color(1, 1, 1, Mathf.Clamp01(n / 2f - d)); // one pixel of anti-aliasing at the rim
+                }
+            t.SetPixels(px); t.Apply(true);
+            return t;
+        }
+
         private static Texture2D BuildCircle(int n)
         {
             var t = NewTex(n, n);

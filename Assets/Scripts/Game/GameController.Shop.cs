@@ -67,11 +67,34 @@ namespace BlockDrop.Game
             Outlined(r, text, new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, textColor, textColor.grayscale < 0.45f ? 0f : 1f);
         }
 
-        private static void Disc(Rect r, Color c)
+        private static void Disc(Rect r, Color c, bool crisp = false)
         {
             if (Event.current.type != EventType.Repaint) return;
             var old = GUI.color; GUI.color = new Color(c.r, c.g, c.b, c.a * old.a);
-            GUI.DrawTexture(r, Visuals.Circle.texture); GUI.color = old;
+            GUI.DrawTexture(r, (crisp ? Visuals.CrispCircle : Visuals.Circle).texture); GUI.color = old;
+        }
+
+        /// <summary>A minted coin: dark rim, bright body, a pressed inner ring, a raised centre and a glint. Crisp at any size.</summary>
+        private static void MintedCoin(Rect c, float shadow)
+        {
+            float d = c.width;
+            Disc(new Rect(c.x - d * 0.02f, c.y + d * shadow, d, d), Visuals.Hex("8A4E06"), true);
+            Disc(c, Visuals.Hex("E39A12"), true);
+            Disc(new Rect(c.x + d * 0.06f, c.y + d * 0.06f, d * 0.88f, d * 0.88f), Visuals.Hex("FFC83D"), true);
+            Disc(new Rect(c.x + d * 0.2f, c.y + d * 0.2f, d * 0.6f, d * 0.6f), Visuals.Hex("E8A412"), true);
+            Disc(new Rect(c.x + d * 0.24f, c.y + d * 0.24f, d * 0.52f, d * 0.52f), Visuals.Hex("FFDD6B"), true);
+            Disc(new Rect(c.x + d * 0.22f, c.y + d * 0.14f, d * 0.26f, d * 0.16f), new Color(1, 1, 1, 0.55f), true);
+        }
+
+        /// <summary>A glossy colour tile: the theme's own colour with a light top edge and a darker lower lip.</summary>
+        private void GlossTile(Rect r, Color c)
+        {
+            Panel(r, Swatch(c));
+            if (Event.current.type != EventType.Repaint) return;
+            var old = GUI.color;
+            GUI.color = new Color(1, 1, 1, 0.34f); GUI.DrawTexture(new Rect(r.x + r.width * 0.14f, r.y + r.height * 0.1f, r.width * 0.72f, r.height * 0.16f), Texture2D.whiteTexture);
+            GUI.color = new Color(0, 0, 0, 0.2f); GUI.DrawTexture(new Rect(r.x + r.width * 0.1f, r.yMax - r.height * 0.16f, r.width * 0.8f, r.height * 0.08f), Texture2D.whiteTexture);
+            GUI.color = old;
         }
 
         /// <summary>A little pyramid of gold coins (1, 3, 6 or 10) that grows with the pack.</summary>
@@ -87,10 +110,7 @@ namespace BlockDrop.Game
                 for (int i = 0; i < n; i++)
                 {
                     var c = new Rect(x0 + i * d + d * 0.04f, y0 + row * d * 0.72f, d * 0.92f, d * 0.92f);
-                    Disc(new Rect(c.x - d * 0.03f, c.y + d * 0.04f, c.width, c.height), Visuals.Hex("A8620A"));
-                    Disc(c, Visuals.Hex("FFB627"));
-                    Disc(new Rect(c.x + c.width * 0.12f, c.y + c.height * 0.12f, c.width * 0.76f, c.height * 0.76f), Visuals.Hex("FFE27A"));
-                    Disc(new Rect(c.x + c.width * 0.3f, c.y + c.height * 0.3f, c.width * 0.4f, c.height * 0.4f), Visuals.Hex("FFC93C"));
+                    MintedCoin(c, 0.05f);
                 }
             }
         }
@@ -98,11 +118,7 @@ namespace BlockDrop.Game
         /// <summary>One gold coin, the same look as the piles.</summary>
         private static void GoldCoin(Rect c)
         {
-            float d = c.height;
-            Disc(new Rect(c.x - d * 0.03f, c.y + d * 0.05f, c.width, c.height), Visuals.Hex("A8620A"));
-            Disc(c, Visuals.Hex("FFB627"));
-            Disc(new Rect(c.x + c.width * 0.12f, c.y + c.height * 0.12f, c.width * 0.76f, c.height * 0.76f), Visuals.Hex("FFE27A"));
-            Disc(new Rect(c.x + c.width * 0.3f, c.y + c.height * 0.3f, c.width * 0.4f, c.height * 0.4f), Visuals.Hex("FFC93C"));
+            MintedCoin(c, 0.06f);
         }
 
 
@@ -191,7 +207,7 @@ namespace BlockDrop.Game
                 float sw = h * 0.028f;
                 var board = new Rect(card.x + w * 0.04f, card.y + h * 0.067f, 5 * (sw + 4) + 6, sw + 6);
                 Panel(board, ShopStyle(th.Panel, th.Panel));
-                for (int k = 0; k < 5; k++) Panel(new Rect(board.x + 3 + k * (sw + 4), board.y + 3, sw, sw), Swatch(Visuals.Hex(th.Blocks[k])));
+                for (int k = 0; k < 5; k++) GlossTile(new Rect(board.x + 3 + k * (sw + 4), board.y + 3, sw, sw), Visuals.Hex(th.Blocks[k]));
                 var btn = new Rect(card.xMax - w * 0.32f, card.y + h * 0.034f, w * 0.28f, h * 0.056f);
                 if (selected) Pill(new Rect(btn.x, btn.y + btn.height * 0.1f, btn.width, btn.height * 0.8f), "IN USE", "FFFFFF", "C9F7E4", Visuals.Hex("0E6B48"));
                 else if (!owned && !th.Buyable)

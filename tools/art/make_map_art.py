@@ -160,20 +160,57 @@ def sprite(name, size, draw_fn):
     draw_fn(ImageDraw.Draw(img), size * S)
     save(down(img, size, size), name)
 
+def g(v, a=255): return (v, v, v, a)  # grey tones: the map tints tree and house with the chapter colour, so the shading survives
+
+def prop(name, size, draw_fn, outline=(60, 60, 70), glow=None):
+    """Props are drawn big, then given a soft ground shadow and a dark outline so they sit in the painted scenery."""
+    n = size * S
+    body = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    draw_fn(ImageDraw.Draw(body), n)
+    alpha = body.split()[3]
+    edge = alpha.filter(ImageFilter.MaxFilter(2 * S + 1))  # about 2 px of outline once scaled down
+    ol = Image.new("RGBA", (n, n), outline + (255,)); ol.putalpha(edge)
+    sh = Image.new("RGBA", (n, n), (0, 0, 0, 0)); ImageDraw.Draw(sh).ellipse([n * .16, n * .86, n * .84, n * .99], fill=(30, 20, 50, 110))
+    img = Image.alpha_composite(sh.filter(ImageFilter.GaussianBlur(S * 2)), ol)
+    if glow:
+        gl = Image.new("RGBA", (n, n), (0, 0, 0, 0)); ImageDraw.Draw(gl).ellipse([n * .12, n * .0, n * .88, n * .56], fill=glow)
+        img = Image.alpha_composite(img, gl.filter(ImageFilter.GaussianBlur(S * 5)))
+    img = Image.alpha_composite(img, body)
+    save(down(img, size, size), name)
+
 def tree(d, n):
-    d.rounded_rectangle([n * .44, n * .5, n * .56, n * .95], n * .03, fill=hexc("#6b4a3a"))
-    for cx, cy, r, c in ((.5, .36, .3, "#bfbfbf"), (.4, .46, .22, "#d6d6d6"), (.62, .44, .2, "#d6d6d6"), (.46, .28, .12, "#ffffff")):
-        d.ellipse([n * (cx - r), n * (cy - r), n * (cx + r), n * (cy + r)], fill=hexc(c))
+    d.rounded_rectangle([n * .43, n * .52, n * .57, n * .93], n * .04, fill=g(150))
+    d.rounded_rectangle([n * .5, n * .52, n * .57, n * .93], n * .03, fill=g(110))           # shaded side of the trunk
+    for cx, cy, r, c in ((.5, .36, .3, 130), (.36, .5, .2, 150), (.66, .5, .2, 140), (.5, .26, .22, 175)):
+        d.ellipse([n * (cx - r), n * (cy - r), n * (cx + r), n * (cy + r)], fill=g(c))     # dark base blobs
+    for cx, cy, r, c in ((.46, .3, .2, 205), (.34, .45, .12, 215), (.62, .42, .13, 195)):
+        d.ellipse([n * (cx - r), n * (cy - r), n * (cx + r), n * (cy + r)], fill=g(c))     # sunlit leaves
+    for cx, cy in ((.4, .22), (.55, .2), (.3, .42)):
+        d.ellipse([n * (cx - .05), n * (cy - .035), n * (cx + .05), n * (cy + .035)], fill=g(250))  # highlights
 
 def house(d, n):
-    d.rectangle([n * .2, n * .45, n * .8, n * .92], fill=hexc("#ececec"))
-    d.polygon([(n * .12, n * .47), (n * .5, n * .12), (n * .88, n * .47)], fill=hexc("#b5b5b5"))
-    d.rectangle([n * .44, n * .62, n * .58, n * .92], fill=hexc("#6b4a3a"))
-    d.rectangle([n * .27, n * .56, n * .38, n * .68], fill=hexc("#8fd0ff")); d.rectangle([n * .62, n * .56, n * .73, n * .68], fill=hexc("#8fd0ff"))
+    d.rectangle([n * .62, n * .14, n * .72, n * .36], fill=g(120))                         # chimney
+    d.rectangle([n * .2, n * .45, n * .8, n * .9], fill=g(225))                            # wall
+    d.rectangle([n * .62, n * .45, n * .8, n * .9], fill=g(185))                           # wall in shade
+    d.polygon([(n * .1, n * .5), (n * .5, n * .1), (n * .9, n * .5)], fill=g(140))         # roof
+    d.polygon([(n * .1, n * .5), (n * .5, n * .1), (n * .5, n * .5)], fill=g(175))         # lit roof plane
+    d.line([(n * .1, n * .5), (n * .5, n * .1), (n * .9, n * .5)], fill=g(95), width=int(n * .025))
+    d.rectangle([n * .1, n * .5, n * .9, n * .54], fill=g(105))                            # eave
+    d.rounded_rectangle([n * .42, n * .6, n * .58, n * .9], n * .03, fill=g(110))          # door
+    d.ellipse([n * .53, n * .74, n * .56, n * .77], fill=g(235))
+    for x0 in (.26, .64):
+        d.rectangle([n * x0, n * .57, n * (x0 + .12), n * .71], fill=g(255))               # window frame
+        d.rectangle([n * (x0 + .015), n * .585, n * (x0 + .105), n * .695], fill=(143, 208, 255, 255))
+        d.line([(n * (x0 + .06), n * .585), (n * (x0 + .06), n * .695)], fill=g(255), width=int(n * .015))
 
 def lamp(d, n):
-    d.rounded_rectangle([n * .47, n * .3, n * .53, n * .95], n * .02, fill=hexc("#8a8a8a"))
-    d.ellipse([n * .3, n * .1, n * .7, n * .5], fill=hexc("#fff0a0")); d.ellipse([n * .4, n * .18, n * .55, n * .33], fill=hexc("#ffffff"))
+    d.rounded_rectangle([n * .46, n * .36, n * .54, n * .93], n * .025, fill=hexc("#7d8190"))
+    d.rounded_rectangle([n * .46, n * .36, n * .49, n * .93], n * .015, fill=hexc("#b9bdca"))   # metal highlight
+    d.rounded_rectangle([n * .38, n * .88, n * .62, n * .95], n * .03, fill=hexc("#5f6270"))   # base
+    d.rounded_rectangle([n * .34, n * .28, n * .66, n * .38], n * .03, fill=hexc("#5f6270"))   # lamp holder
+    d.ellipse([n * .3, n * .06, n * .7, n * .42], fill=hexc("#ffd95a"))                         # bulb
+    d.ellipse([n * .35, n * .1, n * .65, n * .36], fill=hexc("#fff3a8"))
+    d.ellipse([n * .4, n * .13, n * .52, n * .24], fill=hexc("#ffffff"))                        # glint
 
 def node(d, n):  # glossy button: white so the screen can tint it
     d.ellipse([n * .04, n * .1, n * .96, n * .98], fill=(0, 0, 0, 90))
@@ -209,7 +246,8 @@ def ribbon():
 
 os.makedirs(OUT, exist_ok=True)
 for i, (k, v) in enumerate(THEMES.items()): backdrop(k, *v)
-for n, fn in (("tree", tree), ("house", house), ("lamp", lamp), ("node", node), ("star_on", star(True)), ("star_off", star(False)), ("crown", crown), ("lock", lock)):
+prop("tree", 128, tree); prop("house", 128, house); prop("lamp", 128, lamp, outline=(70, 60, 90), glow=(255, 230, 120, 140))
+for n, fn in (("node", node), ("star_on", star(True)), ("star_off", star(False)), ("crown", crown), ("lock", lock)):
     sprite(n, 128 if n == "node" else 64, fn)
 ribbon()
 print(sorted(os.listdir(OUT)))

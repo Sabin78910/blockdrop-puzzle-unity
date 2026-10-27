@@ -238,6 +238,8 @@ namespace BlockDrop.Core
             ["CLAIM"] = "लिनुहोस्",
             ["TODAY"] = "आज",
             ["{0} of 7 days this week"] = "यो हप्ता ७ मध्ये {0} दिन",
+            ["AI"] = "एआई",
+            ["SCORE"] = "स्कोर",
             ["GOOGLE CONNECTED ✓"] = "गुगल जोडियो ✓",
             ["CONNECTING…"] = "जोड्दै…",
             ["CONTINUE WITH GOOGLE"] = "गुगलसँग जारी राख्नुहोस्",

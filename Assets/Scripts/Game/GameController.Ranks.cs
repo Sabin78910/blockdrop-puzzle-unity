@@ -31,11 +31,11 @@ namespace BlockDrop.Game
         }
 
         /// <summary>Badge, rank name and a bar that fills from the old points to the new ones. Tap for the overview.</summary>
-        private void DrawRankBlock(float w, float h, float t, float boxY = -1f)
+        private void DrawRankBlock(float w, float h, float t, float boxY = -1f, float inset = 0.1f)
         {
             var r = _rankResult;
             if (r == null) return;
-            var box = new Rect(w * 0.1f, boxY < 0 ? h * 0.55f : boxY, w * 0.8f, h * 0.1f);
+            var box = new Rect(w * inset, boxY < 0 ? h * 0.55f : boxY, w * (1f - 2f * inset), h * 0.1f);
             float k = NewLook.ReducedMotion ? 1f : Mathf.Clamp01((t - 0.6f) / 1.1f);
             int shown = Mathf.RoundToInt(Mathf.Lerp(r.Before, r.After, k));
             int step = Ranks.StepOf(r.Track, shown);

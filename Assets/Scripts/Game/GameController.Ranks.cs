@@ -7,6 +7,7 @@ namespace BlockDrop.Game
     public sealed partial class GameController
     {
         private RankResult _rankResult;
+        private float _kingAsked = -99f;
 
         private static string TrackName(RankTrack t) => t == RankTrack.Classic ? "CLASSIC" : t == RankTrack.Daily ? "DAILY" : "VS AI";
 
@@ -18,6 +19,8 @@ namespace BlockDrop.Game
             if (_mode == Mode.Classic) _rankResult = _meta.RankClassic(Score);
             else if (_mode == Mode.Daily) _rankResult = _meta.RankDaily(Score, Today);
             else if (_mode == Mode.VsAi) _rankResult = _meta.RankVs(_aiLevel, _versus.Winner);
+            if (_mode == Mode.Classic || _mode == Mode.Daily) OnlineService.SubmitRank(_mode == Mode.Classic ? RankTrack.Classic : RankTrack.Daily, MainSeat.Board);
+            else if (_mode == Mode.VsAi && _versus.Winner >= 0) OnlineService.SubmitRankVs(_aiLevel, _versus.Winner == 0);
             var r = _rankResult;
             if (r == null || !r.Promoted) return;
             Toast(Loc.F("RANK UP: {0}!   +{1} ●", Ranks.Display(r.StepAfter), r.Coins), Visuals.Hex(Ranks.TierColor(r.StepAfter)));
@@ -63,8 +66,18 @@ namespace BlockDrop.Game
             return Ranks.ToNext(t, p) > 0 ? Loc.F("{0}   ·   {1} RP to {2}", Ranks.Display(s), Ranks.ToNext(t, p), Ranks.Display(s + 1)) : Ranks.Display(s);
         }
 
+        /// <summary>KING is decided by the server (top 100) and needs a linked account; the client never claims it.</summary>
+        private void DrawKingLine(float w, float h)
+        {
+            var st = new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false };
+            if (OnlineService.IsKing) Outlined(new Rect(w * 0.05f, h * 0.795f, w * 0.9f, h * 0.035f), Loc.F("KING  #{0}", OnlineService.KingRank), st, Visuals.Gold, 1.5f);
+            else if (_meta.RankStep(RankTrack.Classic) >= Ranks.TopStep || _meta.RankStep(RankTrack.Daily) >= Ranks.TopStep || _meta.RankStep(RankTrack.VsAi) >= Ranks.TopStep)
+                Outlined(new Rect(w * 0.03f, h * 0.795f, w * 0.94f, h * 0.035f), Loc.L("Link your Google account to chase the KING title (top 100)."), st, Visuals.Hex("7CF8FF"), 1.2f);
+        }
+
         private void DrawRanks(float w, float h)
         {
+            if (Time.unscaledTime - _kingAsked > 30f) { _kingAsked = Time.unscaledTime; OnlineService.RefreshKing(); }
             Outlined(new Rect(0, h * 0.06f, w, h * 0.08f), "RANKS", _h2, Visuals.Hex("7CF8FF"), 3);
             Outlined(new Rect(w * 0.05f, h * 0.135f, w * 0.9f, h * 0.05f), "Play to climb. Every new rank pays coins, and every new tier a hammer and a shuffle.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
             string[] tops = { "FFC24B", "4FD8FF", "B98CFF" }, bottoms = { "F08A1C", "1C8FE0", "7A3FE0" };
@@ -97,7 +110,8 @@ namespace BlockDrop.Game
                     else ShowMenu(Screen.AiSelect);
                 }
             }
-            Outlined(new Rect(w * 0.05f, h * 0.8f, w * 0.9f, h * 0.04f), "Tap a mode to play it.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
+            DrawKingLine(w, h);
+            Outlined(new Rect(w * 0.05f, h * 0.835f, w * 0.9f, h * 0.03f), "Tap a mode to play it.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
             if (Btn(Row(w, h * 0.87f, h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
         }
     }

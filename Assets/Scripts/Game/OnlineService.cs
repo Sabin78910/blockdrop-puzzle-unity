@@ -6,6 +6,7 @@ using Unity.Services.Authentication;
 using Unity.Services.CloudCode;
 using Unity.Services.Core;
 using Unity.Services.Leaderboards;
+using Unity.Services.Leaderboards.Exceptions;
 using UnityEngine;
 
 namespace BlockDrop.Game
@@ -19,6 +20,8 @@ namespace BlockDrop.Game
         public const string ClassicBoard = "Classic";
         public const string DailyBoard = "Daily";
         public const string LevelsBoard = "Levels"; // total level stars
+        public const string KingBoard = "King"; // server-owned rank points (CloudCode/SUBMITRANK.md)
+        public const int KingTop = 100;
 
         public struct Row { public int Rank; public string Name; public long Score; public bool IsMe; }
 
@@ -121,6 +124,56 @@ namespace BlockDrop.Game
         }
 
         [Serializable] private class SubmitReply { public bool accepted; public string reason; }
+
+        /// <summary>The player's place on the King board (1 = best), 0 when unranked or unknown.</summary>
+        public static int KingRank { get; private set; }
+
+        /// <summary>King needs a top-100 place on the server board AND a linked Google account: the server cannot
+        /// see linking, and anonymous ids are free to farm.</summary>
+        public static bool IsKing => KingRank > 0 && KingRank <= KingTop && AccountLink.Linked;
+
+        /// <summary>Sends a finished Classic or Daily game to SubmitRank, which keeps the points that decide King.
+        /// The phone's own rank bar never depends on this.</summary>
+        public static void SubmitRank(RankTrack track, Board result) => SendRank(new Dictionary<string, object>
+        {
+            ["track"] = track.ToString(), ["score"] = result.Score, ["placements"] = result.Placements, ["lines"] = result.LinesCleared,
+        });
+
+        /// <summary>A decided VS AI match (ties are not sent).</summary>
+        public static void SubmitRankVs(BotLevel bot, bool won) => SendRank(new Dictionary<string, object>
+        {
+            ["track"] = RankTrack.VsAi.ToString(), ["bot"] = bot.ToString(), ["won"] = won,
+        });
+
+        private static async void SendRank(Dictionary<string, object> args)
+        {
+            try
+            {
+                if (IsPreview) return; // test builds never post to the live boards
+                await EnsureReady();
+                if (!Ready) return;
+                var reply = await CloudCodeService.Instance.CallEndpointAsync<SubmitReply>("SubmitRank", args);
+                if (!reply.accepted) Debug.LogWarning($"Rank rejected: {reply.reason}");
+                await RefreshKingAsync();
+            }
+            catch (Exception e) { Debug.LogWarning($"Rank submit failed: {e.Message}"); }
+        }
+
+        public static async void RefreshKing()
+        {
+            try { await EnsureReady(); if (Ready && !IsPreview) await RefreshKingAsync(); }
+            catch (Exception e) { Debug.LogWarning($"King rank failed: {e.Message}"); }
+        }
+
+        private static async Task RefreshKingAsync()
+        {
+            try
+            {
+                var me = await LeaderboardsService.Instance.GetPlayerScoreAsync(KingBoard);
+                KingRank = me.Rank + 1;
+            }
+            catch (LeaderboardsException) { KingRank = 0; } // not on the board yet
+        }
 
         public static async void Refresh(string board)
         {

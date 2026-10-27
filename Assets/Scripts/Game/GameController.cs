@@ -40,8 +40,7 @@ namespace BlockDrop.Game
         private float _tutorialStepAt;
         private static string Today => PlayerMeta.Day(DateTime.Now);
         private bool _bestCelebrated, _nameSynced, _paused, _offerRevive, _firstSession;
-        private float _introAt; // when the start card opened (unscaled time)
-        private bool _offerContinue, _levelIntro, _boosterTray, _hammerMode; // level: the continue card and the start card
+        private bool _offerContinue, _boosterTray, _hammerMode; // level: the continue card and the start card
         private int _chapterPage, _bonusShown, _coinsEarned, _shuffles;
         private const int ContinueCost = 100, CoinsPerStar = 15, HelpingHandMoves = 3, HelpingHandAfter = 3;
         private readonly IAdProvider _ads = new BetaAdProvider();
@@ -390,7 +389,7 @@ namespace BlockDrop.Game
             _ => null,
         };
 
-        private bool InputAllowed => _screen == Screen.Playing && !_aiThinking && !_levelIntro && !_offerContinue && !(_mode == Mode.VsAi && _versus.Turn != 0) && Time.time > _turnBannerUntil;
+        private bool InputAllowed => _screen == Screen.Playing && !_aiThinking && !_offerContinue && !(_mode == Mode.VsAi && _versus.Turn != 0) && Time.time > _turnBannerUntil;
 
         private void StartMode(Mode mode, int seed = 0, int level = 0)
         {
@@ -407,8 +406,7 @@ namespace BlockDrop.Game
             _hintsLeft = Competitive ? 0 : 3;
             MaybeInterstitial();
             EnterPlay(mode);
-            _levelIntro = mode == Mode.Level; // the start card: goals, moves and anything new
-            _introAt = Time.unscaledTime;
+            if (mode == Mode.Level && _level.Definition.Intro != null) Toast(Loc.L(_level.Definition.Intro), Visuals.Hex("7CF8FF")); // the new idea, without a popup
         }
 
         private static string FailKey(int level) => "lvfail" + level;
@@ -423,7 +421,7 @@ namespace BlockDrop.Game
             _mode = mode;
             _runId++;
             _hint = null; _newBest = false; _aiThinking = false; _finishing = false; _bestCelebrated = false; _offerRevive = false;
-            _offerContinue = false; _levelIntro = false; _boosterTray = false; _hammerMode = false; _bonusShown = 0; _coinsEarned = 0; _shuffles = mode == Mode.Level ? _level.Shuffles : 0;
+            _offerContinue = false; _boosterTray = false; _hammerMode = false; _bonusShown = 0; _coinsEarned = 0; _shuffles = mode == Mode.Level ? _level.Shuffles : 0;
             _shownScore = 0;
             _floaters.Clear();
             _screen = Screen.Playing;
@@ -626,7 +624,6 @@ namespace BlockDrop.Game
             if (Input.GetKeyDown(KeyCode.Escape) && _screen != Screen.Menu)
             {
                 if (_screen == Screen.Playing && _offerRevive) DeclineRevive();
-                else if (_screen == Screen.Playing && _levelIntro) { _levelIntro = false; ShowMenu(Screen.LevelSelect); } // the start card: back to the map
                 else if (_screen == Screen.Playing && (_hammerMode || _boosterTray)) { _hammerMode = false; _boosterTray = false; }
                 else if (_screen == Screen.Playing) SetPaused(!_paused); // never throw a run away on an accidental back press
                 else GoBack();
@@ -921,55 +918,6 @@ namespace BlockDrop.Game
             bool afford = _meta.Coins >= ContinueCost;
             if (Btn(new Rect(bx, card.y + h * 0.2f, bw, h * 0.065f), Loc.F("+{0} MOVES  {1} ●", LevelSession.ContinueMoves, ContinueCost), afford ? "4BE38A" : "4A4370", afford ? "1FA45B" : "2E2850", 0.85f)) AcceptContinue();
             if (Btn(new Rect(bx, card.y + h * 0.28f, bw, h * 0.06f), "NO THANKS", "5A4FA8", "3A2F80", 0.8f)) DeclineContinue();
-        }
-
-        /// <summary>The level's start card: what to do, how many moves, and the chapter's new idea when there is one.</summary>
-        private void DrawLevelIntro(float w, float h)
-        {
-            if (!_levelIntro || _mode != Mode.Level) return;
-            var d = _level.Definition;
-            string intro = d.Intro != null ? Loc.L(d.Intro) : null;
-            var card = new Rect(w * 0.08f, h * 0.26f, w * 0.84f, h * (intro != null ? 0.5f : 0.44f) + (d.IsHard ? h * 0.042f : 0f));
-            if (Event.current.type == EventType.Repaint)
-            {
-                var old = GUI.color; GUI.color = new Color(0.02f, 0.01f, 0.1f, 0.88f); // hide the board behind the card
-                GUI.DrawTexture(new Rect(-w, -h, w * 3, h * 3), Texture2D.whiteTexture); GUI.color = old;
-            }
-            // One card for every level: purple body, gold rim. Difficulty is a small badge, never a recolour.
-            var oldMatrix = GUI.matrix;
-            float open = NewLook.ReducedMotion ? 1f : Mathf.Clamp01((Time.unscaledTime - _introAt) / 0.35f);
-            if (open < 1f)
-            {
-                float sc = 0.86f + 0.14f * EaseOutBack(open);
-                GUIUtility.ScaleAroundPivot(new Vector2(sc, sc), card.center);
-            }
-            Panel(new Rect(card.x - w * 0.008f, card.y - w * 0.008f, card.width + w * 0.016f, card.height + w * 0.016f), ShopStyle("FFE27A", "C9922B"));
-            Panel(card, ShopStyle("6A33D1", "2A1770"));
-            float y = card.y + h * 0.02f;
-            Outlined(new Rect(card.x, y, card.width, h * 0.06f), Loc.F("LEVEL {0}", d.Number), _h2, Visuals.Hex("FFE27A"), 3);
-            y += h * 0.06f;
-            Outlined(new Rect(card.x, y, card.width, h * 0.035f), Loc.L(d.Chapter.Name).ToUpperInvariant(), _small, new Color(1, 1, 1, 0.8f), 1.2f);
-            y += h * 0.04f;
-            if (d.IsHard)
-            {
-                bool sup = d.Tier == LevelTier.SuperHard;
-                Pill(new Rect(card.center.x - w * 0.15f, y, w * 0.3f, h * 0.032f), Loc.L(sup ? "SUPER HARD" : "HARD LEVEL"), sup ? "FF8FA3" : "FFE27A", sup ? "C23B63" : "C9922B", Color.white);
-                y += h * 0.042f;
-            }
-            if (intro != null)
-            {
-                Outlined(new Rect(card.x, y, card.width, h * 0.03f), "NEW!", _small, Visuals.Hex("7CF8FF"), 1.2f);
-                Outlined(new Rect(card.x + w * 0.05f, y + h * 0.028f, card.width - w * 0.1f, h * 0.05f), intro, _small, Color.white, 1.2f);
-                y += h * 0.085f;
-            }
-            for (int i = 0; i < d.Goals.Length; i++, y += h * 0.042f)
-                Outlined(new Rect(card.x, y, card.width, h * 0.04f), GoalText(d.Goals[i]), _body, Color.white, 1.4f);
-            string moves = Loc.F("in {0} moves", _level.MaxMoves);
-            if (_level.ExtraMoves > 0) moves += "   " + Loc.F("(+{0} helping hand)", _level.ExtraMoves);
-            Outlined(new Rect(card.x, y, card.width, h * 0.035f), moves, _small, Visuals.Hex("FFE27A"), 1.2f);
-            if (Btn(new Rect(card.x + card.width * 0.15f, card.yMax - h * 0.145f, card.width * 0.7f, h * 0.065f), "PLAY", "4BE38A", "1FA45B")) _levelIntro = false;
-            if (Btn(new Rect(card.x + card.width * 0.3f, card.yMax - h * 0.07f, card.width * 0.4f, h * 0.052f), "BACK", "5A4FA8", "3A2F80", 0.7f)) { _levelIntro = false; ShowMenu(Screen.LevelSelect); }
-            GUI.matrix = oldMatrix;
         }
 
         private static string GoalText(LevelGoal g) => g.Kind switch
@@ -1398,7 +1346,7 @@ namespace BlockDrop.Game
                 case Screen.Menu: GUI.enabled = _welcomeReward == 0; DrawMenu(w, h); break;
                 case Screen.LevelSelect: DrawLevelSelect(w, h); break;
                 case Screen.AiSelect: DrawAiSelect(w, h); break;
-                case Screen.Playing: GUI.enabled = !_breakOpen && !_paused && !_offerRevive && !_offerContinue && !_levelIntro; DrawHud(w, h); GUI.enabled = true; break;
+                case Screen.Playing: GUI.enabled = !_breakOpen && !_paused && !_offerRevive && !_offerContinue; DrawHud(w, h); GUI.enabled = true; break;
                 case Screen.Result: DrawResult(w, h); break;
                 case Screen.Challenge: DrawChallenge(w, h); break;
                 case Screen.Leaderboard: DrawLeaderboard(w, h); break;
@@ -1415,7 +1363,7 @@ namespace BlockDrop.Game
             GUI.enabled = true;
             DrawFloaters(w);
             DrawToasts(w, h);
-            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); DrawPause(w, h); DrawSecondChance(w, h); DrawLevelIntro(w, h); DrawContinue(w, h); }
+            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); DrawPause(w, h); DrawSecondChance(w, h); DrawContinue(w, h); }
             if (Time.unscaledTime < _flashUntil)
             {
                 var old = GUI.color; GUI.color = new Color(1, 1, 1, 0.55f * (_flashUntil - Time.unscaledTime) / 0.14f);

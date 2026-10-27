@@ -20,22 +20,32 @@ namespace BlockDrop.Core
         public bool AlreadyScored;
     }
 
-    /// <summary>Rank ladders: Rookie to Legend, three divisions per tier. Classic and Daily only ever go up (skill
-    /// shown, never punished); VS AI is a trophy count that can drop, but never below the start of the current tier.</summary>
+    /// <summary>One ladder shape for all three modes: Bronze, Silver, Gold, Diamond and Crown each have five
+    /// divisions (V up to I) that split the rank's point range evenly, then Master, Champion and Legend stand alone.
+    /// King (top 100 players) is not here on purpose: it needs a server ranking, see CloudCode/RANKS.md.
+    /// Classic and Daily only ever go up; VS AI can drop, but never below the start of the current rank.</summary>
     public static class Ranks
     {
-        public static readonly string[] Tiers = { "Rookie", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Master", "Legend" };
-        static readonly string[] Divisions = { "III", "II", "I" };
-        static readonly string[] TierColors = { "9AA3C7", "D98B4F", "C7D2E8", "FFD54A", "5FE0D0", "6FC8FF", "C77DFF", "FF6B8B" };
+        public static readonly string[] Tiers = { "Bronze", "Silver", "Gold", "Diamond", "Crown", "Master", "Champion", "Legend" };
+        static readonly string[] Divisions = { "V", "IV", "III", "II", "I" };
+        static readonly string[] TierColors = { "D98B4F", "C7D2E8", "FFD54A", "6FC8FF", "FF9BD2", "C77DFF", "5FE0D0", "FF6B8B" };
+        /// <summary>Points where each rank begins.</summary>
+        static readonly int[] TierStarts = { 0, 600, 1500, 2800, 4500, 6500, 8500, 11000 };
 
-        public const int DivisionsPerTier = 3;
-        public const int TopStep = 7 * DivisionsPerTier; // 7 tiers with divisions, then Legend
-        public const int EasyCap = 150, MediumCap = 600; // trophies the easier AIs stop paying beyond
+        public const int DivisionsPerTier = 5;
+        public const int DividedTiers = 5;                       // Bronze to Crown
+        public const int TopStep = DividedTiers * DivisionsPerTier + 2; // Master, Champion, Legend follow
+        public const int EasyCap = 600, MediumCap = 2800;        // the easier AIs stop paying beyond this
 
-        static int Unit(RankTrack t) => t == RankTrack.Classic ? 30 : t == RankTrack.Daily ? 20 : 30;
-
-        /// <summary>Points needed to stand on <paramref name="step"/>: 1, 3, 6, 10 … times the track's unit.</summary>
-        public static int PointsFor(RankTrack t, int step) => step <= 0 ? 0 : Unit(t) * step * (step + 1) / 2;
+        public static int PointsFor(RankTrack t, int step)
+        {
+            if (step <= 0) return 0;
+            if (step > TopStep) step = TopStep;
+            int d = DividedTiers * DivisionsPerTier;
+            if (step >= d) return TierStarts[DividedTiers + (step - d)];
+            int r = step / DivisionsPerTier, i = step % DivisionsPerTier;
+            return TierStarts[r] + (TierStarts[r + 1] - TierStarts[r]) * i / DivisionsPerTier;
+        }
 
         public static int StepOf(RankTrack t, int points)
         {
@@ -44,13 +54,21 @@ namespace BlockDrop.Core
             return step;
         }
 
-        public static int TierOf(int step) => Math.Min(step / DivisionsPerTier, Tiers.Length - 1);
+        public static int TierOf(int step) => step < DividedTiers * DivisionsPerTier ? step / DivisionsPerTier : DividedTiers + (step - DividedTiers * DivisionsPerTier);
+        static int FirstStepOf(int tier) => tier < DividedTiers ? tier * DivisionsPerTier : DividedTiers * DivisionsPerTier + (tier - DividedTiers);
         public static string TierName(int step) => Tiers[TierOf(step)];
         public static string TierColor(int step) => TierColors[TierOf(step)];
 
-        /// <summary>"GOLD II"; Legend has no division.</summary>
+        /// <summary>"GOLD II"; Master, Champion and Legend have no division.</summary>
         public static string Name(int step) =>
-            (step >= TopStep ? Tiers[Tiers.Length - 1] : Tiers[TierOf(step)] + " " + Divisions[step % DivisionsPerTier]).ToUpperInvariant();
+            (TierOf(step) < DividedTiers ? Tiers[TierOf(step)] + " " + Divisions[step % DivisionsPerTier] : Tiers[TierOf(step)]).ToUpperInvariant();
+
+        /// <summary>Same as <see cref="Name"/> in the player's language ("ORO II"); Name stays English for logic and tests.</summary>
+        public static string Display(int step)
+        {
+            string tier = Loc.L(Tiers[TierOf(step)].ToUpperInvariant());
+            return TierOf(step) < DividedTiers ? tier + " " + Divisions[step % DivisionsPerTier] : tier;
+        }
 
         /// <summary>0..1 progress from this step to the next; 1 at the top.</summary>
         public static float Fill(RankTrack t, int points)
@@ -63,14 +81,14 @@ namespace BlockDrop.Core
 
         public static int ToNext(RankTrack t, int points) { int s = StepOf(t, points); return s >= TopStep ? 0 : PointsFor(t, s + 1) - points; }
 
-        /// <summary>Lowest trophy count the player can fall to: the start of their current tier (Rookie can't fall).</summary>
-        public static int Floor(RankTrack t, int points) => PointsFor(t, TierOf(StepOf(t, points)) * DivisionsPerTier);
+        /// <summary>Lowest count the player can fall to: the start of their current rank (Bronze can't fall).</summary>
+        public static int Floor(RankTrack t, int points) => PointsFor(t, FirstStepOf(TierOf(StepOf(t, points))));
 
         // ---- how a game turns into points ----
 
-        public static int ClassicGain(int score) => 10 + Math.Min(140, Math.Max(0, score) / 40);
+        public static int ClassicGain(int score) => 15 + Math.Min(135, Math.Max(0, score) / 30);
 
-        public static int DailyGain(int score, int loginStreak) => 30 + Math.Min(100, Math.Max(0, score) / 50) + 5 * Math.Min(10, Math.Max(0, loginStreak));
+        public static int DailyGain(int score, int loginStreak) => 50 + Math.Min(100, Math.Max(0, score) / 40) + 5 * Math.Min(10, Math.Max(0, loginStreak));
 
         /// <summary>Trophies for a VS AI result. Harder AIs pay more and cost less; Easy and Medium stop paying once
         /// you are past their cap (a loss still costs, so they can't be farmed). A win streak adds up to +10.</summary>
@@ -78,8 +96,8 @@ namespace BlockDrop.Core
         {
             capped = false;
             if (winner < 0) return 0;
-            int win = level == BotLevel.Easy ? 8 : level == BotLevel.Medium ? 20 : 32;
-            int loss = level == BotLevel.Easy ? 12 : level == BotLevel.Medium ? 10 : 8;
+            int win = level == BotLevel.Easy ? 12 : level == BotLevel.Medium ? 25 : 40;
+            int loss = level == BotLevel.Easy ? 15 : level == BotLevel.Medium ? 12 : 8;
             if (winner != 0) return -Math.Min(loss, trophies - Floor(RankTrack.VsAi, trophies));
             int cap = level == BotLevel.Easy ? EasyCap : level == BotLevel.Medium ? MediumCap : int.MaxValue;
             if (trophies >= cap) { capped = true; return 0; }
@@ -91,6 +109,6 @@ namespace BlockDrop.Core
         public static int StepCoins(RankTrack t, int step) => (25 + 5 * step) * (t == RankTrack.VsAi ? 3 : 2) / 2 + (step >= TopStep ? 500 : 0);
 
         /// <summary>A new tier also brings a hammer and a shuffle: a real gift, not just coins.</summary>
-        public static bool TierStart(int step) => step > 0 && (step % DivisionsPerTier == 0 || step >= TopStep);
+        public static bool TierStart(int step) => step > 0 && (step >= DividedTiers * DivisionsPerTier || step % DivisionsPerTier == 0);
     }
 }

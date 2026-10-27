@@ -20,7 +20,7 @@ namespace BlockDrop.Game
             else if (_mode == Mode.VsAi) _rankResult = _meta.RankVs(_aiLevel, _versus.Winner);
             var r = _rankResult;
             if (r == null || !r.Promoted) return;
-            Toast(Loc.F("RANK UP: {0}!   +{1} ●", Ranks.Name(r.StepAfter), r.Coins), Visuals.Hex(Ranks.TierColor(r.StepAfter)));
+            Toast(Loc.F("RANK UP: {0}!   +{1} ●", Ranks.Display(r.StepAfter), r.Coins), Visuals.Hex(Ranks.TierColor(r.StepAfter)));
             _fx.Win();
             Confetti(r.Hammers > 0 ? 70 : 40);
         }
@@ -39,7 +39,7 @@ namespace BlockDrop.Game
             Outlined(new Rect(box.x, box.y + box.height * 0.08f, box.height * 0.5f, box.height * 0.5f), (Ranks.TierOf(step) + 1).ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.5f);
             var left = new GUIStyle(_body) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
             float tx = box.x + box.height * 0.6f;
-            Outlined(new Rect(tx, box.y, box.width * 0.5f, box.height * 0.34f), Loc.L(Ranks.Name(step)), left, col, 1.5f);
+            Outlined(new Rect(tx, box.y, box.width * 0.5f, box.height * 0.34f), Ranks.Display(step), left, col, 1.5f);
             string gain = r.AlreadyScored ? "" : r.Delta > 0 ? $"+{r.Delta} RP" : r.Delta < 0 ? $"{r.Delta} RP" : "0 RP";
             Outlined(new Rect(box.xMax - box.width * 0.35f, box.y, box.width * 0.35f, box.height * 0.34f), gain, new GUIStyle(left) { alignment = TextAnchor.MiddleRight }, r.Delta < 0 ? Visuals.Hex("FF8FA3") : Visuals.Gold, 1.5f);
             var bar = new Rect(tx, box.y + box.height * 0.4f, box.xMax - tx, box.height * 0.16f);
@@ -50,7 +50,7 @@ namespace BlockDrop.Game
             if (r.AlreadyScored) note = Loc.L("Daily rank counts once a day. Come back tomorrow!");
             else if (r.Capped) note = Loc.L("This AI is too easy for your rank. Try a harder one!");
             else if (k >= 1f && r.Promoted) note = Loc.F("RANK UP!  +{0} ●{1}", r.Coins, r.Hammers > 0 ? Loc.L("  +1 HAMMER  +1 SHUFFLE") : "");
-            else if (Ranks.ToNext(r.Track, shown) > 0) note = Loc.F("{0} RP to {1}", Ranks.ToNext(r.Track, shown), Loc.L(Ranks.Name(step + 1)));
+            else if (Ranks.ToNext(r.Track, shown) > 0) note = Loc.F("{0} RP to {1}", Ranks.ToNext(r.Track, shown), Ranks.Display(step + 1));
             else note = Loc.L("You are a Legend!");
             Outlined(new Rect(box.x, box.y + box.height * 0.62f, box.width, box.height * 0.36f), note, new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, k >= 1f && r.Promoted ? Visuals.Hex("7CF8FF") : Color.white, 1.2f);
             if (GUI.Button(box, GUIContent.none, GUIStyle.none)) ShowMenu(Screen.Ranks);
@@ -60,7 +60,7 @@ namespace BlockDrop.Game
         private string RankLine(RankTrack t)
         {
             int p = _meta.RankPoints[(int)t], s = Ranks.StepOf(t, p);
-            return Ranks.ToNext(t, p) > 0 ? Loc.F("{0}   ·   {1} RP to {2}", Loc.L(Ranks.Name(s)), Ranks.ToNext(t, p), Loc.L(Ranks.Name(s + 1))) : Loc.L(Ranks.Name(s));
+            return Ranks.ToNext(t, p) > 0 ? Loc.F("{0}   ·   {1} RP to {2}", Ranks.Display(s), Ranks.ToNext(t, p), Ranks.Display(s + 1)) : Ranks.Display(s);
         }
 
         private void DrawRanks(float w, float h)
@@ -80,12 +80,12 @@ namespace BlockDrop.Game
                 Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.05f, h * 0.06f, h * 0.06f), (Ranks.TierOf(s) + 1).ToString(), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.5f);
                 var left = new GUIStyle(_body) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
                 float tx = card.x + w * 0.04f + h * 0.07f;
-                Outlined(new Rect(tx, card.y + h * 0.045f, card.xMax - tx - w * 0.04f, h * 0.04f), Loc.L(Ranks.Name(s)) + $"   {p} RP", left, Color.white, 1.5f);
+                Outlined(new Rect(tx, card.y + h * 0.045f, card.xMax - tx - w * 0.04f, h * 0.04f), Ranks.Display(s) + $"   {p} RP", left, Color.white, 1.5f);
                 var bar = new Rect(tx, card.y + h * 0.09f, card.xMax - tx - w * 0.04f, h * 0.02f);
                 Panel(bar, _barBackStyle);
                 float f = Ranks.Fill(track, p);
                 if (f > 0.02f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * f), bar.height), Swatch(col));
-                string next = Ranks.ToNext(track, p) > 0 ? Loc.F("{0} RP to {1}", Ranks.ToNext(track, p), Loc.L(Ranks.Name(s + 1))) : Loc.L("Top rank reached!");
+                string next = Ranks.ToNext(track, p) > 0 ? Loc.F("{0} RP to {1}", Ranks.ToNext(track, p), Ranks.Display(s + 1)) : Loc.L("Top rank reached!");
                 Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.118f, card.width - w * 0.08f, h * 0.025f), next, new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft }, Color.white, 1f);
                 Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.145f, card.width - w * 0.08f, h * 0.03f), Loc.L(hints[i]), new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleLeft, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, new Color(1, 1, 1, 0.8f), 1f);
                 bool tapped = GUI.Button(card, GUIContent.none, GUIStyle.none);

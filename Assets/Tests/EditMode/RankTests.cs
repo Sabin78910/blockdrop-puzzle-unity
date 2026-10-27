@@ -16,16 +16,32 @@ public class RankTests
             }
             Assert.AreEqual(Ranks.TopStep, Ranks.StepOf(t, int.MaxValue / 2));
         }
-        Assert.AreEqual("ROOKIE III", Ranks.Name(0));
-        Assert.AreEqual("GOLD II", Ranks.Name(10));
+        Assert.AreEqual("BRONZE V", Ranks.Name(0));
+        Assert.AreEqual("GOLD II", Ranks.Name(13));
         Assert.AreEqual("LEGEND", Ranks.Name(Ranks.TopStep));
+    }
+
+    [Test] public void ThresholdsMatchTheRankTable()
+    {
+        var c = RankTrack.Classic;
+        Assert.AreEqual(600, Ranks.PointsFor(c, 5));   // Silver V
+        Assert.AreEqual(780, Ranks.PointsFor(c, 6));   // Silver IV: 900 / 5 = 180 per division
+        Assert.AreEqual(1500, Ranks.PointsFor(c, 10)); // Gold V
+        Assert.AreEqual(2800, Ranks.PointsFor(c, 15)); // Diamond V
+        Assert.AreEqual(4500, Ranks.PointsFor(c, 20)); // Crown V
+        Assert.AreEqual(6500, Ranks.PointsFor(c, 25)); // Master
+        Assert.AreEqual(8500, Ranks.PointsFor(c, 26)); // Champion
+        Assert.AreEqual(11000, Ranks.PointsFor(c, 27)); // Legend
+        Assert.AreEqual("MASTER", Ranks.Name(25));
+        Assert.AreEqual("CROWN I", Ranks.Name(24));
+        Assert.AreEqual(4500, Ranks.Floor(c, 5000));
     }
 
     [Test] public void FillAndToNextTrackProgress()
     {
         Assert.AreEqual(0f, Ranks.Fill(RankTrack.Classic, 0), 1e-4);
-        Assert.AreEqual(0.5f, Ranks.Fill(RankTrack.Classic, 15), 1e-4);
-        Assert.AreEqual(15, Ranks.ToNext(RankTrack.Classic, 15));
+        Assert.AreEqual(0.5f, Ranks.Fill(RankTrack.Classic, 60), 1e-4);
+        Assert.AreEqual(60, Ranks.ToNext(RankTrack.Classic, 60));
         Assert.AreEqual(1f, Ranks.Fill(RankTrack.Classic, int.MaxValue / 2));
         Assert.AreEqual(0, Ranks.ToNext(RankTrack.Classic, int.MaxValue / 2));
     }
@@ -34,7 +50,7 @@ public class RankTests
     {
         var m = new PlayerMeta();
         int coins = m.Coins;
-        var r = m.RankClassic(800);
+        var r = m.RankClassic(4000);
         Assert.IsTrue(r.Promoted);
         Assert.Greater(r.Coins, 0);
         Assert.AreEqual(coins + r.Coins, m.Coins);
@@ -45,8 +61,8 @@ public class RankTests
     {
         var m = new PlayerMeta();
         int hammers = m.BoostersOf(Booster.Hammer);
-        var r = m.AwardRank(RankTrack.Classic, Ranks.PointsFor(RankTrack.Classic, 3));
-        Assert.AreEqual(3, r.StepAfter);
+        var r = m.AwardRank(RankTrack.Classic, Ranks.PointsFor(RankTrack.Classic, 5));
+        Assert.AreEqual(5, r.StepAfter);
         Assert.AreEqual(1, r.Hammers);
         Assert.AreEqual(hammers + 1, m.BoostersOf(Booster.Hammer));
     }
@@ -65,8 +81,8 @@ public class RankTests
     [Test] public void VsLossNeverDropsBelowTierStartAndRewardsPayOnce()
     {
         var m = new PlayerMeta();
-        m.AwardRank(RankTrack.VsAi, Ranks.PointsFor(RankTrack.VsAi, 4) + 1); // Bronze III, tier start is step 3
-        int floor = Ranks.PointsFor(RankTrack.VsAi, 3);
+        m.AwardRank(RankTrack.VsAi, Ranks.PointsFor(RankTrack.VsAi, 7) + 1); // Silver III, Silver starts at step 5
+        int floor = Ranks.PointsFor(RankTrack.VsAi, 5);
         for (int i = 0; i < 40; i++) m.RankVs(BotLevel.Hard, 1);
         Assert.AreEqual(floor, m.RankPoints[(int)RankTrack.VsAi]);
         int coins = m.Coins;
@@ -79,7 +95,7 @@ public class RankTests
     [Test] public void EasyAiStopsPayingAtItsCapButStillCostsOnLoss()
     {
         var m = new PlayerMeta();
-        m.AwardRank(RankTrack.VsAi, Ranks.EasyCap);
+        m.AwardRank(RankTrack.VsAi, Ranks.EasyCap + 50);
         var win = m.RankVs(BotLevel.Easy, 0);
         Assert.IsTrue(win.Capped);
         Assert.AreEqual(0, win.Delta);

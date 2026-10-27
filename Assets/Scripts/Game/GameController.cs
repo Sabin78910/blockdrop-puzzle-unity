@@ -1990,10 +1990,102 @@ namespace BlockDrop.Game
             }
         }
 
+        /// <summary>The end card for Classic, Daily, VS AI, 2 Players and Challenge: one column, one idea per band. A
+        /// ribbon names the outcome, the score is the biggest thing, the rank sits on its own plate inside the card,
+        /// and the buttons close it. The card is centred, and shrinks when there is no rank to show.</summary>
+        private void DrawResultCard(float w, float h, float t)
+        {
+            EnsurePolishStyles();
+            bool ranked = _rankResult != null;
+            bool versus = _mode == Mode.Versus || _mode == Mode.VsAi;
+            float bh = h * 0.07f, gap = h * 0.012f;
+            float ribbonH = h * 0.058f, scoreH = versus ? h * 0.15f : h * 0.14f, chipH = h * 0.042f, hintH = h * 0.045f, plateH = ranked ? h * 0.115f : 0f;
+            int buttons = _mode == Mode.Challenge ? 3 : 2;
+            float ch = h * 0.03f + ribbonH + gap * 2f + scoreH + (_mode == Mode.Challenge || versus ? 0f : chipH + hintH) + (ranked ? plateH + gap * 2f : 0f) + buttons * (bh + gap) + h * 0.02f;
+            var card = new Rect(w * 0.06f, Mathf.Max(h * 0.05f, (h - ch) / 2f - h * 0.02f), w * 0.88f, ch);
+            Panel(new Rect(card.x - w * 0.008f, card.y - w * 0.008f, card.width + w * 0.016f, card.height + w * 0.016f), ShopStyle("6B5CE0", "2F2670"));
+            Panel(card, _cardStyle);
+            float y = card.y + h * 0.03f;
+
+            string title; Color ink; string top, bottom; bool darkInk;
+            if (versus)
+            {
+                int win = _versus.Winner; bool ai = _mode == Mode.VsAi;
+                title = win < 0 ? "IT'S A TIE!" : ai ? (win == 0 ? "YOU WIN!" : "AI WINS") : Loc.F("PLAYER {0} WINS!", win + 1);
+                bool good = win == 0 || !ai || win < 0;
+                top = good ? "FFE27A" : "FF8FA3"; bottom = good ? "E0900A" : "C23B5B"; ink = Visuals.Hex(good ? "5A2A00" : "4A0F26"); darkInk = true;
+            }
+            else if (_mode == Mode.Challenge) { title = "CHALLENGE"; top = "6E8BFF"; bottom = "3A4FE0"; ink = Color.white; darkInk = false; }
+            else if (_newBest) { title = "NEW BEST!"; top = "FFE27A"; bottom = "E0900A"; ink = Visuals.Hex("5A2A00"); darkInk = true; }
+            else { title = "GAME OVER"; top = "FF8FA3"; bottom = "C23B5B"; ink = Visuals.Hex("4A0F26"); darkInk = true; }
+            var rib = new Rect(card.x + card.width * 0.12f, y, card.width * 0.76f, ribbonH);
+            Panel(rib, ShopStyle(top, bottom));
+            Outlined(rib, title, new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, ink, darkInk ? 0f : 1.5f);
+            y += ribbonH + gap * 2f;
+
+            float k = NewLook.ReducedMotion ? 1f : Mathf.Clamp01((t - 0.15f) / 0.8f);
+            if (versus)
+            {
+                bool ai = _mode == Mode.VsAi;
+                for (int i = 0; i < 2; i++)
+                {
+                    var row = new Rect(card.x + card.width * 0.1f, y + i * scoreH / 2f, card.width * 0.8f, scoreH / 2f - gap);
+                    bool winner = _versus.Winner == i;
+                    Panel(row, winner ? ShopStyle("FFE27A", "E0900A") : _plateStyle);
+                    var nm = new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleLeft };
+                    Color txt = winner ? Visuals.Hex("5A2A00") : Color.white;
+                    Outlined(new Rect(row.x + row.width * 0.06f, row.y, row.width * 0.5f, row.height), i == 0 ? (ai ? Loc.L("YOU") : "P1") : (ai ? "AI" : "P2"), nm, txt, winner ? 0f : 1.5f);
+                    Outlined(new Rect(row.x + row.width * 0.4f, row.y, row.width * 0.54f, row.height), Mathf.RoundToInt(_versus.Seats[i].Board.Score * k).ToString("N0"), new GUIStyle(nm) { alignment = TextAnchor.MiddleRight }, txt, winner ? 0f : 1.5f);
+                }
+            }
+            else
+            {
+                int shown = Mathf.RoundToInt((_mode == Mode.Challenge ? _single.Board.Score : Score) * k);
+                Outlined(new Rect(card.x, y, card.width, h * 0.03f), "SCORE", new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, new Color(1, 1, 1, 0.6f), 1f);
+                var st = new GUIStyle(_h1) { fontSize = Mathf.RoundToInt(_h1.fontSize * (1f + 0.3f * EaseOutBack(Mathf.Clamp01(t * 2f)) - 0.3f)) };
+                Outlined(new Rect(card.x, y + h * 0.02f, card.width, scoreH - h * 0.02f), shown.ToString("N0"), st, Color.white, 3);
+            }
+            y += scoreH;
+
+            if (_mode == Mode.Challenge)
+                Outlined(new Rect(card.x, y - h * 0.06f, card.width, h * 0.05f), ChallengeCode.Encode(_challengeSeed), new GUIStyle(_h2) { wordWrap = false }, Visuals.Hex("7CF8FF"), 3);
+            else if (!versus)
+            {
+                var chip = new Rect(card.center.x - card.width * 0.2f, y, card.width * 0.4f, chipH);
+                Panel(chip, _plateStyle);
+                Outlined(chip, Loc.F("BEST {0}", Mathf.Max(_best, Score)), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Gold, 1.5f);
+                y += chipH;
+                string hint = null;
+                if (!_newBest && _best > 0 && Score >= _best * 0.8f) hint = Loc.F("So close! Only {0} points from your best.", _best - Score);
+                else if (NewLook.On && !_newBest && NearMiss.Find(MainSeat.Board).Message() is string miss) hint = miss;
+                if (hint != null) Outlined(new Rect(card.x + card.width * 0.05f, y, card.width * 0.9f, hintH), hint, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
+                y += hintH;
+            }
+
+            if (ranked)
+            {
+                y += gap;
+                Panel(new Rect(card.x + card.width * 0.05f, y, card.width * 0.9f, plateH), _plateStyle);
+                DrawRankBlock(w, h, t, y + plateH * 0.1f, 0.15f);
+                y += plateH + gap;
+            }
+
+            if (_mode == Mode.Challenge)
+            {
+                if (Btn(Row(w, y, bh, 0.14f), "COPY CODE", "4FD8FF", "1C8FE0")) GUIUtility.systemCopyBuffer = Loc.F("Beat my {0} in Block Drop! Code: {1}", _single.Board.Score, ChallengeCode.Encode(_challengeSeed));
+                y += bh + gap;
+                if (Btn(Row(w, y, bh, 0.14f), "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(Mode.Challenge, _challengeSeed);
+            }
+            else if (Btn(Row(w, y, bh, 0.14f), versus ? "REMATCH" : "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(_mode);
+            y += bh + gap;
+            if (HomeBtn(Row(w, y, bh, 0.14f))) ShowMenu();
+        }
+
         private void DrawResult(float w, float h)
         {
             float t = Time.time - _resultTime;
             float rankExtra = _mode == Mode.Level && _rankResult != null ? h * 0.105f : 0f; // room for the rank bar on a level win
+            if (_mode != Mode.Level) { DrawResultCard(w, h, t); return; }
             Panel(new Rect(w * 0.06f, h * 0.14f, w * 0.88f, h * 0.62f + rankExtra), _cardStyle);
             float y = h * 0.17f;
             switch (_mode)
@@ -2042,43 +2134,7 @@ namespace BlockDrop.Game
                     LevelResultNav(w, by + 2 * (bh + gap), bh);
                     return;
                 }
-                case Mode.Versus:
-                case Mode.VsAi:
-                {
-                    int win = _versus.Winner;
-                    bool ai = _mode == Mode.VsAi;
-                    string title = win < 0 ? "IT'S A TIE!" : ai ? (win == 0 ? "YOU WIN!" : "AI WINS") : Loc.F("PLAYER {0} WINS!", win + 1);
-                    Outlined(new Rect(0, y, w, h * 0.08f), title, _h2, win == 0 || !ai ? Visuals.Hex("FFE27A") : Visuals.Hex("FF8FA3"), 3);
-                    Outlined(new Rect(0, y + h * 0.1f, w, h * 0.1f), $"{(ai ? Loc.L("YOU") : "P1")}  {_versus.Seats[0].Board.Score}\n{(ai ? "AI" : "P2")}  {_versus.Seats[1].Board.Score}", _h2, Color.white, 2);
-                    if (Btn(Row(w, y + h * 0.3f, h * 0.07f, 0.14f), "REMATCH", "4BE38A", "1FA45B")) StartMode(_mode);
-                    break;
-                }
-                case Mode.Challenge:
-                {
-                    string code = ChallengeCode.Encode(_challengeSeed);
-                    Outlined(new Rect(0, y, w, h * 0.08f), Loc.F("SCORE {0}", _single.Board.Score), _h2, Color.white, 3);
-                    Outlined(new Rect(0, y + h * 0.08f, w, h * 0.08f), code, _h1, Visuals.Hex("7CF8FF"), 3);
-                    Outlined(new Rect(w * 0.1f, y + h * 0.16f, w * 0.8f, h * 0.1f), "Send this code to a friend. They get exactly your pieces. Highest score wins!", _small, Color.white, 1.2f);
-                    if (Btn(Row(w, y + h * 0.27f, h * 0.07f, 0.14f), "COPY CODE", "4FD8FF", "1C8FE0")) GUIUtility.systemCopyBuffer = Loc.F("Beat my {0} in Block Drop! Code: {1}", _single.Board.Score, code);
-                    if (Btn(Row(w, y + h * 0.355f, h * 0.07f, 0.14f), "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(Mode.Challenge, _challengeSeed);
-                    break;
-                }
-                default:
-                {
-                    Outlined(new Rect(0, y, w, h * 0.08f), _newBest ? "NEW BEST!" : "GAME OVER", _h2, _newBest ? Visuals.Hex("FFE27A") : Visuals.Hex("FF8FA3"), 3);
-                    var st = new GUIStyle(_h1) { fontSize = Mathf.RoundToInt(_h1.fontSize * (1f + 0.3f * EaseOutBack(Mathf.Clamp01(t * 2f)) - 0.3f)) };
-                    Outlined(new Rect(0, y + h * 0.1f, w, h * 0.12f), Score.ToString(), st, Color.white, 3);
-                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.05f), Loc.F("BEST {0}", _best), _body, Visuals.Gold, 1.5f);
-                    if (!_newBest && _best > 0 && Score >= _best * 0.8f)
-                        Outlined(new Rect(w * 0.05f, y + h * 0.25f, w * 0.9f, h * 0.06f), Loc.F("So close! Only {0} points from your best.", _best - Score), _small, Visuals.Hex("7CF8FF"), 1.2f);
-                    else if (NewLook.On && !_newBest && NearMiss.Find(MainSeat.Board).Message() is string miss)
-                        Outlined(new Rect(0, y + h * 0.255f, w, h * 0.04f), miss, _small, Visuals.Hex("7CF8FF"), 1.2f);
-                    if (Btn(Row(w, y + h * 0.3f, h * 0.07f, 0.14f), "PLAY AGAIN", "4BE38A", "1FA45B")) StartMode(_mode);
-                    break;
-                }
             }
-            DrawRankBlock(w, h, t);
-            if (HomeBtn(Row(w, h * 0.66f, h * 0.07f, 0.14f))) ShowMenu();
         }
 
         private readonly bool[] _starPlayed = new bool[3];

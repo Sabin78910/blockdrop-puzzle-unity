@@ -236,6 +236,8 @@ namespace BlockDrop.Core
             ["DAILY MISSIONS"] = "दैनिक मिसन",
             ["DONE"] = "सकियो",
             ["CLAIM"] = "लिनुहोस्",
+            ["AI"] = "एआई",
+            ["SCORE"] = "स्कोर",
             ["GOOGLE CONNECTED ✓"] = "गुगल जोडियो ✓",
             ["CONNECTING…"] = "जोड्दै…",
             ["CONTINUE WITH GOOGLE"] = "गुगलसँग जारी राख्नुहोस्",

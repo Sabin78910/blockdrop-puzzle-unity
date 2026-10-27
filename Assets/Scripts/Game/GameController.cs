@@ -12,7 +12,7 @@ namespace BlockDrop.Game
     /// vs-AI, 2-player, challenge codes and online leaderboards. Fully playable offline.</summary>
     public sealed partial class GameController : MonoBehaviour
     {
-        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection, Settings, Shop }
+        private enum Screen { Menu, LevelSelect, AiSelect, Playing, Result, Challenge, Leaderboard, Profile, Missions, Themes, Trophies, Collection, Settings, Shop, Ranks, Ladder }
         private enum Mode { Classic, Daily, Level, Versus, VsAi, Challenge }
 
         private const int Size = 8;
@@ -453,7 +453,7 @@ namespace BlockDrop.Game
             if (_screen == Screen.Playing) ClearRun(); // finished or quit: nothing to resume
             SetPaused(false);
             _screen = screen;
-            if (screen == Screen.Shop || screen == Screen.Themes || screen == Screen.Missions) _shopOpened = Time.unscaledTime;
+            if (screen == Screen.Shop || screen == Screen.Themes || screen == Screen.Missions || screen == Screen.Ranks || screen == Screen.Ladder) _shopOpened = Time.unscaledTime;
             if (screen == Screen.LevelSelect) { _mapBottom = -1; _mapVel = 0; _mapDown = _mapTapped = false; _mapPick = 0; } // reopen the map on the player's current level
             _boardRoot.SetActive(false);
             _miniRoot.SetActive(false);
@@ -528,6 +528,7 @@ namespace BlockDrop.Game
             _adPolicy.OnGameEnded(Today, _newBest);
             PlayerPrefs.SetString("ads", _adPolicy.Serialize());
             if (_mode == Mode.Level && _level.State == LevelState.Won) Track(MissionKind.EarnStars, _level.Stars);
+            ApplyRank();
             if (Career)
             {
                 Celebrate(_meta.Record(Stat.GamesPlayed, 1));
@@ -1407,6 +1408,8 @@ namespace BlockDrop.Game
                 case Screen.Collection: DrawCollection(w, h); break;
                 case Screen.Settings: DrawSettings(w, h); break;
                 case Screen.Shop: DrawShop(w, h); break;
+                case Screen.Ranks: DrawRanks(w, h); break;
+                case Screen.Ladder: DrawLadder(w, h); break;
             }
             GUI.enabled = true;
             DrawFloaters(w);
@@ -1623,7 +1626,9 @@ namespace BlockDrop.Game
             DrawDailyChest(w, h);
             Outlined(new Rect(w * 0.08f, h * 0.755f, w * 0.84f, h * 0.045f), "New missions every day. Coins unlock themes; they never buy an advantage.", _small, new Color(1, 1, 1, 0.9f), 1.2f);
             int got = 0; for (int i = 0; i < PlayerMeta.Achievements.Length; i++) if (_meta.HasAchievement(i)) got++;
-            if (Btn(Row(w, h * 0.81f, h * 0.06f), Loc.F("TROPHIES  {0}/{1}", got, PlayerMeta.Achievements.Length), "7CF8FF", "1C8FE0", 0.85f)) ShowMenu(Screen.Trophies);
+            float half = w * 0.84f / 2f - w * 0.01f;
+            if (Btn(new Rect(w * 0.08f, h * 0.81f, half, h * 0.06f), Loc.F("TROPHIES  {0}/{1}", got, PlayerMeta.Achievements.Length), "7CF8FF", "1C8FE0", 0.85f)) ShowMenu(Screen.Trophies);
+            if (Btn(new Rect(w * 0.92f - half, h * 0.81f, half, h * 0.06f), "RANKS", "FFD54A", "D99A00", 0.85f)) ShowMenu(Screen.Ranks);
             if (Btn(Row(w, h * 0.89f, h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
         }
 
@@ -1884,6 +1889,7 @@ namespace BlockDrop.Game
         {
             Outlined(new Rect(0, h * 0.12f, w, h * 0.08f), "VS AI", _h1, Visuals.Hex("C9A7FF"), 3);
             Outlined(new Rect(w * 0.05f, h * 0.21f, w * 0.9f, h * 0.08f), "Same pieces for you and the AI. Highest score wins.", _small, Color.white, 1.5f);
+            Outlined(new Rect(w * 0.05f, h * 0.265f, w * 0.9f, h * 0.04f), RankLine(RankTrack.VsAi), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, Visuals.Hex(Ranks.TierColor(_meta.RankStep(RankTrack.VsAi))), 1.2f);
             float y = h * 0.32f, bh = h * 0.085f, gap = h * 0.02f;
             if (Btn(Row(w, y, bh), "EASY", "4BE38A", "1FA45B")) { _aiLevel = BotLevel.Easy; StartMode(Mode.VsAi); }
             if (Btn(Row(w, y + bh + gap, bh), "MEDIUM", "FFC24B", "F08A1C")) { _aiLevel = BotLevel.Medium; StartMode(Mode.VsAi); }
@@ -1988,7 +1994,8 @@ namespace BlockDrop.Game
         private void DrawResult(float w, float h)
         {
             float t = Time.time - _resultTime;
-            Panel(new Rect(w * 0.06f, h * 0.14f, w * 0.88f, h * 0.62f), _cardStyle);
+            float rankExtra = _mode == Mode.Level && _rankResult != null ? h * 0.105f : 0f; // room for the rank bar on a level win
+            Panel(new Rect(w * 0.06f, h * 0.14f, w * 0.88f, h * 0.62f + rankExtra), _cardStyle);
             float y = h * 0.17f;
             switch (_mode)
             {
@@ -2022,7 +2029,8 @@ namespace BlockDrop.Game
                     if (won && _coinsEarned > 0) scoreLine += $"   +{_coinsEarned} ●";
                     Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), scoreLine, _body, Color.white, 1.5f);
                     if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
-                    float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
+                    if (rankExtra > 0f) DrawRankBlock(w, h, t, y + h * 0.3f);
+                    float by = y + h * 0.3f + rankExtra, bh = h * 0.07f, gap = h * 0.015f;
                     if (won && _level.Definition.Number < LevelLibrary.Count)
                     {
                         // Winning rolls straight on to the next level after a short celebration; any button below takes over.
@@ -2070,6 +2078,7 @@ namespace BlockDrop.Game
                     break;
                 }
             }
+            DrawRankBlock(w, h, t);
             if (HomeBtn(Row(w, h * 0.66f, h * 0.07f, 0.14f))) ShowMenu();
         }
 

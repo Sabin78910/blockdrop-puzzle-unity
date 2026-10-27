@@ -183,6 +183,61 @@ namespace BlockDrop.Core
             return gained;
         }
 
+        // ---- mode ranks (Classic, Daily, VS AI) ----
+        public readonly int[] RankPoints = new int[4];
+        /// <summary>Highest step ever reached per track, so a trophy dip and climb never pays a reward twice.</summary>
+        public readonly int[] RankPeak = new int[4];
+        public string DailyRankDay { get; private set; } = "";
+        public int AiWinStreak { get; private set; }
+
+        public int RankStep(RankTrack t) => Ranks.StepOf(t, RankPoints[(int)t]);
+
+        /// <summary>Applies a finished game to a ladder and pays any rank-up rewards. Classic and Daily only add points.</summary>
+        public RankResult AwardRank(RankTrack t, int delta)
+        {
+            int k = (int)t, before = RankPoints[k];
+            var r = new RankResult { Track = t, Before = before, StepBefore = Ranks.StepOf(t, before) };
+            RankPoints[k] = Math.Max(0, before + delta);
+            r.After = RankPoints[k];
+            r.Delta = r.After - before;
+            r.StepAfter = Ranks.StepOf(t, r.After);
+            for (int s = RankPeak[k] + 1; s <= r.StepAfter; s++)
+            {
+                r.Coins += Ranks.StepCoins(t, s);
+                if (Ranks.TierStart(s)) { r.Hammers++; r.Shuffles++; }
+            }
+            RankPeak[k] = Math.Max(RankPeak[k], r.StepAfter);
+            Coins += r.Coins;
+            AddBoosters(Booster.Hammer, r.Hammers);
+            AddBoosters(Booster.Shuffle, r.Shuffles);
+            return r;
+        }
+
+        public RankResult RankLevel(int starsBefore, int starsNow) => AwardRank(RankTrack.Level, Ranks.LevelGain(starsBefore, starsNow));
+
+        public RankResult RankClassic(int score) => AwardRank(RankTrack.Classic, Ranks.ClassicGain(score));
+
+        /// <summary>Only the first Daily game of a day counts, so replaying the same seed can't be farmed.</summary>
+        public RankResult RankDaily(int score, string today)
+        {
+            if (DailyRankDay == today)
+            {
+                int p = RankPoints[(int)RankTrack.Daily], s = Ranks.StepOf(RankTrack.Daily, p);
+                return new RankResult { Track = RankTrack.Daily, Before = p, After = p, StepBefore = s, StepAfter = s, AlreadyScored = true };
+            }
+            DailyRankDay = today;
+            return AwardRank(RankTrack.Daily, Ranks.DailyGain(score, Streak));
+        }
+
+        public RankResult RankVs(BotLevel level, int winner)
+        {
+            int delta = Ranks.VsDelta(level, winner, AiWinStreak, RankPoints[(int)RankTrack.VsAi], out bool capped);
+            AiWinStreak = winner == 0 ? AiWinStreak + 1 : winner > 0 ? 0 : AiWinStreak;
+            var r = AwardRank(RankTrack.VsAi, delta);
+            r.Capped = capped;
+            return r;
+        }
+
         public bool HasAchievement(int i) => (AchievementMask & (1 << i)) != 0;
 
         /// <summary>Updates a lifetime stat and returns achievements unlocked by it (their coins are granted).</summary>
@@ -369,6 +424,12 @@ namespace BlockDrop.Core
             m.BestStreak = Math.Max(lead.BestStreak, other.BestStreak);
             for (int i = 0; i < m.Stats.Length; i++) m.Stats[i] = Math.Max(lead.Stats[i], other.Stats[i]);
             m.Purchases = lead.Purchases | other.Purchases;
+            for (int i = 0; i < m.RankPoints.Length; i++)
+            {
+                m.RankPoints[i] = Math.Max(lead.RankPoints[i], other.RankPoints[i]);
+                m.RankPeak[i] = Math.Max(Math.Max(lead.RankPeak[i], other.RankPeak[i]), Ranks.StepOf((RankTrack)i, m.RankPoints[i]));
+            }
+            if (string.CompareOrdinal(other.DailyRankDay, lead.DailyRankDay) > 0) m.DailyRankDay = other.DailyRankDay;
             m.NoAds = lead.NoAds || other.NoAds;
             if (lead.MissionDay == other.MissionDay) m.ChestClaimed = lead.ChestClaimed || other.ChestClaimed; // a chest opened on one device stays opened on both
             return m;
@@ -379,7 +440,7 @@ namespace BlockDrop.Core
             var sb = new StringBuilder();
             sb.Append($"c={Coins};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
             sb.Append($"p={Progress[0]},{Progress[1]},{Progress[2]};k={(Claimed[0] ? 1 : 0)}{(Claimed[1] ? 1 : 0)}{(Claimed[2] ? 1 : 0)};");
-            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};bo={Boosters[0]},{Boosters[1]}");
+            sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};rp={string.Join(",", RankPoints)};rk={string.Join(",", RankPeak)};dd={DailyRankDay};ws={AiWinStreak};bo={Boosters[0]},{Boosters[1]}");
             return sb.ToString();
         }
 
@@ -419,6 +480,10 @@ namespace BlockDrop.Core
                         for (int i = 0; i < m.Boosters.Length && i < bs.Length; i++)
                             if (int.TryParse(bs[i], out int count)) m.Boosters[i] = Math.Max(0, count);
                         break;
+                    case "rp": ParseInts(v, m.RankPoints); break;
+                    case "rk": ParseInts(v, m.RankPeak); break;
+                    case "dd": m.DailyRankDay = v; break;
+                    case "ws": m.AiWinStreak = Math.Max(0, n); break;
                     case "na": m.NoAds = n == 1; break;
                     case "st":
                         var ss = v.Split(',');
@@ -427,7 +492,18 @@ namespace BlockDrop.Core
                 }
             }
             if (!m.Owns(m.ThemeIndex)) m.ThemeIndex = 0;
+            for (int i = 0; i < m.RankPoints.Length; i++)
+            {
+                m.RankPoints[i] = Math.Max(0, m.RankPoints[i]);
+                m.RankPeak[i] = Math.Max(Math.Max(0, m.RankPeak[i]), Ranks.StepOf((RankTrack)i, m.RankPoints[i]));
+            }
             return m;
+        }
+
+        private static void ParseInts(string v, int[] into)
+        {
+            var parts = v.Split(',');
+            for (int i = 0; i < into.Length && i < parts.Length; i++) int.TryParse(parts[i], out into[i]);
         }
     }
 }

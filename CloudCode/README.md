@@ -35,4 +35,4 @@ production environment, create `SubmitScore`, add parameters `leaderboardId` (St
 needs the workflow (or the UGS CLI).
 
 ## Test the rules locally
-`node --test CloudCode/SubmitScore.test.js`
+`node --test CloudCode/SubmitScore.test.js CloudCode/Wallet.test.js`

@@ -49,7 +49,7 @@ public class RankTests
     [Test] public void FirstClassicGameRanksUpAndPaysOnce()
     {
         var m = new PlayerMeta();
-        int coins = m.Coins;
+        long coins = m.Coins;
         var r = m.RankClassic(4000);
         Assert.IsTrue(r.Promoted);
         Assert.Greater(r.Coins, 0);
@@ -85,7 +85,7 @@ public class RankTests
         int floor = Ranks.PointsFor(RankTrack.VsAi, 5);
         for (int i = 0; i < 100; i++) m.RankVs(BotLevel.Hard, 1);
         Assert.AreEqual(floor, m.RankPoints[(int)RankTrack.VsAi]);
-        int coins = m.Coins;
+        long coins = m.Coins;
         m.RankVs(BotLevel.Hard, 0); m.RankVs(BotLevel.Hard, 1);
         var back = m.AwardRank(RankTrack.VsAi, 0);
         Assert.AreEqual(0, back.Coins);

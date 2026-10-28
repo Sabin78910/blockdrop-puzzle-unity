@@ -38,7 +38,7 @@ namespace BlockDrop.Core
     /// <summary>Starter themes are cheap, premium ones are a goal for a few weeks of play, legendary ones are the
     /// long-term prize (or a direct purchase). Exclusive themes cannot be bought at all: they are earned, so they
     /// say something about the player.</summary>
-    public enum ThemeTier { Starter, Premium, Legendary, Exclusive }
+    public enum ThemeTier { Starter, Premium, Legendary, Exclusive, Mythic, Cosmic, Eternal }
 
     /// <summary>Level helpers. Earned in play (a starter gift, every chapter, every 7th streak day) or bought with
     /// coins. They give the player a choice at the hardest moment instead of a wall.</summary>
@@ -47,7 +47,7 @@ namespace BlockDrop.Core
     public sealed class Theme
     {
         public string Name;
-        public int Price;
+        public long Price;
         public string[] Blocks;   // 5 hex colours
         public string BackgroundTint;
         public ThemeTier Tier;
@@ -55,7 +55,10 @@ namespace BlockDrop.Core
         public int ChapterReward; // exclusive: earned by finishing this chapter
         public int StarsReward;   // exclusive: earned with this many level stars
         public string Tagline = "";
+        public string Requires = ""; // a theme that must be owned first, on top of owning one theme of the tier below
         public bool Buyable => Tier != ThemeTier.Exclusive;
+        /// <summary>Bought through the server wallet, so a edited save cannot give it away.</summary>
+        public bool ServerSold => Buyable && Price >= Economy.ServerMinPrice;
     }
 
     /// <summary>Fair, skill-based progression: daily streak, three daily missions, coins and cosmetic
@@ -80,6 +83,20 @@ namespace BlockDrop.Core
             new Theme { Name = "Galaxy", Price = 6500, Tier = ThemeTier.Legendary, Blocks = new[] { "C77DFF", "7B2CBF", "E0AAFF", "48BFE3", "FF70A6" }, BackgroundTint = "2D1B69", Panel = "0D0221", Slot = "1E0B45", Tagline = "Deep space violet" },
             new Theme { Name = "Diamond", Price = 8000, Tier = ThemeTier.Legendary, Blocks = new[] { "E0FBFC", "B9E6FF", "FFFFFF", "C2DFE3", "9DB4C0" }, BackgroundTint = "AFC8D6", Panel = "1D2D44", Slot = "2E4460", Tagline = "Ice-clear luxury" },
             new Theme { Name = "Royal Gold", Price = 9000, Tier = ThemeTier.Legendary, Blocks = new[] { "FFD700", "FFC300", "F5E6A8", "D4AF37", "FFF1B5" }, BackgroundTint = "4A2368", Panel = "1F0B33", Slot = "35154F", Tagline = "Solid gold on royal purple" },
+            // mythic: the first server-sold prestige tier. Each theme owned raises Fortune (coin rewards x price/9000).
+            new Theme { Name = "Ember", Price = 15000, Tier = ThemeTier.Mythic, Blocks = new[] { "FF5A1F", "FFB000", "FF3D68", "FFD27D", "B5179E" }, BackgroundTint = "5C1A0B", Panel = "1F0A05", Slot = "3A1409", Tagline = "Glowing coals, never cooling" },
+            new Theme { Name = "Tidal", Price = 40000, Tier = ThemeTier.Mythic, Blocks = new[] { "00E5FF", "2979FF", "00BFA5", "B2EBF2", "6200EA" }, BackgroundTint = "0B3C5D", Panel = "03121F", Slot = "0A2A44", Tagline = "Deep currents and sea glass" },
+            new Theme { Name = "Orchid", Price = 100000, Tier = ThemeTier.Mythic, Blocks = new[] { "E040FB", "FF80AB", "EA80FC", "FFD6F5", "7C4DFF" }, BackgroundTint = "4A1259", Panel = "1A0524", Slot = "321046", Tagline = "Rare bloom, royal petals" },
+            new Theme { Name = "Obsidian", Price = 250000, Tier = ThemeTier.Mythic, Blocks = new[] { "9E9EB8", "FF1744", "C0C0D8", "5E5E7E", "FF8A80" }, BackgroundTint = "16161F", Panel = "050507", Slot = "13131C", Tagline = "Volcanic glass with red fire" },
+            // cosmic
+            new Theme { Name = "Nebula", Price = 500000, Tier = ThemeTier.Cosmic, Blocks = new[] { "FF6EC7", "7F5AF0", "2CB1BC", "FFC9E3", "5F3DC4" }, BackgroundTint = "301A5E", Panel = "0C0620", Slot = "1B0F3F", Tagline = "A star nursery in pink and violet" },
+            new Theme { Name = "Supernova", Price = 1000000, Tier = ThemeTier.Cosmic, Blocks = new[] { "FFFFFF", "FFE066", "FF6B6B", "74C0FC", "FFA94D" }, BackgroundTint = "3B1D0F", Panel = "120804", Slot = "28130A", Tagline = "One blinding moment" },
+            new Theme { Name = "Quasar", Price = 5000000, Tier = ThemeTier.Cosmic, Blocks = new[] { "5CE1E6", "C77DFF", "FFFFFF", "3A86FF", "F72585" }, BackgroundTint = "0A1A3F", Panel = "020617", Slot = "0A1233", Tagline = "A beacon older than light" },
+            new Theme { Name = "Pulsar", Price = 25000000, Tier = ThemeTier.Cosmic, Blocks = new[] { "C8FF00", "00E5FF", "FFFFFF", "7CFFCB", "FF4081" }, BackgroundTint = "062B2B", Panel = "010E0E", Slot = "042222", Tagline = "A steady heartbeat in the dark" },
+            // eternal: the end of the ladder
+            new Theme { Name = "Aether", Price = 100000000, Tier = ThemeTier.Eternal, Blocks = new[] { "E8F0FF", "B3C7FF", "FFFFFF", "D0B8FF", "9FE7FF" }, BackgroundTint = "1B2A5C", Panel = "070C24", Slot = "121B45", Tagline = "Weightless light" },
+            new Theme { Name = "Genesis", Price = 250000000, Tier = ThemeTier.Eternal, Blocks = new[] { "FFF1A8", "FFD54A", "FFFFFF", "FFAA5C", "FF7BAC" }, BackgroundTint = "4A2F0F", Panel = "1A0F03", Slot = "33200A", Tagline = "The first morning" },
+            new Theme { Name = "Singularity", Price = 1000000000, Tier = ThemeTier.Eternal, Requires = "Genesis", Blocks = new[] { "FFFFFF", "FFD700", "B388FF", "40C4FF", "FF5C8A" }, BackgroundTint = "000000", Panel = "000000", Slot = "0F0F14", Tagline = "One billion coins. Everything, folded in" },
             // exclusive: earned, never sold
             new Theme { Name = "Glacier", Tier = ThemeTier.Exclusive, ChapterReward = 5, Blocks = new[] { "A9E4FF", "6EC1E4", "DFF6FF", "3E92CC", "B8F2E6" }, BackgroundTint = "7FB7D9", Panel = "0E2A3D", Slot = "173F5A", Tagline = "Finish chapter 5" },
             new Theme { Name = "Crown Jewels", Tier = ThemeTier.Exclusive, ChapterReward = 10, Blocks = new[] { "E0115F", "0F52BA", "50C878", "FFD700", "9966CC" }, BackgroundTint = "3D155F", Panel = "140626", Slot = "2A0F45", Tagline = "Finish all 100 levels" },
@@ -98,7 +115,31 @@ namespace BlockDrop.Core
             (MissionKind.BeatAi, new[] { 1, 2, 3 }, 40),
         };
 
-        public int Coins { get; private set; }
+        public long Coins { get; private set; }
+
+        /// <summary>Lifetime coins this phone says it earned and spent on things other than server-sold themes. The server
+        /// ledger (CloudCode/Wallet.js) reads both, caps what it credits, and returns the balance that counts.</summary>
+        public long EarnedTotal { get; private set; }
+        public long SpentOther { get; private set; }
+
+        /// <summary>Price of the dearest theme owned that was bought rather than earned (0 when none).</summary>
+        private long BestThemePrice()
+        {
+            long best = 0;
+            for (int i = 0; i < Themes.Length; i++) if (Owns(i) && Themes[i].Buyable) best = Math.Max(best, Themes[i].Price);
+            return best;
+        }
+
+        /// <summary>Fortune: every coin reward is multiplied by the price of the best theme owned over 9,000 (never below 1).</summary>
+        public double Fortune => Economy.Fortune(BestThemePrice());
+
+        private void Credit(long baseAmount)
+        {
+            long best = BestThemePrice();
+            long amount = best > Economy.FortuneBase ? baseAmount * best / Economy.FortuneBase : baseAmount; // whole-number maths: no rounding drift
+            Coins += amount;
+            EarnedTotal += amount;
+        }
 
         public const int StarterBoosters = 3, ChapterBoosters = 2;
         public readonly int[] Boosters = { StarterBoosters, StarterBoosters };
@@ -119,13 +160,14 @@ namespace BlockDrop.Core
             Boosters[(int)b]++;
             return true;
         }
-        public void AddCoins(int amount) { if (amount > 0) Coins += amount; }
+        public void AddCoins(int amount) { if (amount > 0) Credit(amount); }
 
         /// <summary>Pays <paramref name="amount"/> coins if the player has them.</summary>
-        public bool Spend(int amount)
+        public bool Spend(long amount)
         {
             if (amount < 0 || Coins < amount) return false;
             Coins -= amount;
+            SpentOther += amount;
             return true;
         }
         public int Streak { get; private set; }
@@ -149,7 +191,7 @@ namespace BlockDrop.Core
         /// <summary>Today's chest: opens once all three missions are claimed.</summary>
         public bool ChestClaimed;
         public const int ChestCoins = 50;
-        public int OwnedThemes { get; private set; } = 1; // bit mask, Jewel owned
+        public long OwnedThemes { get; private set; } = 1; // bit mask, Jewel owned
         public int ThemeIndex { get; private set; }
 
         public static readonly Achievement[] Achievements =
@@ -190,7 +232,7 @@ namespace BlockDrop.Core
                 Xp -= XpToNext(Level);
                 Level++;
                 gained++;
-                Coins += LevelReward(Level);
+                Credit(LevelReward(Level));
             }
             return gained;
         }
@@ -219,7 +261,7 @@ namespace BlockDrop.Core
                 if (Ranks.TierStart(s)) { r.Hammers++; r.Shuffles++; }
             }
             RankPeak[k] = Math.Max(RankPeak[k], r.StepAfter);
-            Coins += r.Coins;
+            Credit(r.Coins);
             AddBoosters(Booster.Hammer, r.Hammers);
             AddBoosters(Booster.Shuffle, r.Shuffles);
             return r;
@@ -264,7 +306,7 @@ namespace BlockDrop.Core
                 var a = Achievements[i];
                 if (a.Stat != stat || HasAchievement(i) || Stats[k] < a.Target) continue;
                 AchievementMask |= 1 << i;
-                Coins += a.Reward;
+                Credit(a.Reward);
                 unlocked.Add(a);
             }
             return unlocked;
@@ -310,7 +352,7 @@ namespace BlockDrop.Core
             LastCheckIn = today;
             if (Streak % 7 == 0) { AddBoosters(Booster.Hammer, 1); StreakFreezes = Math.Min(MaxStreakFreezes, StreakFreezes + 1); } // a weekly treat on top of the coins
             int reward = StreakReward(Streak);
-            Coins += reward;
+            Credit(reward);
             return reward;
         }
 
@@ -337,7 +379,7 @@ namespace BlockDrop.Core
         {
             if (!ChestReady(today)) return false;
             ChestClaimed = true;
-            Coins += ChestCoins;
+            Credit(ChestCoins);
             AddBoosters(Booster.Hammer, 1); AddBoosters(Booster.Shuffle, 1);
             return true;
         }
@@ -364,24 +406,78 @@ namespace BlockDrop.Core
         {
             if (!IsComplete(i, today) || Claimed[i]) return false;
             Claimed[i] = true;
-            Coins += MissionsFor(today)[i].Reward;
+            Credit(MissionsFor(today)[i].Reward);
             return true;
         }
 
-        public bool Owns(int theme) => (OwnedThemes & (1 << theme)) != 0;
+        public bool Owns(int theme) => theme >= 0 && theme < 63 && (OwnedThemes & (1L << theme)) != 0;
 
-        public bool BuyOrSelect(int theme)
+        /// <summary>Why a theme cannot be bought yet (the ladder rule), or null. High tiers open one at a time: you need a
+        /// theme from the tier below, and Singularity also needs Genesis.</summary>
+        public string LockReason(int theme)
+        {
+            var t = Themes[theme];
+            ThemeTier below = t.Tier == ThemeTier.Mythic ? ThemeTier.Legendary : t.Tier == ThemeTier.Cosmic ? ThemeTier.Mythic : t.Tier == ThemeTier.Eternal ? ThemeTier.Cosmic : ThemeTier.Starter;
+            if (below != ThemeTier.Starter)
+            {
+                bool has = false;
+                for (int i = 0; i < Themes.Length; i++) if (Themes[i].Tier == below && Owns(i)) has = true;
+                if (!has) return Loc.F("Own a {0} theme first", below);
+            }
+            if (t.Requires != "" && !Owns(FindTheme(t.Requires))) return Loc.F("Own {0} first", t.Requires);
+            return null;
+        }
+
+        /// <summary>Selects an owned theme, or buys a locally sold one (Starter and Premium). Themes from
+        /// <see cref="Economy.ServerMinPrice"/> up are bought through the server wallet (<c>WalletSync.BuyAsync</c>), which then
+        /// reports them in <see cref="ApplyServer"/>; <paramref name="allowServerSold"/> is only for preview builds with no backend.</summary>
+        public bool BuyOrSelect(int theme, bool allowServerSold = false)
         {
             if (theme < 0 || theme >= Themes.Length) return false;
             if (!Owns(theme))
             {
-                if (!Themes[theme].Buyable) return false;
-                if (Coins < Themes[theme].Price) return false;
-                Coins -= Themes[theme].Price;
-                OwnedThemes |= 1 << theme;
+                var t = Themes[theme];
+                if (!t.Buyable || (t.ServerSold && !allowServerSold) || Coins < t.Price || LockReason(theme) != null) return false;
+                Coins -= t.Price;
+                SpentOther += t.Price;
+                OwnedThemes |= 1L << theme;
             }
             ThemeIndex = theme;
             return true;
+        }
+
+        /// <summary>Names of server-sold themes this save claims, sent once so a save from before the wallet keeps what it bought.</summary>
+        public List<string> ClaimedServerThemes()
+        {
+            var names = new List<string>();
+            for (int i = 0; i < Themes.Length; i++) if (Themes[i].ServerSold && Owns(i)) names.Add(Themes[i].Name);
+            return names;
+        }
+
+        /// <summary>Server-sold themes owned by this save (the bits the wallet is allowed to change).</summary>
+        public static long ServerThemeMask()
+        {
+            long mask = 0;
+            for (int i = 0; i < Themes.Length; i++) if (Themes[i].ServerSold) mask |= 1L << i;
+            return mask;
+        }
+
+        /// <summary>Takes the wallet's answer: the balance that counts and the server-sold themes that are really owned.
+        /// Coins earned or spent since the request left stay on top, so play during a sync is never lost.
+        /// Server-sold theme bits not in <paramref name="ownedNames"/> are removed: a hand-edited save cannot keep them.</summary>
+        public void ApplyServer(long balance, IEnumerable<string> ownedNames, long earnedAtSend, long spentAtSend)
+        {
+            Coins = Math.Max(0, balance + (EarnedTotal - earnedAtSend) - (SpentOther - spentAtSend));
+            long mask = 0;
+            foreach (var n in ownedNames) { int i = FindTheme(n); if (i >= 0 && Themes[i].ServerSold) mask |= 1L << i; }
+            // Themes that came inside a store bundle this save has already been granted stay (the server cannot see receipts).
+            for (int p = 0; p < Store.Products.Length; p++)
+            {
+                if ((Purchases & (1 << p)) == 0) continue;
+                foreach (var name in Store.Products[p].Themes) { int i = FindTheme(name); if (i >= 0) mask |= 1L << i; }
+            }
+            OwnedThemes = (OwnedThemes & ~ServerThemeMask()) | mask | 1;
+            if (!Owns(ThemeIndex)) ThemeIndex = 0;
         }
 
         /// <summary>Exclusive themes earned by finishing chapters or collecting stars. Returns newly unlocked indexes.</summary>
@@ -394,7 +490,7 @@ namespace BlockDrop.Core
                 if (t.Tier != ThemeTier.Exclusive || Owns(i)) continue;
                 bool earned = (t.ChapterReward > 0 && chaptersComplete >= t.ChapterReward) || (t.StarsReward > 0 && totalStars >= t.StarsReward);
                 if (!earned) continue;
-                OwnedThemes |= 1 << i;
+                OwnedThemes |= 1L << i;
                 got.Add(i);
             }
             return got;
@@ -418,10 +514,11 @@ namespace BlockDrop.Core
                 Purchases |= 1 << i;
             }
             Coins += product.Coins;
+            EarnedTotal += product.Coins;
             foreach (var name in product.Themes)
             {
                 int t = FindTheme(name);
-                if (t >= 0) OwnedThemes |= 1 << t;
+                if (t >= 0) OwnedThemes |= 1L << t;
             }
             if (product.RemoveAds) NoAds = true;
             AddBoosters(Booster.Hammer, product.Hammers);
@@ -442,6 +539,8 @@ namespace BlockDrop.Core
             m.AchievementMask = lead.AchievementMask | other.AchievementMask;
             m.BestStreak = Math.Max(lead.BestStreak, other.BestStreak);
             m.StreakFreezes = Math.Max(lead.StreakFreezes, other.StreakFreezes);
+            m.EarnedTotal = Math.Max(lead.EarnedTotal, other.EarnedTotal);
+            m.SpentOther = Math.Max(lead.SpentOther, other.SpentOther);
             for (int i = 0; i < m.Stats.Length; i++) m.Stats[i] = Math.Max(lead.Stats[i], other.Stats[i]);
             m.Purchases = lead.Purchases | other.Purchases;
             for (int i = 0; i < m.RankPoints.Length; i++)
@@ -458,7 +557,7 @@ namespace BlockDrop.Core
         public string Serialize()
         {
             var sb = new StringBuilder();
-            sb.Append($"c={Coins};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
+            sb.Append($"c={Coins};ec={EarnedTotal};sp={SpentOther};s={Streak};b={BestStreak};l={LastCheckIn};m={MissionDay};o={OwnedThemes};t={ThemeIndex};");
             sb.Append($"p={Progress[0]},{Progress[1]},{Progress[2]};k={(Claimed[0] ? 1 : 0)}{(Claimed[1] ? 1 : 0)}{(Claimed[2] ? 1 : 0)};");
             sb.Append($"v={Level};x={Xp};a={AchievementMask};st={string.Join(",", Stats)};pu={Purchases};na={(NoAds ? 1 : 0)};dc={(ChestClaimed ? 1 : 0)};rp={string.Join(",", RankPoints)};rk={string.Join(",", RankPeak)};dd={DailyRankDay};ws={AiWinStreak};bo={Boosters[0]},{Boosters[1]};sf={StreakFreezes}");
             return sb.ToString();
@@ -467,6 +566,7 @@ namespace BlockDrop.Core
         public static PlayerMeta Parse(string data)
         {
             var m = new PlayerMeta();
+            bool sawEarned = false;
             if (string.IsNullOrEmpty(data)) return m;
             foreach (var part in data.Split(';'))
             {
@@ -474,14 +574,17 @@ namespace BlockDrop.Core
                 if (eq <= 0) continue;
                 string k = part.Substring(0, eq), v = part.Substring(eq + 1);
                 int.TryParse(v, out int n);
+                long.TryParse(v, out long big);
                 switch (k)
                 {
-                    case "c": m.Coins = Math.Max(0, n); break;
+                    case "c": m.Coins = Math.Max(0, big); break;
+                    case "ec": m.EarnedTotal = Math.Max(0, big); sawEarned = true; break;
+                    case "sp": m.SpentOther = Math.Max(0, big); break;
                     case "s": m.Streak = Math.Max(0, n); break;
                     case "b": m.BestStreak = Math.Max(0, n); break;
                     case "l": m.LastCheckIn = v; break;
                     case "m": m.MissionDay = v; break;
-                    case "o": m.OwnedThemes = n | 1; break;
+                    case "o": m.OwnedThemes = big | 1; break;
                     case "t": m.ThemeIndex = n >= 0 && n < Themes.Length ? n : 0; break;
                     case "p":
                         var ps = v.Split(',');
@@ -512,6 +615,7 @@ namespace BlockDrop.Core
                         break;
                 }
             }
+            if (!sawEarned) m.EarnedTotal = m.Coins; // a save from before the wallet: what it holds is its claim
             if (!m.Owns(m.ThemeIndex)) m.ThemeIndex = 0;
             for (int i = 0; i < m.RankPoints.Length; i++)
             {

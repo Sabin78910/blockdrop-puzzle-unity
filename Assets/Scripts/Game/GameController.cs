@@ -246,7 +246,7 @@ namespace BlockDrop.Game
             SaveRun();
             SaveMeta();
         }
-        private void OnApplicationFocus(bool focused) { if (!focused && _meta != null) { SaveRun(); SaveMeta(); } }
+        private void OnApplicationFocus(bool focused) { if (!focused && _meta != null) { SaveRun(); SaveMeta(); SyncWallet(); } }
         private void OnApplicationQuit() { if (_meta != null) { SaveRun(); SaveMeta(); } }
 
         // ---------- the run in progress survives the app being closed ----------
@@ -637,6 +637,7 @@ namespace BlockDrop.Game
                 _meta = PlayerMeta.Parse(PlayerPrefs.GetString("meta", ""));
                 _best = PlayerPrefs.GetInt("best", 0);
             }
+            if (OnlineService.Ready && !_walletStarted) { _walletStarted = true; SyncWallet(); }
             if (OnlineService.Ready && !_nameSynced)
             {
                 _nameSynced = true;
@@ -913,7 +914,7 @@ namespace BlockDrop.Game
             Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.06f), "OUT OF MOVES", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.85f) }, Visuals.Hex("FF8FA3"), 3);
             string close = _level.NearMiss() ?? Loc.L("Keep going: 5 more moves could do it.");
             Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.085f, card.width - w * 0.1f, h * 0.07f), close, _body, Color.white, 1.4f);
-            Outlined(new Rect(card.x, card.y + h * 0.155f, card.width, h * 0.035f), $"● {_meta.Coins}", _small, Visuals.Gold, 1.2f);
+            Outlined(new Rect(card.x, card.y + h * 0.155f, card.width, h * 0.035f), $"● {Economy.Compact(_meta.Coins)}", _small, Visuals.Gold, 1.2f);
             float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
             bool afford = _meta.Coins >= ContinueCost;
             if (Btn(new Rect(bx, card.y + h * 0.2f, bw, h * 0.065f), Loc.F("+{0} MOVES  {1} ●", LevelSession.ContinueMoves, ContinueCost), afford ? "4BE38A" : "4A4370", afford ? "1FA45B" : "2E2850", 0.85f)) AcceptContinue();
@@ -1492,7 +1493,7 @@ namespace BlockDrop.Game
                 GUI.color = Visuals.Gold; GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * _meta.Xp / PlayerMeta.XpToNext(_meta.Level), bar.height), Texture2D.whiteTexture);
                 GUI.color = oldC;
             }
-            Outlined(new Rect(w * 0.43f, h * 0.025f, w * 0.5f, h * 0.045f), $"● {_meta.Coins}", new GUIStyle(_body) { alignment = TextAnchor.MiddleRight }, Visuals.Gold, 1.5f);
+            Outlined(new Rect(w * 0.43f, h * 0.025f, w * 0.5f, h * 0.045f), $"● {Economy.Compact(_meta.Coins)}", new GUIStyle(_body) { alignment = TextAnchor.MiddleRight }, Visuals.Gold, 1.5f);
             Outlined(new Rect(0, h * 0.075f + bob, w, h * 0.08f), "BLOCK", _h1, Visuals.Hex("FFE27A"), 3);
             Outlined(new Rect(0, h * 0.145f + bob, w, h * 0.08f), "DROP", _h1, Color.white, 3);
             if (NewLook.On) Outlined(new Rect(0, h * 0.216f + bob, w, h * 0.03f), "Fair hands. Every game.", _small, Visuals.Hex("B9B8E8"), 1f);
@@ -1619,7 +1620,7 @@ namespace BlockDrop.Game
         private void DrawMissions(float w, float h)
         {
             Outlined(new Rect(0, h * 0.06f, w, h * 0.08f), "DAILY MISSIONS", _h2, Visuals.Hex("7CF8FF"), 3);
-            Outlined(new Rect(0, h * 0.13f, w, h * 0.04f), Loc.F("● {0}   ·   STREAK {1}   ·   BEST STREAK {2}", _meta.Coins, _meta.Streak, _meta.BestStreak), _small, Visuals.Gold, 1.2f);
+            Outlined(new Rect(0, h * 0.13f, w, h * 0.04f), Loc.F("● {0}   ·   STREAK {1}   ·   BEST STREAK {2}", Economy.Compact(_meta.Coins), _meta.Streak, _meta.BestStreak), _small, Visuals.Gold, 1.2f);
             var ms = PlayerMeta.MissionsFor(Today);
             for (int i = 0; i < 3; i++)
             {

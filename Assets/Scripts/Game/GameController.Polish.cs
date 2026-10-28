@@ -163,7 +163,7 @@ namespace BlockDrop.Game
             if (xf > 0f) Panel(new Rect(xpBar.x, xpBar.y, Mathf.Max(xpBar.height, xpBar.width * xf), xpBar.height), _barFillStyle);
             Outlined(new Rect(tx, sum.y + h * 0.074f, tw, h * 0.026f), $"{_meta.Xp}/{need} XP", label, new Color(1, 1, 1, 0.8f), 1f);
             float tileW = (sum.width - w * 0.08f - 2 * w * 0.02f) / 3f, ty = sum.y + h * 0.107f, th = h * 0.07f;
-            var tiles = new[] { ($"{got}/{ach.Length}", Coach.T("TROPHIES"), "FFE27A"), ("● " + _meta.Coins, Coach.T("COINS"), "FFD54A"), ("★ " + _progress.TotalStars, Coach.T("STARS"), "7CF8FF") };
+            var tiles = new[] { ($"{got}/{ach.Length}", Coach.T("TROPHIES"), "FFE27A"), ("● " + Economy.Compact(_meta.Coins), Coach.T("COINS"), "FFD54A"), ("★ " + _progress.TotalStars, Coach.T("STARS"), "7CF8FF") };
             for (int k = 0; k < 3; k++)
             {
                 var r = new Rect(sum.x + w * 0.04f + k * (tileW + w * 0.02f), ty, tileW, th);

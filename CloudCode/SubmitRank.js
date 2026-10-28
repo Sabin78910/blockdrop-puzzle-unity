@@ -43,8 +43,9 @@ function validate({ leaderboardId, score, placements, lines }) {
 
 const KING_BOARD = "King";
 const STATE_KEY = "rank_state";
-const TRACKS = ["Classic", "Daily", "VsAi"];
+const TRACKS = ["Classic", "Daily", "VsAi", "Level"];
 const BOTS = ["Easy", "Medium", "Hard"];
+const MAX_LEVEL = 1000;        // far above the level table, keeps the stored record small
 const MIN_GAP_MS = 30000;      // two games cannot finish faster than this
 const DAY_CAP = 1500;          // most points one player can earn per UTC day, across all modes
 const EASY_CAP = 600, MEDIUM_CAP = 2800;
@@ -54,7 +55,7 @@ const DAY_MS = 86400000;
 const dayOf = (ms) => Math.floor(ms / DAY_MS);
 
 function newState() {
-  return { Classic: 0, Daily: 0, VsAi: 0, lastMs: 0, day: -1, dayGain: 0, dailyDone: -1, streak: 0, streakDay: -1, winStreak: 0 };
+  return { Classic: 0, Daily: 0, VsAi: 0, Level: 0, levels: {}, lastMs: 0, day: -1, dayGain: 0, dailyDone: -1, streak: 0, streakDay: -1, winStreak: 0 };
 }
 
 /** Start of the player's current rank: a VS AI loss never drops below it. */
@@ -79,7 +80,14 @@ function applyGame(prev, claim, nowMs) {
   if (s.dayGain >= DAY_CAP) return { accepted: false, reason: "daily rank limit reached" };
 
   let gain = 0;
-  if (claim.track === "Classic" || claim.track === "Daily") {
+  if (claim.track === "Level") {
+    if (!Number.isSafeInteger(claim.level) || claim.level < 1 || claim.level > MAX_LEVEL) return { accepted: false, reason: "level out of range" };
+    if (![1, 2, 3].includes(claim.stars)) return { accepted: false, reason: "stars must be 1, 2 or 3" };
+    // Stars cannot be proved here: the per-level payout (at most 140) and the daily cap are what bound a false claim.
+    const best = s.levels[claim.level] || 0;
+    gain = Math.max(0, claim.stars - best) * 40 + (best === 0 ? 20 : 0);
+    if (claim.stars > best) s.levels = Object.assign({}, s.levels, { [claim.level]: claim.stars });
+  } else if (claim.track === "Classic" || claim.track === "Daily") {
     const problem = validate({ leaderboardId: claim.track, score: claim.score, placements: claim.placements, lines: claim.lines });
     if (problem) return { accepted: false, reason: problem };
     if (claim.track === "Classic") {
@@ -113,12 +121,12 @@ function applyGame(prev, claim, nowMs) {
   return { accepted: true, gain, state: s };
 }
 
-const kingScore = (s) => s.Classic + s.Daily + s.VsAi;
+const kingScore = (s) => s.Classic + s.Daily + s.VsAi + s.Level;
 
 module.exports = async ({ params, context, logger }) => {
   const claim = {
     track: params.track, score: params.score, placements: params.placements, lines: params.lines,
-    bot: params.bot, won: params.won,
+    bot: params.bot, won: params.won, level: params.level, stars: params.stars,
   };
   const cloudSave = new DataApi(context);
   const stored = await cloudSave.getProtectedItems(context.projectId, context.playerId, [STATE_KEY]);
@@ -132,7 +140,7 @@ module.exports = async ({ params, context, logger }) => {
   await cloudSave.setProtectedItem(context.projectId, context.playerId, { key: STATE_KEY, value: result.state });
   const total = kingScore(result.state);
   await new LeaderboardsApi(context).addLeaderboardPlayerScore(context.projectId, KING_BOARD, context.playerId, { score: total });
-  return { accepted: true, gain: result.gain, points: { Classic: result.state.Classic, Daily: result.state.Daily, VsAi: result.state.VsAi }, king: total };
+  return { accepted: true, gain: result.gain, points: { Classic: result.state.Classic, Daily: result.state.Daily, VsAi: result.state.VsAi, Level: result.state.Level }, king: total };
 };
 
 module.exports.params = {
@@ -142,6 +150,8 @@ module.exports.params = {
   lines: { type: "Numeric", required: false },
   bot: { type: "String", required: false },
   won: { type: "Boolean", required: false },
+  level: { type: "Numeric", required: false },
+  stars: { type: "Numeric", required: false },
 };
 
 module.exports.applyGame = applyGame;

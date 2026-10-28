@@ -8,15 +8,18 @@ King = top 100 players, so the points that decide it live on the server. `Submit
   The phone's own ladder in `PlayerMeta` / `blockdrop_save` is only a progress bar and never feeds King.
 - Classic and Daily: the claimed score must pass the same Board-rules check as `SubmitScore` (a copy of it, with a test
   that fails if the two drift). Points: `ModeRank.ClassicGain` and `DailyGain`; the server keeps the Daily streak itself.
+- Level wins (`track` "Level", `level` 1 to 1000, `stars` 1 to 3): the server keeps the best stars per level and pays
+  `(stars - best) * 40`, plus 20 the first time, so a replay pays 0 and one level pays at most 140. Stars cannot be proved, so the
+  per-level payout, the 30 s gap and the daily cap are the only limit.
 - VS AI: the result cannot be proved, so it is capped: 30 s between games, 1,500 points per UTC day, Easy and Medium stop
   paying past 600 and 2,800 like the game, and a loss still costs.
-- King score on the board = Classic + Daily + VS AI totals (sort descending, keep best, no reset).
+- King score on the board = Classic + Daily + VS AI + Level totals (sort descending, keep best, no reset).
 - Honest limit: this slows cheating, it does not end it. A determined cheater can report wins up to the daily cap.
 
 ## Calling it (client side, ranks thread)
-`CloudCode.CallEndpoint`-style call to `SubmitRank` with `track` ("Classic", "Daily" or "VsAi") plus
-`score`, `placements`, `lines` for Classic/Daily, or `bot` ("Easy", "Medium", "Hard") and `won` for VsAi.
-Reply: `{accepted, gain, points:{Classic,Daily,VsAi}, king}` or `{accepted:false, reason}`.
+`CloudCode.CallEndpoint`-style call to `SubmitRank` with `track` ("Classic", "Daily", "VsAi" or "Level") plus
+`score`, `placements`, `lines` for Classic/Daily, `bot` ("Easy", "Medium", "Hard") and `won` for VsAi, or `level` and `stars` for Level.
+Reply: `{accepted, gain, points:{Classic,Daily,VsAi,Level}, king}` or `{accepted:false, reason}`.
 Show KING only when the player is Google-linked (`AccountLink.Linked`) and `GetPlayerScore` on `King` gives rank 100 or better.
 The server cannot see whether an account is linked, so that rule is enforced in the client only.
 

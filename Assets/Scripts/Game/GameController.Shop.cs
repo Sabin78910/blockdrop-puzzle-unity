@@ -179,8 +179,8 @@ namespace BlockDrop.Game
         }
 
         // indexed by (int)ThemeTier: Starter, Premium, Legendary, Exclusive, Mythic, Cosmic, Eternal
-        private static readonly string[] TierTop = { "4FD8FF", "B98CFF", "FFD54A", "3DE0C0", "FF7A7A", "8E94FF", "FFA8E6" };
-        private static readonly string[] TierBottom = { "1B7FD6", "6A33D1", "E08A00", "138F78", "C2283C", "3D3FB8", "B03A8E" };
+        private static readonly string[] TierTop = { "4FD8FF", "B98CFF", "FFD54A", "3DE0C0", "FF7A7A", "8E94FF", "B8438F" };
+        private static readonly string[] TierBottom = { "1B7FD6", "6A33D1", "E08A00", "138F78", "C2283C", "3D3FB8", "6E1A57" };
         private static readonly ThemeTier[] TabOrder = { ThemeTier.Starter, ThemeTier.Premium, ThemeTier.Legendary, ThemeTier.Mythic, ThemeTier.Cosmic, ThemeTier.Eternal, ThemeTier.Exclusive };
         private const int TabsPerRow = 4;
         private const long DailyCoinEstimate = 700; // what an active player earns a day before Fortune; see Economy.cs
@@ -207,13 +207,13 @@ namespace BlockDrop.Game
                 if (_meta.BuyOrSelect(t, true)) { ThemeBought(t, from); } else _fx.Invalid();
                 return;
             }
-            if (!WalletSync.Available) { Toast(Loc.L("Go online to buy"), Visuals.Hex("FFB86B")); _fx.Invalid(); return; }
+            if (!WalletSync.Available) { Toast(Loc.L(WalletSync.Missing ? "Can't buy right now, try again later" : "Go online to buy"), Visuals.Hex("FFB86B")); _fx.Invalid(); return; }
             _walletBusy = true;
             try
             {
                 var r = await WalletSync.BuyAsync(_meta, PlayerMeta.Themes[t].Name);
                 if (r.Outcome == WalletSync.Outcome.Bought && _meta.BuyOrSelect(t)) ThemeBought(t, from);
-                else { _fx.Invalid(); Toast(Loc.L(string.IsNullOrEmpty(r.Reason) ? "Purchase failed, try again" : r.Reason), Visuals.Hex("FF8FA3")); }
+                else { _fx.Invalid(); Toast(Loc.L(string.IsNullOrEmpty(r.Reason) ? "Can't buy right now, try again later" : r.Reason), Visuals.Hex("FF8FA3")); }
             }
             finally { _walletBusy = false; }
             SaveMeta();
@@ -277,7 +277,11 @@ namespace BlockDrop.Game
                     if (have > 0) Panel(new Rect(btn.x, btn.y + btn.height * 0.55f, Mathf.Max(btn.height * 0.3f, btn.width * have / need), btn.height * 0.3f), _barFillStyle);
                     Outlined(new Rect(btn.x, btn.y - btn.height * 0.1f, btn.width, btn.height * 0.6f), ExclusiveProgress(th), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Color.white, 1.2f);
                 }
-                else if (!owned && lockReason != null) Pill(new Rect(btn.x, btn.y + btn.height * 0.1f, btn.width, btn.height * 0.8f), "LOCKED", "6C6590", "463F66", new Color(1, 1, 1, 0.85f));
+                else if (!owned && lockReason != null)
+                {   // the goal stays visible: price on the pill, the unlock condition on the line under the name
+                    Pill(btn, Economy.Compact(th.Price) + " ●", "6C6590", "463F66", new Color(1, 1, 1, 0.9f));
+                    Outlined(caption, Loc.L("LOCKED"), captionStyle, new Color(1, 1, 1, 0.8f), 1f);
+                }
                 else
                 {
                     string label = owned ? "USE" : Economy.Compact(th.Price) + " ●";

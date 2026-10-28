@@ -240,6 +240,7 @@ namespace BlockDrop.Core
             ["One billion coins. Everything, folded in"] = ("Mil millones de monedas. Todo, plegado en uno", "Um bilhão de moedas. Tudo, dobrado em um"),
             ["Own a {0} theme first"] = ("Primero consigue un tema {0}", "Primeiro conquiste um tema {0}"),
             ["Own {0} first"] = ("Primero consigue {0}", "Primeiro conquiste {0}"),
+            ["Can't buy right now, try again later"] = ("No se puede comprar ahora, inténtalo más tarde", "Não é possível comprar agora, tente mais tarde"),
             ["Go online to buy"] = ("Conéctate para comprar", "Conecte-se para comprar"),
             ["Not enough coins"] = ("No tienes monedas suficientes", "Moedas insuficientes"),
             ["Purchase failed, try again"] = ("La compra falló, inténtalo de nuevo", "A compra falhou, tente de novo"),

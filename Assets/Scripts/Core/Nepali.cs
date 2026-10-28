@@ -37,6 +37,7 @@ namespace BlockDrop.Core
             ["One billion coins. Everything, folded in"] = "एक अर्ब सिक्का। सबै कुरा एकमा",
             ["Own a {0} theme first"] = "पहिले {0} थिम लिनुहोस्",
             ["Own {0} first"] = "पहिले {0} लिनुहोस्",
+            ["Can't buy right now, try again later"] = "अहिले किन्न मिल्दैन, पछि फेरि प्रयास गर्नुहोस्",
             ["Go online to buy"] = "किन्न अनलाइन जानुहोस्",
             ["Not enough coins"] = "पर्याप्त सिक्का छैन",
             ["Purchase failed, try again"] = "खरिद असफल, फेरि प्रयास गर्नुहोस्",

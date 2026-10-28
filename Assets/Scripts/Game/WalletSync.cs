@@ -24,7 +24,11 @@ namespace BlockDrop.Game
         public static bool Busy => _running != null && !_running.IsCompleted;
 
         /// <summary>Whether this build and this moment can reach the wallet at all.</summary>
-        public static bool Available => OnlineService.Ready && !OnlineService.IsPreview;
+        public static bool Available => OnlineService.Ready && !OnlineService.IsPreview && !_missing;
+
+        // The Wallet script is not published in this project yet: stop asking for the rest of the session.
+        private static bool _missing;
+        public static bool Missing => _missing;
 
         public static Task<Result> SyncAsync(PlayerMeta meta) => Run(meta, "sync", "");
         public static Task<Result> BuyAsync(PlayerMeta meta, string theme) => Run(meta, "buy", theme);
@@ -53,7 +57,14 @@ namespace BlockDrop.Game
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Wallet request failed: " + e.Message);
+                string m = e.Message ?? "";
+                if (m.Contains("404") || m.IndexOf("not found", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("notfound", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _missing = true;
+                    Debug.LogWarning("Wallet service is not published; expensive themes stay unavailable this session: " + m);
+                    return new Result { Outcome = Outcome.Offline, Reason = "" };
+                }
+                Debug.LogWarning("Wallet request failed: " + m);
                 return new Result { Outcome = Outcome.Offline, Reason = "Purchase failed, try again" };
             }
         }

@@ -2291,7 +2291,7 @@ namespace BlockDrop.Game
             Color ink = medal > 0 && !r.IsMe ? Visuals.Hex("3A1B00") : Color.white;
             float pad = row.height * 0.12f, d = row.height - pad * 2;
             var rankStyle = new GUIStyle(_h2) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter };
-            Outlined(new Rect(row.x + pad, row.y, row.height * 0.8f, row.height), r.Rank.ToString(), rankStyle, ink, 1.2f);
+            Outlined(new Rect(row.x + pad, row.y, row.height * 0.8f, row.height), r.Rank > 0 ? r.Rank.ToString() : "–", rankStyle, ink, 1.2f);
 
             var emb = new Rect(row.x + pad + row.height * 0.85f, row.y + pad, d, d);
             if (Event.current.type == EventType.Repaint)
@@ -2329,21 +2329,44 @@ namespace BlockDrop.Game
             var card = new Rect(w * 0.04f, h * 0.22f, w * 0.92f, h * 0.62f);
             Panel(card, _cardStyle);
             float y = card.y + h * 0.015f, rh = h * 0.058f;
-            if (OnlineService.Errors.TryGetValue(_boardTab, out var err)) Outlined(new Rect(card.x, y, card.width, rh * 3), err, _body, Color.white, 1.2f);
+            if (OnlineService.Errors.TryGetValue(_boardTab, out var err))
+            {
+                int detailAt = err.LastIndexOf('\n');
+                Outlined(new Rect(card.x + card.width * 0.04f, y, card.width * 0.92f, rh * 2.2f), Loc.L(err.Substring(0, detailAt)), _body, Color.white, 1.2f);
+                Outlined(new Rect(card.x + card.width * 0.04f, y + rh * 2.3f, card.width * 0.92f, rh * 1.2f), err.Substring(detailAt + 1), new GUIStyle(_small) { fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.75f)) }, new Color(1, 1, 1, 0.6f), 1f);
+            }
             else if (!OnlineService.Ready) Outlined(new Rect(card.x, y, card.width, rh * 2), OnlineService.Status, _body, Color.white, 1.2f);
             else if (!OnlineService.Top.TryGetValue(_boardTab, out var rows)) Outlined(new Rect(card.x, y, card.width, rh), "Loading…", _body, Color.white, 1.2f);
-            else if (rows.Count == 0) Outlined(new Rect(card.x, y, card.width, rh * 2), "No scores yet.\nBe the first!", _body, Color.white, 1.2f);
+            else if (rows.Count == 0)
+            {
+                Outlined(new Rect(card.x, y, card.width, rh * 2), "No scores yet.\nBe the first!", _body, Color.white, 1.2f);
+                DrawMyRow(card, y + rh * 2.2f, rh);
+            }
             else
             {
                 rh = Mathf.Min(rh, (card.height - h * 0.03f) / rows.Count);
                 float gap = rh * 0.08f;
+                bool meShown = false;
                 foreach (var r in rows)
                 {
                     DrawRankRow(new Rect(card.x + card.width * 0.03f, y, card.width * 0.94f, rh - gap), r);
+                    meShown |= r.IsMe;
                     y += rh;
                 }
+                if (!meShown) DrawMyRow(card, y + rh * 0.15f, rh);
             }
             if (Btn(Row(w, h * 0.87f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
+        }
+
+        /// <summary>The player's own place: from the server when they are on the board, otherwise a "not on the board yet" row with their local best.</summary>
+        private void DrawMyRow(Rect card, float y, float rh)
+        {
+            var area = new Rect(card.x + card.width * 0.03f, y, card.width * 0.94f, rh * 0.94f);
+            if (OnlineService.Me.TryGetValue(_boardTab, out var mine)) { DrawRankRow(area, mine); return; }
+            long local = _boardTab == OnlineService.LevelsBoard ? _progress.TotalStars : _boardTab == OnlineService.ClassicBoard ? PlayerPrefs.GetInt("best", 0) : 0;
+            string name = OnlineService.Ready && OnlineService.PlayerName != "" ? OnlineService.PlayerName : Loc.L("YOU");
+            if (local > 0) DrawRankRow(area, new OnlineService.Row { Rank = 0, Name = name, Score = local, IsMe = true });
+            Outlined(new Rect(card.x, area.yMax + rh * 0.1f, card.width, rh * 0.8f), local > 0 ? "You're not on this board yet. Play a game to join it!" : "Play a game to get on this board!", new GUIStyle(_small) { wordWrap = false }, Visuals.Hex("7CF8FF"), 1.2f);
         }
 
         private void DrawFloaters(float w)

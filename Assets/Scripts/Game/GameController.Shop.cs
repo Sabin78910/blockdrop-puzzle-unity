@@ -175,40 +175,99 @@ namespace BlockDrop.Game
             var coinPill = new Rect(w * 0.34f, h * 0.103f, w * 0.32f, h * 0.036f);
             Panel(coinPill, _barBackStyle);
             GoldCoin(new Rect(coinPill.x + coinPill.height * 0.15f, coinPill.y + coinPill.height * 0.12f, coinPill.height * 0.76f, coinPill.height * 0.76f));
-            Outlined(new Rect(coinPill.x + coinPill.height * 0.9f, coinPill.y, coinPill.width - coinPill.height, coinPill.height), _meta.Coins.ToString("N0", CultureInfo.InvariantCulture), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Gold, 1.2f);
+            Outlined(new Rect(coinPill.x + coinPill.height * 0.9f, coinPill.y, coinPill.width - coinPill.height, coinPill.height), Economy.Compact(_meta.Coins), new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Gold, 1.2f);
         }
 
-        private static readonly string[] TierTop = { "4FD8FF", "B98CFF", "FFD54A", "3DE0C0" };
-        private static readonly string[] TierBottom = { "1B7FD6", "6A33D1", "E08A00", "138F78" };
+        // indexed by (int)ThemeTier: Starter, Premium, Legendary, Exclusive, Mythic, Cosmic, Eternal
+        private static readonly string[] TierTop = { "4FD8FF", "B98CFF", "FFD54A", "3DE0C0", "FF7A7A", "8E94FF", "B8438F" };
+        private static readonly string[] TierBottom = { "1B7FD6", "6A33D1", "E08A00", "138F78", "C2283C", "3D3FB8", "6E1A57" };
+        private static readonly ThemeTier[] TabOrder = { ThemeTier.Starter, ThemeTier.Premium, ThemeTier.Legendary, ThemeTier.Mythic, ThemeTier.Cosmic, ThemeTier.Eternal, ThemeTier.Exclusive };
+        private const int TabsPerRow = 4;
+        private const long DailyCoinEstimate = 700; // what an active player earns a day before Fortune; see Economy.cs
+
+        private bool _walletBusy, _walletStarted;
+        private float _walletSyncAt = -999f;
+
+        /// <summary>Asks the wallet for the real balance when the screen opens or every few minutes, so what the player
+        /// sees is the server's number whenever a connection exists.</summary>
+        private async void SyncWallet()
+        {
+            if (!WalletSync.Available || _walletBusy || _meta == null) return;
+            _walletBusy = true;
+            _walletSyncAt = Time.unscaledTime;
+            try { await WalletSync.SyncAsync(_meta); ApplyTheme(); SaveMeta(); }
+            finally { _walletBusy = false; }
+        }
+
+        private async void BuyServerTheme(int t, Vector2 from)
+        {
+            if (_walletBusy) return;
+            if (OnlineService.IsPreview)
+            {   // test builds have no wallet: buy on the phone so the screens can still be checked
+                if (_meta.BuyOrSelect(t, true)) { ThemeBought(t, from); } else _fx.Invalid();
+                return;
+            }
+            if (!WalletSync.Available) { Toast(Loc.L(WalletSync.Missing ? "Can't buy right now, try again later" : "Go online to buy"), Visuals.Hex("FFB86B")); _fx.Invalid(); return; }
+            _walletBusy = true;
+            try
+            {
+                var r = await WalletSync.BuyAsync(_meta, PlayerMeta.Themes[t].Name);
+                if (r.Outcome == WalletSync.Outcome.Bought && _meta.BuyOrSelect(t)) ThemeBought(t, from);
+                else { _fx.Invalid(); Toast(Loc.L(string.IsNullOrEmpty(r.Reason) ? "Can't buy right now, try again later" : r.Reason), Visuals.Hex("FF8FA3")); }
+            }
+            finally { _walletBusy = false; }
+            SaveMeta();
+        }
+
+        private void ThemeBought(int t, Vector2 from)
+        {
+            ApplyTheme(); SaveMeta(); _fx.Star();
+            Confetti(PlayerMeta.Themes[t].Tier >= ThemeTier.Mythic ? 110 : PlayerMeta.Themes[t].Tier == ThemeTier.Legendary ? 70 : 25);
+            _shopBurstFrom = from; _shopBurstAt = Time.unscaledTime;
+        }
 
         private void DrawThemes(float w, float h)
         {
+            if (Time.unscaledTime - _walletSyncAt > 180f) SyncWallet();
             Outlined(new Rect(0, h * 0.03f, w, h * 0.075f), "THEMES", _h2, Visuals.Hex("FF8FAB"), 3);
             CoinPill(w, h);
-            string[] tabs = { "STARTER", "PREMIUM", "LEGENDARY", "EXCLUSIVE" };
-            float tw = w * 0.88f / tabs.Length;
-            for (int k = 0; k < tabs.Length; k++)
+            if (_meta.Fortune > 1.0001)
+                Outlined(new Rect(0, h * 0.141f, w, h * 0.024f), Loc.F("FORTUNE x{0}", _meta.Fortune.ToString(_meta.Fortune < 10 ? "0.##" : "0.#", CultureInfo.InvariantCulture)),
+                    new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.85f)) }, Visuals.Hex("7CF8FF"), 1.1f);
+
+            // two rows of tabs so seven tiers stay readable
+            float tw = w * 0.88f / TabsPerRow, tabH = h * 0.042f;
+            for (int k = 0; k < TabOrder.Length; k++)
             {
-                bool on = (int)_themeTab == k;
-                if (Btn(new Rect(w * 0.06f + k * tw, h * 0.155f, tw - w * 0.01f, h * 0.05f), tabs[k], on ? TierTop[k] : "5A4FA8", on ? TierBottom[k] : "3A2F80", 0.55f)) _themeTab = (ThemeTier)k;
+                int row = k / TabsPerRow, col = k % TabsPerRow, inRow = Mathf.Min(TabsPerRow, TabOrder.Length - row * TabsPerRow);
+                float x = w * 0.06f + col * tw + (TabsPerRow - inRow) * tw * 0.5f;
+                int ti = (int)TabOrder[k];
+                bool on = _themeTab == TabOrder[k];
+                if (Btn(new Rect(x, h * 0.17f + row * (tabH + h * 0.006f), tw - w * 0.012f, tabH), TabOrder[k].ToString().ToUpperInvariant(), on ? TierTop[ti] : "5A4FA8", on ? TierBottom[ti] : "3A2F80", 0.5f)) _themeTab = TabOrder[k];
             }
-            int tier = (int)_themeTab, row = 0;
+            int tier = (int)_themeTab, shown = 0;
+            float top = h * 0.268f, pitch = h * 0.103f, cardH = h * 0.095f;
             for (int t = 0; t < PlayerMeta.Themes.Length; t++)
             {
                 var th = PlayerMeta.Themes[t];
                 if (th.Tier != _themeTab) continue;
+                int row = shown++;
                 bool owned = _meta.Owns(t), selected = _meta.ThemeIndex == t, afford = _meta.Coins >= th.Price;
-                bool locked = !owned && (!th.Buyable || !afford);
-                var card = BeginShopCard(new Rect(w * 0.05f, h * (0.225f + row * 0.118f), w * 0.9f, h * 0.108f), row, selected ? "2EE59D" : TierTop[tier], selected ? "13805A" : TierBottom[tier], selected || th.Tier == ThemeTier.Legendary, locked, selected ? "7CF8C0" : "FFD959");
-                row++;
-                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.005f, w * 0.5f, h * 0.036f), Loc.L(th.Name).ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.5f);
-                if (th.Tagline != "") Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.039f, w * 0.5f, h * 0.024f), Loc.L(th.Tagline), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.85f)) }, new Color(1, 1, 1, 0.85f), 1f);
+                string lockReason = owned || !th.Buyable ? null : _meta.LockReason(t);
+                bool locked = !owned && (!th.Buyable || !afford || lockReason != null);
+                var card = BeginShopCard(new Rect(w * 0.05f, top + row * pitch, w * 0.9f, cardH), row, selected ? "2EE59D" : TierTop[tier], selected ? "13805A" : TierBottom[tier], selected || th.Tier == ThemeTier.Legendary || th.Tier >= ThemeTier.Mythic, locked, selected ? "7CF8C0" : "FFD959");
+                float textW = w * 0.5f;
+                Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.004f, textW, h * 0.03f), Loc.L(th.Name).ToUpperInvariant(), new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false }, Color.white, 1.5f);
+                string line = lockReason != null ? Loc.L(lockReason) : th.Tagline != "" ? Loc.L(th.Tagline) : "";
+                if (line != "") Outlined(new Rect(card.x + w * 0.04f, card.y + h * 0.033f, textW, h * 0.022f), line, new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.8f)) }, lockReason != null ? Visuals.Hex("FFE9A8") : new Color(1, 1, 1, 0.85f), 1f);
                 // a little board in the theme's own colours
-                float sw = h * 0.028f;
-                var board = new Rect(card.x + w * 0.04f, card.y + h * 0.067f, 5 * (sw + 4) + 6, sw + 6);
+                float sw = h * 0.024f;
+                var board = new Rect(card.x + w * 0.04f, card.y + h * 0.058f, 5 * (sw + 4) + 6, sw + 6);
                 Panel(board, ShopStyle(th.Panel, th.Panel));
                 for (int k = 0; k < 5; k++) GlossTile(new Rect(board.x + 3 + k * (sw + 4), board.y + 3, sw, sw), Visuals.Hex(th.Blocks[k]));
-                var btn = new Rect(card.xMax - w * 0.32f, card.y + h * 0.034f, w * 0.28f, h * 0.056f);
+                var btn = new Rect(card.xMax - w * 0.32f, card.y + h * 0.008f, w * 0.28f, h * 0.052f);
+                var caption = new Rect(btn.x - w * 0.02f, btn.yMax + h * 0.002f, btn.width + w * 0.04f, h * 0.02f);
+                var captionStyle = new GUIStyle(_small) { wordWrap = false, alignment = TextAnchor.MiddleCenter, fontSize = Mathf.Max(8, Mathf.RoundToInt(_small.fontSize * 0.75f)) };
                 if (selected) Pill(new Rect(btn.x, btn.y + btn.height * 0.1f, btn.width, btn.height * 0.8f), "IN USE", "FFFFFF", "C9F7E4", Visuals.Hex("0E6B48"));
                 else if (!owned && !th.Buyable)
                 {
@@ -218,10 +277,29 @@ namespace BlockDrop.Game
                     if (have > 0) Panel(new Rect(btn.x, btn.y + btn.height * 0.55f, Mathf.Max(btn.height * 0.3f, btn.width * have / need), btn.height * 0.3f), _barFillStyle);
                     Outlined(new Rect(btn.x, btn.y - btn.height * 0.1f, btn.width, btn.height * 0.6f), ExclusiveProgress(th), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter }, Color.white, 1.2f);
                 }
-                else if (Btn(btn, owned ? "USE" : $"{th.Price} ●", owned ? "6E8BFF" : afford ? "FFD54A" : "6C6590", owned ? "3A4FE0" : afford ? "D99A00" : "463F66", 0.75f))
+                else if (!owned && lockReason != null)
+                {   // the goal stays visible: price on the pill, the unlock condition on the line under the name
+                    Pill(btn, Economy.Compact(th.Price) + " ●", "6C6590", "463F66", new Color(1, 1, 1, 0.9f));
+                    Outlined(caption, Loc.L("LOCKED"), captionStyle, new Color(1, 1, 1, 0.8f), 1f);
+                }
+                else
                 {
-                    if (_meta.BuyOrSelect(t)) { ApplyTheme(); SaveMeta(); _fx.Star(); if (!owned) { Confetti(th.Tier == ThemeTier.Legendary ? 70 : 25); _shopBurstFrom = btn.center; _shopBurstAt = Time.unscaledTime; } }
-                    else _fx.Invalid();
+                    string label = owned ? "USE" : Economy.Compact(th.Price) + " ●";
+                    GUI.enabled = !_walletBusy;
+                    if (Btn(btn, label, owned ? "6E8BFF" : afford ? "FFD54A" : "6C6590", owned ? "3A4FE0" : afford ? "D99A00" : "463F66", 0.75f))
+                    {
+                        if (owned || !th.ServerSold)
+                        {
+                            bool wasOwned = owned;
+                            if (_meta.BuyOrSelect(t)) { ApplyTheme(); SaveMeta(); _fx.Star(); if (!wasOwned) { Confetti(th.Tier == ThemeTier.Legendary ? 70 : 25); _shopBurstFrom = btn.center; _shopBurstAt = Time.unscaledTime; } }
+                            else _fx.Invalid();
+                        }
+                        else if (afford) BuyServerTheme(t, btn.center);
+                        else _fx.Invalid();
+                    }
+                    GUI.enabled = true;
+                    if (!owned && !afford)
+                        Outlined(caption, Loc.F("about {0} days", Economy.DaysToAfford(th.Price - _meta.Coins, (long)(DailyCoinEstimate * _meta.Fortune))), captionStyle, new Color(1, 1, 1, 0.8f), 1f);
                 }
                 EndShopCard();
             }

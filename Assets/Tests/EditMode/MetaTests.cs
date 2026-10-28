@@ -45,7 +45,7 @@ public class MetaTests
         const string day = "2026-10-09";
         var missions = PlayerMeta.MissionsFor(day);
         for (int i = 0; i < 3; i++) m.Track(missions[i].Kind, missions[i].Target, day);
-        int before = m.Coins;
+        long before = m.Coins;
         Assert.IsTrue(m.Claim(0, day));
         Assert.IsFalse(m.Claim(0, day), "no double claim");
         Assert.AreEqual(before + missions[0].Reward, m.Coins);
@@ -65,7 +65,7 @@ public class MetaTests
             Assert.IsFalse(m.ChestReady(day), "not before the third claim");
             Assert.IsTrue(m.Claim(i, day));
         }
-        int coins = m.Coins, hammers = m.Boosters[0], shuffles = m.Boosters[1];
+        long coins = m.Coins; int hammers = m.Boosters[0], shuffles = m.Boosters[1];
         Assert.IsTrue(m.ChestReady(day));
         Assert.IsTrue(m.ClaimChest(day));
         Assert.AreEqual(coins + PlayerMeta.ChestCoins, m.Coins);

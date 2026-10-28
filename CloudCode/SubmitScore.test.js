@@ -6,7 +6,7 @@ const Module = require("node:module");
 // The Leaderboards SDK only exists inside Cloud Code; stub it so the rules can be tested locally.
 const load = Module._load;
 Module._load = (req, ...rest) => (req === "@unity-services/leaderboards-1.1" ? { LeaderboardsApi: class {} } : load(req, ...rest));
-const { validate } = require("./SubmitScore.js");
+const { validate, validateStars } = require("./SubmitScore.js");
 
 const ok = (c) => assert.strictEqual(validate({ leaderboardId: "Classic", ...c }), null);
 const bad = (c) => assert.notStrictEqual(validate({ leaderboardId: "Classic", ...c }), null);
@@ -38,4 +38,13 @@ test("accepts the best possible single placement", () => {
 test("rejects more lines than the cells placed could ever clear", () => {
   bad({ score: 100000, placements: 10, lines: 30 }); // 10 pieces add 90 cells, 30 lines remove at least 195
   ok({ score: 9 * 10 + 10 * 8 * 8 * 5, placements: 10, lines: 8 }); // dense but possible: 8 lines from 10 pieces
+});
+
+test("the Levels board takes a total-stars score with no placements or lines", () => {
+  assert.strictEqual(validateStars({ score: 0 }), null);
+  assert.strictEqual(validateStars({ score: 250 }), null);
+  assert.notStrictEqual(validateStars({ score: -1 }), null);
+  assert.notStrictEqual(validateStars({ score: 1.5 }), null);
+  assert.notStrictEqual(validateStars({ score: 3001 }), null);
+  assert.notStrictEqual(validate({ leaderboardId: "Levels", score: 10, placements: 0, lines: 0 }), null, "Classic/Daily rules still reject it");
 });

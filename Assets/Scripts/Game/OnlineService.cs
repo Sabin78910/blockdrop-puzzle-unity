@@ -32,6 +32,8 @@ namespace BlockDrop.Game
         public static string PlayerName { get; private set; } = "";
         public static readonly Dictionary<string, List<Row>> Top = new Dictionary<string, List<Row>>();
         public static readonly Dictionary<string, string> Errors = new Dictionary<string, string>();
+        /// <summary>The player's own entry per board, so the screen can show it when they are outside the top 10 or the board is empty.</summary>
+        public static readonly Dictionary<string, Row> Me = new Dictionary<string, Row>();
 
         private static Task _init;
 
@@ -188,9 +190,21 @@ namespace BlockDrop.Game
             try { await RefreshAsync(board); }
             catch (Exception e)
             {
-                Errors[board] = "Leaderboard unavailable right now.\nPlease try again later.";
-                Debug.LogWarning($"Leaderboard '{board}' failed: {e.Message}");
+                Errors[board] = Describe(e);
+                Debug.LogWarning($"Leaderboard '{board}' failed: {e.GetType().Name}: {e.Message}");
             }
+        }
+
+        /// <summary>Plain words for the player plus a short technical line, so a failure on a phone says what actually broke
+        /// (a board missing on the server reads very differently from a bad connection).</summary>
+        private static string Describe(Exception e)
+        {
+            string m = (e.Message ?? "").Replace('\n', ' ');
+            string detail = $"{e.GetType().Name}: {(m.Length > 70 ? m.Substring(0, 70) + "…" : m)}";
+            bool missing = m.IndexOf("404", StringComparison.Ordinal) >= 0 || m.Replace(" ", "").IndexOf("notfound", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool denied = m.IndexOf("403", StringComparison.Ordinal) >= 0 || m.IndexOf("forbidden", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("401", StringComparison.Ordinal) >= 0 || m.IndexOf("unauthor", StringComparison.OrdinalIgnoreCase) >= 0;
+            string head = missing ? "This ranking isn't set up on the server yet." : denied ? "The server refused the ranking request." : "Rankings are unavailable right now.\nPlease try again later.";
+            return head + "\n" + detail;
         }
 
         /// <summary>Sets the public player name (letters, digits, underscore; 3–20 chars). UGS adds a #1234 suffix.</summary>
@@ -215,6 +229,13 @@ namespace BlockDrop.Game
             foreach (var e in page.Results)
                 rows.Add(new Row { Rank = e.Rank + 1, Name = NameFilter.ForDisplay(e.PlayerName), Score = (long)e.Score, IsMe = e.PlayerId == AuthenticationService.Instance.PlayerId });
             Top[board] = rows;
+            Me.Remove(board);
+            try
+            {
+                var mine = await LeaderboardsService.Instance.GetPlayerScoreAsync(board);
+                Me[board] = new Row { Rank = mine.Rank + 1, Name = NameFilter.ForDisplay(mine.PlayerName), Score = (long)mine.Score, IsMe = true };
+            }
+            catch (LeaderboardsException) { } // not on this board yet
         }
     }
 }

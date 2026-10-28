@@ -219,7 +219,7 @@ namespace BlockDrop.Game
             _fitW = UnityEngine.Screen.width; _fitH = UnityEngine.Screen.height;
             _fitSafe = SafeArea();
             float aspect = (float)_fitW / Mathf.Max(1, _fitH);
-            const float needW = 9.6f, needTop = 9.6f, needBottom = -8.2f;
+            const float needW = 9.6f, needTop = 9.9f, needBottom = -8.8f; // room above for the HUD and below for the tallest piece in the hand
             // Fit the play area inside the safe area; the background still fills the whole screen.
             float unitsPerPixel = Mathf.Max((needTop - needBottom) / Mathf.Max(1f, _fitSafe.height), needW / Mathf.Max(1f, _fitSafe.width));
             float halfH = _fitH * unitsPerPixel / 2f;
@@ -1611,7 +1611,9 @@ namespace BlockDrop.Game
             if (_cam != null) boardTop = ToGui(_cam.WorldToScreenPoint(new Vector3(0, BoardCenter.y + 4.35f, 0))).y;
             labelH = h * 0.03f;
             labelY = boardTop - labelH - h * 0.006f;
-            bar = new Rect(w * 0.1f, labelY - h * 0.004f - h * 0.016f, w * 0.8f, h * 0.016f);
+            // the stars sit ON the bar (a 0.04h tall row), so the whole strip is bar row + label line
+            float mid = labelY - h * 0.004f - h * 0.02f;
+            bar = new Rect(w * 0.1f, mid - h * 0.007f, w * 0.8f, h * 0.014f);
         }
 
         private void DrawMissions(float w, float h)
@@ -1940,13 +1942,13 @@ namespace BlockDrop.Game
                 {
                     var d = _level.Definition;
                     // top bar: MENU left, BOOST right, the title and its badge centred between them
-                    float tx = w * 0.04f + bs * 1.6f + w * 0.02f, tw = (w * 0.96f - bs * 2.1f - w * 0.02f) - tx;
+                    float tx = w * 0.04f + bs * 1.6f + w * 0.04f, tw = (w * 0.96f - bs * 2.1f - w * 0.04f) - tx; // clear of MENU and BOOST on narrow phones
                     Outlined(new Rect(tx, top, tw, bs * 0.58f), Loc.F("LEVEL {0}", d.Number), _body, Visuals.Hex("FFE27A"), 1.5f);
                     var badge = new Rect(tx + tw * 0.1f, top + bs * 0.64f, tw * 0.8f, bs * 0.34f);
                     if (d.IsHard) Pill(badge, Loc.L(d.Tier == LevelTier.SuperHard ? "SUPER HARD" : "HARD"), d.Tier == LevelTier.SuperHard ? "FF8FA3" : "FFE27A", d.Tier == LevelTier.SuperHard ? "C23B63" : "C9922B", Color.white);
                     else Outlined(badge, Loc.L(d.Chapter.Name).ToUpperInvariant(), _small, new Color(1, 1, 1, 0.7f), 1f);
                     // moves left: big and always visible, warm when few are left
-                    float rowY = h * 0.1f, rowH = h * 0.085f;
+                    float rowY = h * 0.093f, rowH = h * 0.072f;
                     int left = _level.MovesLeft;
                     Panel(new Rect(w * 0.04f, rowY, w * 0.24f, rowH), _cardStyle);
                     Outlined(new Rect(w * 0.04f, rowY, w * 0.24f, rowH * 0.62f), left.ToString(), _h2, left <= 3 ? Visuals.Hex("FF8FA3") : Color.white, 2.5f);
@@ -1980,7 +1982,7 @@ namespace BlockDrop.Game
                     {
                         float sx = si == 0 ? x1 : si == 1 ? x2 : x3;
                         bool got = si == 0 ? _level.AllGoalsMet : shown >= (si == 1 ? d.TwoStarScore : d.ThreeStarScore);
-                        Outlined(new Rect(sx - starW / 2f, bar.y - h * 0.04f, starW, h * 0.04f), got ? "★" : "☆", starStyle, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
+                        Outlined(new Rect(sx - starW / 2f, bar.center.y - h * 0.02f, starW, h * 0.04f), got ? "★" : "☆", starStyle, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
                     }
                     Outlined(new Rect(bar.x, labelY, bar.width * 0.3f, labelH), Mathf.RoundToInt(shown).ToString(), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
                     if (_boosterTray) DrawBoosterTray(w, h);

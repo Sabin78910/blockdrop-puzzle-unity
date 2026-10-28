@@ -107,3 +107,24 @@ test("malformed claims are refused", () => {
   assert.strictEqual(applyGame(null, { track: "VsAi", bot: "God", won: true }, T0).accepted, false);
   assert.strictEqual(applyGame(null, { track: "VsAi", bot: "Easy", won: "yes" }, T0).accepted, false);
 });
+
+test("level wins pay for new stars only, so replays pay nothing", () => {
+  const lv = (level, stars) => ({ track: "Level", level, stars });
+  let r = applyGame(null, lv(3, 2), T0);
+  assert.strictEqual(r.gain, 2 * 40 + 20);
+  r = applyGame(r.state, lv(3, 2), T0 + MIN_GAP_MS);
+  assert.strictEqual(r.gain, 0);
+  r = applyGame(r.state, lv(3, 1), T0 + 2 * MIN_GAP_MS);
+  assert.strictEqual(r.gain, 0);
+  r = applyGame(r.state, lv(3, 3), T0 + 3 * MIN_GAP_MS);
+  assert.strictEqual(r.gain, 40);
+  assert.strictEqual(r.state.levels[3], 3);
+  assert.strictEqual(r.state.Level, 140);
+  assert.strictEqual(rank.kingScore(r.state), 140);
+});
+
+test("a first 3-star win is the most one level can pay, and bad level claims are refused", () => {
+  assert.strictEqual(applyGame(null, { track: "Level", level: 1, stars: 3 }, T0).gain, 140);
+  for (const c of [{ level: 0, stars: 1 }, { level: 1.5, stars: 1 }, { level: 5000, stars: 1 }, { level: 1, stars: 0 }, { level: 1, stars: 4 }, { level: "2", stars: 1 }])
+    assert.strictEqual(applyGame(null, { track: "Level", ...c }, T0).accepted, false);
+});

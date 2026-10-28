@@ -1943,7 +1943,7 @@ namespace BlockDrop.Game
                     var d = _level.Definition;
                     // top bar: MENU left, BOOST right, the title and its badge centred between them
                     float tx = w * 0.04f + bs * 1.6f + w * 0.04f, tw = (w * 0.96f - bs * 2.1f - w * 0.04f) - tx; // clear of MENU and BOOST on narrow phones
-                    Outlined(new Rect(tx, top, tw, bs * 0.58f), Loc.F("LEVEL {0}", d.Number), _body, Visuals.Hex("FFE27A"), 1.5f);
+                    Outlined(new Rect(tx, top, tw, bs * 0.58f), Loc.F("LEVEL {0}", d.Number), new GUIStyle(_body) { wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Hex("FFE27A"), 1.5f); // one line, shrunk to fit between MENU and BOOST
                     var badge = new Rect(tx + tw * 0.1f, top + bs * 0.64f, tw * 0.8f, bs * 0.34f);
                     if (d.IsHard) Pill(badge, Loc.L(d.Tier == LevelTier.SuperHard ? "SUPER HARD" : "HARD"), d.Tier == LevelTier.SuperHard ? "FF8FA3" : "FFE27A", d.Tier == LevelTier.SuperHard ? "C23B63" : "C9922B", Color.white);
                     else Outlined(badge, Loc.L(d.Chapter.Name).ToUpperInvariant(), _small, new Color(1, 1, 1, 0.7f), 1f);

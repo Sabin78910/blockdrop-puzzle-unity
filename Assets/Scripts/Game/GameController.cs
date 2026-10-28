@@ -2355,7 +2355,8 @@ namespace BlockDrop.Game
             }
             else
             {
-                rh = Mathf.Min(rh, (card.height - h * 0.03f) / rows.Count);
+                bool needMe = !rows.Exists(x => x.IsMe);
+                rh = Mathf.Min(rh, (card.height - h * 0.03f) / (rows.Count + (needMe ? 1.3f : 0f)));
                 float gap = rh * 0.08f;
                 bool meShown = false;
                 foreach (var r in rows)
@@ -2364,7 +2365,7 @@ namespace BlockDrop.Game
                     meShown |= r.IsMe;
                     y += rh;
                 }
-                if (!meShown) DrawMyRow(card, y + rh * 0.15f, rh);
+                if (!meShown) DrawMyRow(card, y + rh * 0.1f, rh);
             }
             if (Btn(Row(w, h * 0.87f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) GoBack();
         }

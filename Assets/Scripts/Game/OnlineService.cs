@@ -201,7 +201,7 @@ namespace BlockDrop.Game
         {
             string m = (e.Message ?? "").Replace('\n', ' ');
             string detail = $"{e.GetType().Name}: {(m.Length > 70 ? m.Substring(0, 70) + "…" : m)}";
-            bool missing = m.IndexOf("404", StringComparison.Ordinal) >= 0 || m.IndexOf("not found", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("notfound", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool missing = m.IndexOf("404", StringComparison.Ordinal) >= 0 || m.Replace(" ", "").IndexOf("notfound", StringComparison.OrdinalIgnoreCase) >= 0;
             bool denied = m.IndexOf("403", StringComparison.Ordinal) >= 0 || m.IndexOf("forbidden", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("401", StringComparison.Ordinal) >= 0 || m.IndexOf("unauthor", StringComparison.OrdinalIgnoreCase) >= 0;
             string head = missing ? "This ranking isn't set up on the server yet." : denied ? "The server refused the ranking request." : "Rankings are unavailable right now.\nPlease try again later.";
             return head + "\n" + detail;

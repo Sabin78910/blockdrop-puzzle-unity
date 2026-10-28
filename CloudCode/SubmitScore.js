@@ -18,6 +18,18 @@ const MAX_PLACEMENTS = 20000;
 // and the board holds at most 64 to begin with, so 6.5 x lines <= 9 x placements + 64 (all doubled below).
 const START_CELLS_ALLOWANCE = 64;
 
+// The Levels board holds total level stars, not a played game, so it has no placements or lines to check.
+// A level is worth at most 3 stars and the game has far fewer than 1000 levels.
+const STARS_BOARD = "Levels";
+const MAX_STARS = 3000;
+
+/** Returns null when a total-stars claim is possible, otherwise the reason it is not. */
+function validateStars({ score }) {
+  if (!Number.isSafeInteger(score) || score < 0) return "score must be a non-negative integer";
+  if (score > MAX_STARS) return "stars out of range";
+  return null;
+}
+
 /** Returns null when the claim is possible under the Board rules, otherwise the reason it is not. */
 function validate({ leaderboardId, score, placements, lines }) {
   if (!BOARDS.includes(leaderboardId)) return "unknown leaderboard";
@@ -43,7 +55,7 @@ module.exports = async ({ params, context, logger }) => {
     placements: params.placements,
     lines: params.lines,
   };
-  const problem = validate(claim);
+  const problem = claim.leaderboardId === STARS_BOARD ? validateStars(claim) : validate(claim);
   if (problem) {
     logger.warning(`Rejected score from ${context.playerId}: ${problem}`, { claim: JSON.stringify(claim) });
     return { accepted: false, reason: problem };
@@ -62,3 +74,4 @@ module.exports.params = {
 };
 
 module.exports.validate = validate;
+module.exports.validateStars = validateStars;

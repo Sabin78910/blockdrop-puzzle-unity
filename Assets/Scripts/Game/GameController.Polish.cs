@@ -110,7 +110,8 @@ namespace BlockDrop.Game
                 int score = Score;
                 int toNext = Goal.ToNextStar(score, 0, d.TwoStarScore, d.ThreeStarScore);
                 int nextAt = score < d.TwoStarScore ? d.TwoStarScore : d.ThreeStarScore;
-                Outlined(new Rect(w * 0.38f, h * 0.245f + h * 0.022f, w * 0.54f, h * 0.03f), toNext > 0 ? Coach.F("NEXT ★ AT {0}", nextAt) : Coach.T("ALL STARS!"),
+                LevelStrip(w, h, out var stripBar, out float stripY, out float stripH);
+                Outlined(new Rect(stripBar.xMax - w * 0.5f, stripY, w * 0.5f, stripH), toNext > 0 ? Coach.F("NEXT ★ AT {0}", nextAt) : Coach.T("ALL STARS!"),
                     new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight }, toNext > 0 ? Visuals.Hex("FFE27A") : Visuals.Gold, 1.2f);
                 if (Goal.LowMoves(_level.MovesLeft) && Event.current.type == EventType.Repaint)
                 {

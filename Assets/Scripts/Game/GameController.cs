@@ -219,7 +219,7 @@ namespace BlockDrop.Game
             _fitW = UnityEngine.Screen.width; _fitH = UnityEngine.Screen.height;
             _fitSafe = SafeArea();
             float aspect = (float)_fitW / Mathf.Max(1, _fitH);
-            const float needW = 9.6f, needTop = 9.6f, needBottom = -8.2f;
+            const float needW = 9.6f, needTop = 9.9f, needBottom = -8.8f; // room above for the HUD and below for the tallest piece in the hand
             // Fit the play area inside the safe area; the background still fills the whole screen.
             float unitsPerPixel = Mathf.Max((needTop - needBottom) / Mathf.Max(1f, _fitSafe.height), needW / Mathf.Max(1f, _fitSafe.width));
             float halfH = _fitH * unitsPerPixel / 2f;
@@ -1588,6 +1588,19 @@ namespace BlockDrop.Game
             }
         }
 
+        /// <summary>Where the level's score strip sits: the bar and the label line under it end just above the board's top edge,
+        /// so nothing in the strip can overlap the grid whatever the phone's shape. Stars go above the bar.</summary>
+        private void LevelStrip(float w, float h, out Rect bar, out float labelY, out float labelH)
+        {
+            float boardTop = h * 0.29f;
+            if (_cam != null) boardTop = ToGui(_cam.WorldToScreenPoint(new Vector3(0, BoardCenter.y + 4.35f, 0))).y;
+            labelH = h * 0.03f;
+            labelY = boardTop - labelH - h * 0.006f;
+            // the stars sit ON the bar (a 0.04h tall row), so the whole strip is bar row + label line
+            float mid = labelY - h * 0.004f - h * 0.02f;
+            bar = new Rect(w * 0.1f, mid - h * 0.007f, w * 0.8f, h * 0.014f);
+        }
+
         private void DrawMissions(float w, float h)
         {
             Outlined(new Rect(0, h * 0.06f, w, h * 0.08f), "DAILY MISSIONS", _h2, Visuals.Hex("7CF8FF"), 3);
@@ -1914,13 +1927,13 @@ namespace BlockDrop.Game
                 {
                     var d = _level.Definition;
                     // top bar: MENU left, BOOST right, the title and its badge centred between them
-                    float tx = w * 0.04f + bs * 1.6f + w * 0.02f, tw = (w * 0.96f - bs * 2.1f - w * 0.02f) - tx;
-                    Outlined(new Rect(tx, top, tw, bs * 0.58f), Loc.F("LEVEL {0}", d.Number), _body, Visuals.Hex("FFE27A"), 1.5f);
+                    float tx = w * 0.04f + bs * 1.6f + w * 0.04f, tw = (w * 0.96f - bs * 2.1f - w * 0.04f) - tx; // clear of MENU and BOOST on narrow phones
+                    Outlined(new Rect(tx, top, tw, bs * 0.58f), Loc.F("LEVEL {0}", d.Number), new GUIStyle(_body) { wordWrap = false, alignment = TextAnchor.MiddleCenter }, Visuals.Hex("FFE27A"), 1.5f); // one line, shrunk to fit between MENU and BOOST
                     var badge = new Rect(tx + tw * 0.1f, top + bs * 0.64f, tw * 0.8f, bs * 0.34f);
                     if (d.IsHard) Pill(badge, Loc.L(d.Tier == LevelTier.SuperHard ? "SUPER HARD" : "HARD"), d.Tier == LevelTier.SuperHard ? "FF8FA3" : "FFE27A", d.Tier == LevelTier.SuperHard ? "C23B63" : "C9922B", Color.white);
                     else Outlined(badge, Loc.L(d.Chapter.Name).ToUpperInvariant(), _small, new Color(1, 1, 1, 0.7f), 1f);
                     // moves left: big and always visible, warm when few are left
-                    float rowY = h * 0.1f, rowH = h * 0.085f;
+                    float rowY = h * 0.093f, rowH = h * 0.072f;
                     int left = _level.MovesLeft;
                     Panel(new Rect(w * 0.04f, rowY, w * 0.24f, rowH), _cardStyle);
                     Outlined(new Rect(w * 0.04f, rowY, w * 0.24f, rowH * 0.62f), left.ToString(), _h2, left <= 3 ? Visuals.Hex("FF8FA3") : Color.white, 2.5f);
@@ -1941,22 +1954,22 @@ namespace BlockDrop.Game
                     }
                     // score bar: the three stars sit right on it, the score and the next star hang under it
                     float shown = _shownScore + _bonusShown;
-                    var bar = new Rect(w * 0.08f, h * 0.245f, w * 0.84f, h * 0.018f);
+                    LevelStrip(w, h, out var bar, out float labelY, out float labelH);
                     Panel(bar, _barBackStyle);
                     float sf = Mathf.Clamp01(shown / Mathf.Max(1, d.ThreeStarScore));
                     if (sf > 0.04f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * sf), bar.height), _barFillStyle);
                     // three stars: the first is for winning, the second and third sit at their score marks (kept apart so they never crowd)
                     float starW = h * 0.06f, minGap = h * 0.065f;
-                    float x3 = bar.xMax, x2 = Mathf.Min(bar.x + bar.width * Mathf.Clamp01((float)d.TwoStarScore / Mathf.Max(1, d.ThreeStarScore)), x3 - minGap);
-                    float x1 = Mathf.Min(bar.x + starW * 0.3f, x2 - minGap);
+                    float x3 = bar.xMax - starW / 2f, x2 = Mathf.Min(bar.x + bar.width * Mathf.Clamp01((float)d.TwoStarScore / Mathf.Max(1, d.ThreeStarScore)), x3 - minGap);
+                    float x1 = Mathf.Min(bar.x + starW / 2f, x2 - minGap);
                     var starStyle = new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.7f), font = null, fontStyle = FontStyle.Bold };
                     for (int si = 0; si < 3; si++)
                     {
                         float sx = si == 0 ? x1 : si == 1 ? x2 : x3;
                         bool got = si == 0 ? _level.AllGoalsMet : shown >= (si == 1 ? d.TwoStarScore : d.ThreeStarScore);
-                        Outlined(new Rect(sx - starW / 2f, bar.y - h * 0.04f, starW, h * 0.04f), got ? "★" : "☆", starStyle, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
+                        Outlined(new Rect(sx - starW / 2f, bar.center.y - h * 0.02f, starW, h * 0.04f), got ? "★" : "☆", starStyle, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
                     }
-                    Outlined(new Rect(bar.x, bar.yMax + h * 0.004f, bar.width * 0.3f, h * 0.03f), Mathf.RoundToInt(shown).ToString(), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
+                    Outlined(new Rect(bar.x, labelY, bar.width * 0.3f, labelH), Mathf.RoundToInt(shown).ToString(), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
                     if (_boosterTray) DrawBoosterTray(w, h);
                     break;
                 }

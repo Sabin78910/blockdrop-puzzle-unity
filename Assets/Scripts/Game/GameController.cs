@@ -1603,6 +1603,17 @@ namespace BlockDrop.Game
 
         private float _welcomeCollectAt = -1f;
 
+        /// <summary>Where the level's score strip sits: the bar and the label line under it end just above the board's top edge,
+        /// so nothing in the strip can overlap the grid whatever the phone's shape. Stars go above the bar.</summary>
+        private void LevelStrip(float w, float h, out Rect bar, out float labelY, out float labelH)
+        {
+            float boardTop = h * 0.29f;
+            if (_cam != null) boardTop = ToGui(_cam.WorldToScreenPoint(new Vector3(0, BoardCenter.y + 4.35f, 0))).y;
+            labelH = h * 0.03f;
+            labelY = boardTop - labelH - h * 0.006f;
+            bar = new Rect(w * 0.1f, labelY - h * 0.004f - h * 0.016f, w * 0.8f, h * 0.016f);
+        }
+
         private void DrawMissions(float w, float h)
         {
             Outlined(new Rect(0, h * 0.06f, w, h * 0.08f), "DAILY MISSIONS", _h2, Visuals.Hex("7CF8FF"), 3);
@@ -1956,14 +1967,14 @@ namespace BlockDrop.Game
                     }
                     // score bar: the three stars sit right on it, the score and the next star hang under it
                     float shown = _shownScore + _bonusShown;
-                    var bar = new Rect(w * 0.08f, h * 0.245f, w * 0.84f, h * 0.018f);
+                    LevelStrip(w, h, out var bar, out float labelY, out float labelH);
                     Panel(bar, _barBackStyle);
                     float sf = Mathf.Clamp01(shown / Mathf.Max(1, d.ThreeStarScore));
                     if (sf > 0.04f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * sf), bar.height), _barFillStyle);
                     // three stars: the first is for winning, the second and third sit at their score marks (kept apart so they never crowd)
                     float starW = h * 0.06f, minGap = h * 0.065f;
-                    float x3 = bar.xMax, x2 = Mathf.Min(bar.x + bar.width * Mathf.Clamp01((float)d.TwoStarScore / Mathf.Max(1, d.ThreeStarScore)), x3 - minGap);
-                    float x1 = Mathf.Min(bar.x + starW * 0.3f, x2 - minGap);
+                    float x3 = bar.xMax - starW / 2f, x2 = Mathf.Min(bar.x + bar.width * Mathf.Clamp01((float)d.TwoStarScore / Mathf.Max(1, d.ThreeStarScore)), x3 - minGap);
+                    float x1 = Mathf.Min(bar.x + starW / 2f, x2 - minGap);
                     var starStyle = new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.7f), font = null, fontStyle = FontStyle.Bold };
                     for (int si = 0; si < 3; si++)
                     {
@@ -1971,7 +1982,7 @@ namespace BlockDrop.Game
                         bool got = si == 0 ? _level.AllGoalsMet : shown >= (si == 1 ? d.TwoStarScore : d.ThreeStarScore);
                         Outlined(new Rect(sx - starW / 2f, bar.y - h * 0.04f, starW, h * 0.04f), got ? "★" : "☆", starStyle, got ? Visuals.Gold : new Color(1, 1, 1, 0.9f), 2f);
                     }
-                    Outlined(new Rect(bar.x, bar.yMax + h * 0.004f, bar.width * 0.3f, h * 0.03f), Mathf.RoundToInt(shown).ToString(), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
+                    Outlined(new Rect(bar.x, labelY, bar.width * 0.3f, labelH), Mathf.RoundToInt(shown).ToString(), new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false, fontStyle = FontStyle.Bold }, Color.white, 1.2f);
                     if (_boosterTray) DrawBoosterTray(w, h);
                     break;
                 }

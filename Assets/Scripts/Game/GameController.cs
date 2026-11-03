@@ -44,7 +44,11 @@ namespace BlockDrop.Game
         private int _chapterPage, _bonusShown, _coinsEarned, _shuffles;
         private const int ContinueCost = 100, CoinsPerStar = 15, HelpingHandMoves = 3, HelpingHandAfter = 3;
         private readonly IAdProvider _ads = new BetaAdProvider();
+        #if UNITY_ANDROID && !UNITY_EDITOR
+        private readonly IStoreProvider _store = new UnityStoreProvider();
+#else
         private readonly IStoreProvider _store = new BetaStoreProvider();
+#endif
         private ThemeTier _themeTab;
         private SpriteRenderer _panel, _miniPanel;
         private readonly List<SpriteRenderer> _slots = new List<SpriteRenderer>();

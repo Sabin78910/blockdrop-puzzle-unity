@@ -8,6 +8,8 @@ Unity 6000.6.2f1 · C# · NUnit EditMode tests · IL2CPP ARM64 · Unity Gaming S
 Set `UNITY=/Applications/Unity/Hub/Editor/6000.6.2f1/Unity.app/Contents/MacOS/Unity`, then:
 - Test: `"$UNITY" -batchmode -nographics -projectPath . -runTests -testPlatform EditMode`
 - Build: `"$UNITY" -batchmode -quit -projectPath . -executeMethod BlockDrop.EditorTools.BuildScript.BuildAndroid`
+- Core rules tests without Unity (what CI's `core-tests` job runs): `dotnet test tools/CoreTests`
+- Cloud Code tests: `node --test CloudCode/*.test.js`
 
 ## Architecture
 - `Assets/Scripts/Core/` pure C# rules with no engine references: board, pieces, modes, meta, fair play,
@@ -30,5 +32,11 @@ Set `UNITY=/Applications/Unity/Hub/Editor/6000.6.2f1/Unity.app/Contents/MacOS/Un
 - `main` is protected: branch, open a PR, merge when CI is green. One issue per PR, under ~300 lines.
 - Branch protection expects a `test-and-build` check that no longer runs; merge with `--admin` after local tests pass.
 
+## Approvals
+- Ask before any production or store change: Unity Gaming Services config (`CloudCode/`, leaderboards), Play Console or store listing (`store/`, `fastlane/`), release tags, signing config.
+- Keep changes focused on the requested task, and report which checks ran and what was not verified.
+- `.claude/settings.json` lets routine build and test commands run without prompts. Pushing to `main`,
+  force pushes, secret changes and fastlane are blocked.
+
 ## Done when
-Tests pass locally (60/60), short summary, PR opened. User facing work follows `docs/FEEL.md`.
+Tests pass locally (81/81), short summary, PR opened. User facing work follows `docs/FEEL.md`.

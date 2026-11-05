@@ -43,7 +43,11 @@ namespace BlockDrop.Game
 
         /// <summary>Grayscale bevelled block (tinted by SpriteRenderer.color): bright top-left rim,
         /// shaded bottom-right edge, soft vertical gradient.</summary>
-        public static Sprite Tile => _tile ??= MakeSprite(BuildTile(256), 256);
+        public static Sprite Tile => UseNewLook ? NewLook.Tile : OldTile;
+        public static Sprite OldTile => _tile ??= MakeSprite(BuildTile(256), 256);
+
+        /// <summary>Set by <see cref="NewLook.Apply"/>: which look newly created sprites use.</summary>
+        public static bool UseNewLook;
 
         private static Texture2D BuildTile(int n)
         {
@@ -71,7 +75,8 @@ namespace BlockDrop.Game
         }
 
         /// <summary>White glossy highlight laid over each block (not tinted).</summary>
-        public static Sprite Gloss => _gloss ??= MakeSprite(BuildGloss(256), 256);
+        public static Sprite Gloss => UseNewLook ? NewLook.Gloss : OldGloss;
+        public static Sprite OldGloss => _gloss ??= MakeSprite(BuildGloss(256), 256);
 
         private static Texture2D BuildGloss(int n)
         {
@@ -138,7 +143,8 @@ namespace BlockDrop.Game
         }
 
         /// <summary>Deep violet → royal blue gradient with soft light orbs.</summary>
-        public static Sprite Background => _background ??= MakeSprite(BuildBackground(512, 1024), 512);
+        public static Sprite Background => UseNewLook ? NewLook.Background : OldBackground;
+        public static Sprite OldBackground => _background ??= MakeSprite(BuildBackground(512, 1024), 512);
 
         private static Texture2D BuildBackground(int w, int h)
         {

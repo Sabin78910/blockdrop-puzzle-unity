@@ -127,6 +127,13 @@ namespace BlockDrop.Core
             ["Clear {0} lines"] = ("Borra {0} líneas", "Limpe {0} linhas"), ["Score {0} points in total"] = ("Haz {0} puntos en total", "Faça {0} pontos no total"),
             ["Place {0} pieces"] = ("Coloca {0} piezas", "Coloque {0} peças"), ["Reach a x{0} combo"] = ("Logra un combo x{0}", "Faça um combo x{0}"),
             ["Finish {0} games"] = ("Termina {0} partidas", "Termine {0} partidas"), ["Earn {0} level stars"] = ("Gana {0} estrellas de nivel", "Ganhe {0} estrelas de nível"),
+            // new look
+            ["Fair hands. Every game."] = ("Manos justas. Cada partida.", "Mãos justas. Toda partida."),
+            ["One cell away from a {0}-line clear!"] = ("¡A una casilla de borrar {0} líneas!", "A uma casa de limpar {0} linhas!"),
+            ["One cell away from a clear!"] = ("¡A una casilla de borrar una línea!", "A uma casa de limpar uma linha!"),
+            ["MOTION: FULL"] = ("MOVIMIENTO: COMPLETO", "MOVIMENTO: COMPLETO"), ["MOTION: REDUCED"] = ("MOVIMIENTO: REDUCIDO", "MOVIMENTO: REDUZIDO"),
+            ["PATTERNS: ON"] = ("PATRONES: SÍ", "PADRÕES: SIM"), ["PATTERNS: OFF"] = ("PATRONES: NO", "PADRÕES: NÃO"),
+            ["NEW LOOK ON"] = ("NUEVO ESTILO ACTIVADO", "NOVO VISUAL LIGADO"), ["NEW LOOK OFF"] = ("NUEVO ESTILO DESACTIVADO", "NOVO VISUAL DESLIGADO"),
         };
     }
 }

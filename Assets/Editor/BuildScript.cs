@@ -72,7 +72,25 @@ namespace BlockDrop.EditorTools
         public static void PreExportAppBundle()
         {
             EditorUserBuildSettings.buildAppBundle = true;
+            IncludeSymbolsInBundle();
             Debug.Log("PreExportAppBundle: building .aab for Google Play");
+        }
+
+        /// <summary>Puts IL2CPP symbol tables inside the .aab so Play Console's Android vitals shows readable
+        /// crash stacks. Set by reflection: the API lives in the Android build-support assembly, which a
+        /// machine without Android support doesn't have, and a missing type must not break editor scripts.</summary>
+        private static void IncludeSymbolsInBundle()
+        {
+            try
+            {
+                var settings = System.Type.GetType("UnityEditor.Android.UserBuildSettings+DebugSymbols, UnityEditor.Android.Extensions");
+                var level = System.Type.GetType("Unity.Android.Types.DebugSymbolLevel, Unity.Android.Types");
+                var format = System.Type.GetType("Unity.Android.Types.DebugSymbolFormat, Unity.Android.Types");
+                if (settings == null || level == null || format == null) { Debug.LogWarning("Debug symbol settings not found; AAB has no symbols"); return; }
+                settings.GetProperty("level").SetValue(null, System.Enum.Parse(level, "SymbolTable"));
+                settings.GetProperty("format").SetValue(null, System.Enum.Parse(format, "IncludeInBundle"));
+            }
+            catch (System.Exception e) { Debug.LogWarning("Could not set debug symbols: " + e.Message); }
         }
 
         public static void BuildAndroid()

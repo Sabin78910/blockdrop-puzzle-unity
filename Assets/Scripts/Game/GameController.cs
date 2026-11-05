@@ -407,6 +407,7 @@ namespace BlockDrop.Game
             if (_screen == Screen.Playing) ClearRun(); // finished or quit: nothing to resume
             SetPaused(false);
             _screen = screen;
+            if (screen == Screen.LevelSelect) _levelPage = -1; // reopen on the player's current page
             _boardRoot.SetActive(false);
             _miniRoot.SetActive(false);
             _menuDeco.SetActive(true);
@@ -430,7 +431,12 @@ namespace BlockDrop.Game
             {
                 good = _level.State == LevelState.Won;
                 _pieceMsg = "";
-                if (good)
+                if (good && !Collection.Covers(_level.Definition.Number))
+                {
+                    _progress.Record(_level.Definition.Number, _level.Stars);
+                    PlayerPrefs.SetString("progress", _progress.Serialize());
+                }
+                else if (good)
                 {
                     var (pic, tile) = Collection.ForLevel(_level.Definition.Number);
                     bool newPiece = !Collection.Revealed(_progress, pic, tile), wasComplete = Collection.Complete(_progress, pic);
@@ -1341,21 +1347,30 @@ namespace BlockDrop.Game
             if (Btn(Row(w, h * 0.82f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
+        private int _levelPage = -1;
+
         private void DrawLevelSelect(float w, float h)
         {
+            const int perRow = 5, perPage = 30;
+            int lastPage = (LevelLibrary.Count - 1) / perPage;
+            if (_levelPage < 0) _levelPage = (_progress.Frontier - 1) / perPage;
+            int first = _levelPage * perPage + 1, last = Mathf.Min(LevelLibrary.Count, first + perPage - 1);
             Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "LEVELS", _h2, Visuals.Hex("FFE27A"), 3);
-            Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"{_progress.TotalStars} / {LevelLibrary.Count * 3} ★", _body, Color.white, 1.5f);
-            const int perRow = 5;
+            Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"{_progress.TotalStars} ★   ·   {first}-{last}", _body, Color.white, 1.5f);
+            float nav = h * 0.045f;
+            if (_levelPage > 0 && Btn(new Rect(w * 0.07f, h * 0.117f, nav * 1.4f, nav), "<", "5A4FA8", "3A2F80", 0.8f)) _levelPage--;
+            if (_levelPage < lastPage && Btn(new Rect(w * 0.93f - nav * 1.4f, h * 0.117f, nav * 1.4f, nav), ">", "5A4FA8", "3A2F80", 0.8f)) _levelPage++;
             float gap = w * 0.025f, cell = (w * 0.86f - gap * (perRow - 1)) / perRow, y0 = h * 0.18f;
-            for (int n = 1; n <= LevelLibrary.Count; n++)
+            for (int n = first; n <= last; n++)
             {
-                int row = (n - 1) / perRow, col = (n - 1) % perRow;
+                int row = (n - first) / perRow, col = (n - first) % perRow;
                 var r = new Rect(w * 0.07f + col * (cell + gap), y0 + row * (cell * 1.08f + gap), cell, cell * 1.08f);
                 bool open = _progress.IsUnlocked(n);
                 int stars = _progress.StarsFor(n);
                 string label = open ? $"{n}\n{new string('★', stars)}{new string('☆', 3 - stars)}" : $"{n}";
                 GUI.enabled = open;
-                var (top, bottom) = !open ? ("4A4370", "2E2850") : stars == 3 ? ("FFD54A", "D99A00") : stars > 0 ? ("4BE38A", "1FA45B") : ("6E8BFF", "3A4FE0");
+                var tier = LevelLibrary.TierOf(n);
+                var (top, bottom) = !open ? ("4A4370", "2E2850") : stars == 0 && tier != LevelTier.Normal ? (tier == LevelTier.SuperHard ? ("C04BFF", "7A1FB8") : ("FF6B6B", "D93A3A")) : stars == 3 ? ("FFD54A", "D99A00") : stars > 0 ? ("4BE38A", "1FA45B") : ("6E8BFF", "3A4FE0");
                 if (Btn(r, label, top, bottom, 0.8f)) StartMode(Mode.Level, level: n);
                 GUI.enabled = true;
             }
@@ -1414,6 +1429,8 @@ namespace BlockDrop.Game
                 {
                     var d = _level.Definition;
                     Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), Loc.F("LEVEL {0}", d.Number), _body, Visuals.Hex("FFE27A"), 1.5f);
+                    if (d.Tier != LevelTier.Normal)
+                        Outlined(new Rect(w * 0.27f, top + bs * 0.8f, w * 0.46f, bs * 0.5f), d.Tier == LevelTier.SuperHard ? "SUPER HARD LEVEL" : "HARD LEVEL", _small, Visuals.Hex(d.Tier == LevelTier.SuperHard ? "C04BFF" : "FF6B6B"), 1.2f);
                     Outlined(new Rect(0, h * 0.085f, w, h * 0.06f), Mathf.RoundToInt(_shownScore).ToString(), _h2, Color.white, 3);
                     var bar = new Rect(w * 0.12f, h * 0.178f, w * 0.76f, h * 0.022f);
                     Panel(bar, _barBackStyle);

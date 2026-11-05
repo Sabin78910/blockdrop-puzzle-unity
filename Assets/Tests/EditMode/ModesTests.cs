@@ -24,9 +24,12 @@ public class ModesTests
         Assert.AreEqual(a.TargetScore, b.TargetScore);
     }
 
+    // the 30 launch levels, two full generated chapters, and spot checks deep into the endless run
+    private static readonly int[] Sample = Enumerable.Range(1, 50).Concat(new[] { 99, 100, 101, 555, 1000, 4999, 10000, 99999, 100000, 543210, LevelLibrary.Count }).ToArray();
+
     [Test] public void EveryLevelIsBeatableByTheBot()
     {
-        for (int n = 1; n <= LevelLibrary.Count; n++)
+        foreach (int n in Sample)
         {
             var s = new LevelSession(n);
             while (s.State == LevelState.Playing && Bot.TryBestMove(s.Seat.Board, s.Seat.Dealer.Hand, out int i, out int x, out int y))
@@ -39,14 +42,34 @@ public class ModesTests
     [Test] public void DifficultyRises()
     {
         var easy = LevelLibrary.Get(1);
-        var hard = LevelLibrary.Get(LevelLibrary.Count);
+        var hard = LevelLibrary.Get(LevelLibrary.Handmade);
         Assert.Greater(hard.Obstacles.Length, easy.Obstacles.Length);
         Assert.Greater((double)hard.TargetScore / hard.ThreeStarScore, (double)easy.TargetScore / easy.ThreeStarScore);
     }
 
+    [Test] public void GeneratedLevelsFollowASawtoothThatRisesOverall()
+    {
+        Assert.AreEqual(LevelTier.Normal, LevelLibrary.Get(31).Tier);
+        Assert.AreEqual(LevelTier.Hard, LevelLibrary.Get(35).Tier);
+        Assert.AreEqual(LevelTier.SuperHard, LevelLibrary.Get(40).Tier);
+        Assert.AreEqual(LevelTier.Normal, LevelLibrary.Get(30).Tier, "launch levels are not relabelled");
+        double Ratio(int n) { var d = LevelLibrary.Get(n); return (double)d.TargetScore / d.ThreeStarScore; }
+        double Chapter(int first) => Enumerable.Range(first, 10).Select(n => (double)LevelLibrary.Get(n).Obstacles.Length).Average();
+        Assert.Greater(Chapter(2001), Chapter(31), "deep chapters have more obstacles on average");
+        Assert.Greater(Ratio(40), Ratio(41), "a breather follows the super hard level");
+        Assert.LessOrEqual(LevelLibrary.Get(LevelLibrary.Count).Obstacles.Length, 22);
+    }
+
+    [Test] public void GeneratedLevelsDifferFromEachOther()
+    {
+        var layouts = Enumerable.Range(31, 100).Select(n => string.Join(";", LevelLibrary.Get(n).Obstacles)).Distinct().Count();
+        Assert.AreEqual(100, layouts);
+        Assert.Throws<System.ArgumentOutOfRangeException>(() => LevelLibrary.Get(LevelLibrary.Count + 1));
+    }
+
     [Test] public void ObstaclesNeverFillALine()
     {
-        for (int n = 1; n <= LevelLibrary.Count; n++)
+        foreach (int n in Sample)
         {
             var obs = LevelLibrary.Get(n).Obstacles;
             for (int i = 0; i < 8; i++)
@@ -86,6 +109,21 @@ public class ModesTests
         Assert.AreEqual(2, q.StarsFor(1));
         Assert.AreEqual(2, q.TotalStars);
         Assert.IsTrue(Progress.Parse("garbage!!").IsUnlocked(1));
+    }
+
+    [Test] public void ProgressGrowsPastTheLaunchLevelsAndKeepsOldSaves()
+    {
+        var old = Progress.Parse(new string('3', 30)); // a 1.0.0 save with every launch level beaten
+        Assert.AreEqual(90, old.TotalStars);
+        Assert.IsTrue(old.IsUnlocked(31));
+        Assert.AreEqual(31, old.Frontier);
+        for (int n = 31; n <= 5000; n++) old.Record(n, 1);
+        var q = Progress.Parse(old.Serialize());
+        Assert.AreEqual(90 + 4970, q.TotalStars);
+        Assert.IsTrue(q.IsUnlocked(5001));
+        Assert.IsFalse(q.IsUnlocked(5002));
+        Assert.AreEqual(5001, q.Frontier);
+        Assert.AreEqual(5000, q.Serialize().Length);
     }
 
     [Test] public void VersusPlayersAlternateWithIdenticalPieces()

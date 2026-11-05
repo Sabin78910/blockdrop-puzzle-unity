@@ -37,6 +37,9 @@ namespace BlockDrop.Game
         private float _tutorialStepAt;
         private static string Today => PlayerMeta.Day(DateTime.Now);
         private bool _bestCelebrated, _nameSynced, _paused, _offerRevive, _firstSession;
+        private bool _offerContinue, _levelIntro; // level: the continue card and the start card
+        private int _chapterPage, _bonusShown, _coinsEarned, _shuffles;
+        private const int ContinueCost = 100, CoinsPerStar = 15, HelpingHandMoves = 3, HelpingHandAfter = 3;
         private readonly IAdProvider _ads = new BetaAdProvider();
         private AdPolicy _adPolicy;
         private TouchScreenKeyboard _kb;
@@ -245,7 +248,9 @@ namespace BlockDrop.Game
         private void SaveRun()
         {
             if (_screen != Screen.Playing || !Resumable) return;
-            var save = SavedGame.Capture(_mode.ToString(), MainSeat, _mode == Mode.Classic, _mode == Mode.Level ? _level.Definition.Number : 0, Today, _hintsLeft);
+            bool level = _mode == Mode.Level;
+            var save = SavedGame.Capture(_mode.ToString(), MainSeat, _mode == Mode.Classic, level ? _level.Definition.Number : 0, Today, _hintsLeft,
+                level ? _level.ExtraMoves : 0, level ? _level.Continues : 0);
             PlayerPrefs.SetString(RunKey, save.Serialize());
         }
 
@@ -265,6 +270,7 @@ namespace BlockDrop.Game
                     case Mode.Level:
                         _level = new LevelSession(save.Level);
                         save.ApplyTo(_level.Seat);
+                        _level.RestoreExtra(save.Extra, save.Continues);
                         break;
                     case Mode.Challenge: _challengeSeed = save.Seed; _single = save.NewSeat(); break;
                     default: _single = save.NewSeat(); break;
@@ -365,14 +371,14 @@ namespace BlockDrop.Game
             _ => null,
         };
 
-        private bool InputAllowed => _screen == Screen.Playing && !_aiThinking && !(_mode == Mode.VsAi && _versus.Turn != 0) && Time.time > _turnBannerUntil;
+        private bool InputAllowed => _screen == Screen.Playing && !_aiThinking && !_levelIntro && !_offerContinue && !(_mode == Mode.VsAi && _versus.Turn != 0) && Time.time > _turnBannerUntil;
 
         private void StartMode(Mode mode, int seed = 0, int level = 0)
         {
             _mode = mode;
             switch (mode)
             {
-                case Mode.Level: _level = new LevelSession(level); break;
+                case Mode.Level: _level = new LevelSession(level, HelpingHand(level)); break;
                 case Mode.Versus:
                 case Mode.VsAi: _versus = new VersusMatch(Environment.TickCount); break;
                 case Mode.Daily: _single = new Seat(PieceGenerator.DailySeed(DateTime.UtcNow)); break;
@@ -382,7 +388,14 @@ namespace BlockDrop.Game
             _hintsLeft = Competitive ? 0 : 3;
             MaybeInterstitial();
             EnterPlay(mode);
+            _levelIntro = mode == Mode.Level; // the start card: goals, moves and anything new
         }
+
+        private static string FailKey(int level) => "lvfail" + level;
+
+        /// <summary>After a few losses on the same level the next try starts with a few extra moves, and says so.
+        /// Visible help instead of secretly easier pieces: the game stays honest (docs/FEEL.md).</summary>
+        private static int HelpingHand(int level) => PlayerPrefs.GetInt(FailKey(level), 0) >= HelpingHandAfter ? HelpingHandMoves : 0;
 
         /// <summary>Shows the board for <paramref name="mode"/> once its seats exist (new or resumed run).</summary>
         private void EnterPlay(Mode mode)
@@ -390,6 +403,7 @@ namespace BlockDrop.Game
             _mode = mode;
             _runId++;
             _hint = null; _newBest = false; _aiThinking = false; _finishing = false; _bestCelebrated = false; _offerRevive = false;
+            _offerContinue = false; _levelIntro = false; _bonusShown = 0; _coinsEarned = 0; _shuffles = mode == Mode.Level ? _level.Shuffles : 0;
             _shownScore = 0;
             _floaters.Clear();
             _screen = Screen.Playing;
@@ -430,11 +444,14 @@ namespace BlockDrop.Game
             {
                 good = _level.State == LevelState.Won;
                 _pieceMsg = "";
+                int number = _level.Definition.Number;
+                PlayerPrefs.SetInt(FailKey(number), good ? 0 : PlayerPrefs.GetInt(FailKey(number), 0) + 1);
                 if (good)
                 {
-                    var (pic, tile) = Collection.ForLevel(_level.Definition.Number);
+                    var (pic, tile) = Collection.ForLevel(number);
                     bool newPiece = !Collection.Revealed(_progress, pic, tile), wasComplete = Collection.Complete(_progress, pic);
-                    _progress.Record(_level.Definition.Number, _level.Stars);
+                    _coinsEarned = _progress.Record(number, _level.Stars) * CoinsPerStar; // new stars only: replays are never a grind
+                    _meta.AddCoins(_coinsEarned);
                     PlayerPrefs.SetString("progress", _progress.Serialize());
                     if (newPiece) _pieceMsg = Loc.F("PICTURE PIECE!  {0} {1}/{2}", Loc.L(Collection.Pictures[pic].Name), Collection.RevealedCount(_progress, pic), Collection.TilesPerPicture);
                     if (!wasComplete && Collection.Complete(_progress, pic))
@@ -481,8 +498,9 @@ namespace BlockDrop.Game
                     bool filled = b.IsFilled(x, y);
                     _tiles[x, y].enabled = filled;
                     if (filled) _tiles[x, y].color = Visuals.BlockColors[b[x, y]];
-                    _gloss[x, y].enabled = filled && b[x, y] != LevelLibrary.ObstacleColor;
-                    _marks[x, y].sprite = filled && NewLook.PatternsOn ? NewLook.Pattern(b[x, y]) : null;
+                    _gloss[x, y].enabled = filled && b[x, y] != Board.Stone;
+                    // gems and ice always show their mark: their rule differs, so shape must say it, not only colour
+                    _marks[x, y].sprite = filled && (NewLook.PatternsOn || b[x, y] > Board.Stone) ? NewLook.Pattern(b[x, y]) : null;
                 }
             var mini = MiniSeat;
             if (mini != null)
@@ -628,7 +646,8 @@ namespace BlockDrop.Game
                 burst.Add((CellPos(x, y), Visuals.BlockColors[c]));
             }
 
-            int before = board.Score;
+            int before = board.Score, gemsBefore = board.Count(Board.Gem);
+            int goalsBefore = _mode == Mode.Level ? GoalsMet() : 0;
             bool ok = _mode switch
             {
                 Mode.Level => _level.TryPlace(handIndex, ox, oy),
@@ -636,6 +655,14 @@ namespace BlockDrop.Game
                 _ => _single.TryPlace(handIndex, ox, oy),
             };
             if (!ok) { RebuildHand(); return; }
+
+            if (_mode == Mode.Level)
+            {
+                // goal progress lands in the same frame as the move, with its own sound
+                int gems = gemsBefore - board.Count(Board.Gem);
+                if (gems > 0) { AddFloater(gems == 1 ? Loc.L("GEM!") : Loc.F("{0} GEMS!", gems), BoardCenter + new Vector3(0, 1.2f, 0), Visuals.BlockColors[Board.Gem], 1.3f); _fx.Star(); }
+                if (GoalsMet() > goalsBefore && !_level.AllGoalsMet) { AddFloater("GOAL COMPLETE!", BoardCenter + new Vector3(0, 3.0f, 0), Visuals.Hex("2EE59D"), 1.3f); _fx.Star(); }
+            }
 
             int gained = board.Score - before;
             int lines = rows.Count + cols.Count;
@@ -728,8 +755,16 @@ namespace BlockDrop.Game
             {
                 // Classic offers one second chance (a fresh hand that fits) before the game ends.
                 if (_mode == Mode.Classic && _single.Revives == 0) { _offerRevive = true; RefreshBoard(); RebuildHand(); return; }
+                // Levels: a loss may continue with more moves; a win first turns spare moves into points.
+                if (_mode == Mode.Level && _level.CanContinue) { _offerContinue = true; RefreshBoard(); RebuildHand(); return; }
+                if (_mode == Mode.Level && _level.State == LevelState.Won) { StartCoroutine(BonusBlast()); return; }
                 StartCoroutine(FinishSoon());
                 return;
+            }
+            if (_mode == Mode.Level && _level.Shuffles > _shuffles)
+            {
+                _shuffles = _level.Shuffles;
+                AddFloater("NO ROOM! FRESH PIECES", BoardCenter + new Vector3(0, -3.2f, 0), Visuals.Hex("7CF8FF"), 1.0f);
             }
             if (_mode == Mode.Versus) { _turnBannerUntil = Time.time + 1.1f; Array.Clear(_pop, 0, _pop.Length); }
             RefreshBoard(); RebuildHand();
@@ -738,6 +773,132 @@ namespace BlockDrop.Game
 
         private int _runId;
         private bool _finishing;
+
+        private int GoalsMet()
+        {
+            int n = 0;
+            for (int i = 0; i < _level.Definition.Goals.Length; i++) if (_level.GoalMet(i)) n++;
+            return n;
+        }
+
+        /// <summary>The level is won: every spare move bursts into points, one by one, before the result card.
+        /// Anticipation is the reward (docs/FEEL.md), so the count is visible and rises with a sound per move.</summary>
+        private IEnumerator BonusBlast()
+        {
+            int run = _runId;
+            _finishing = true;
+            _aiThinking = true; // blocks input
+            RefreshBoard(); RebuildHand();
+            AddFloater("LEVEL COMPLETE!", BoardCenter + new Vector3(0, 2.6f, 0), Visuals.Hex("FFE27A"), 1.7f);
+            _fx.Win();
+            yield return new WaitForSecondsRealtime(0.8f);
+            int moves = _level.MovesLeft;
+            if (moves > 0) AddFloater(Loc.F("BONUS BLAST! {0} MOVES", moves), BoardCenter + new Vector3(0, 1.2f, 0), Visuals.Hex("FF9BD2"), 1.3f);
+            float step = Mathf.Clamp(1.6f / Mathf.Max(1, moves), 0.06f, 0.16f);
+            for (int i = 0; i < moves; i++)
+            {
+                if (run != _runId || _screen != Screen.Playing) yield break;
+                _bonusShown += LevelLibrary.MoveBonus;
+                var cell = CellPos(_rng.Next(Size), _rng.Next(Size));
+                AddFloater("+" + LevelLibrary.MoveBonus, cell, Visuals.Gold, 0.8f);
+                if (!NewLook.ReducedMotion) Shatter(cell, Visuals.BlockColors[_rng.Next(5)]);
+                _fx.Place();
+                yield return new WaitForSecondsRealtime(step);
+            }
+            yield return new WaitForSecondsRealtime(0.5f);
+            if (run != _runId || _screen != Screen.Playing) yield break;
+            _finishing = false;
+            _aiThinking = false;
+            Finish();
+        }
+
+        private void AcceptContinue()
+        {
+            if (!_meta.Spend(ContinueCost)) { _fx.Invalid(); return; }
+            SaveMeta();
+            _offerContinue = false;
+            if (_level.Continue())
+            {
+                SaveRun();
+                RefreshBoard(); RebuildHand();
+                AddFloater(Loc.F("+{0} MOVES!", LevelSession.ContinueMoves), BoardCenter + new Vector3(0, 2.8f, 0), Visuals.Hex("7CF8FF"), 1.4f);
+                _fx.Star();
+            }
+            else StartCoroutine(FinishSoon());
+        }
+
+        private void DeclineContinue()
+        {
+            _offerContinue = false;
+            StartCoroutine(FinishSoon());
+        }
+
+        /// <summary>Out of moves in a level: an honest "how close" line and an optional paid continue. The way out
+        /// is as big as the way in, and nothing counts down.</summary>
+        private void DrawContinue(float w, float h)
+        {
+            if (!_offerContinue) return;
+            var card = new Rect(w * 0.08f, h * 0.28f, w * 0.84f, h * 0.38f);
+            Modal(w, h, card);
+            Outlined(new Rect(card.x, card.y + h * 0.02f, card.width, h * 0.06f), "OUT OF MOVES", new GUIStyle(_h2) { fontSize = Mathf.RoundToInt(_h2.fontSize * 0.85f) }, Visuals.Hex("FF8FA3"), 3);
+            string close = _level.NearMiss() ?? Loc.L("Keep going: 5 more moves could do it.");
+            Outlined(new Rect(card.x + w * 0.05f, card.y + h * 0.085f, card.width - w * 0.1f, h * 0.07f), close, _body, Color.white, 1.4f);
+            Outlined(new Rect(card.x, card.y + h * 0.155f, card.width, h * 0.035f), $"● {_meta.Coins}", _small, Visuals.Gold, 1.2f);
+            float bw = card.width * 0.8f, bx = card.x + card.width * 0.1f;
+            bool afford = _meta.Coins >= ContinueCost;
+            if (Btn(new Rect(bx, card.y + h * 0.2f, bw, h * 0.065f), Loc.F("+{0} MOVES  {1} ●", LevelSession.ContinueMoves, ContinueCost), afford ? "4BE38A" : "4A4370", afford ? "1FA45B" : "2E2850", 0.85f)) AcceptContinue();
+            if (Btn(new Rect(bx, card.y + h * 0.28f, bw, h * 0.06f), "NO THANKS", "5A4FA8", "3A2F80", 0.8f)) DeclineContinue();
+        }
+
+        /// <summary>The level's start card: what to do, how many moves, and the chapter's new idea when there is one.</summary>
+        private void DrawLevelIntro(float w, float h)
+        {
+            if (!_levelIntro || _mode != Mode.Level) return;
+            var d = _level.Definition;
+            string intro = d.Intro != null ? Loc.L(d.Intro) : null;
+            var card = new Rect(w * 0.08f, h * 0.26f, w * 0.84f, h * (intro != null ? 0.44f : 0.38f));
+            Modal(w, h, card);
+            float y = card.y + h * 0.02f;
+            Outlined(new Rect(card.x, y, card.width, h * 0.06f), Loc.F("LEVEL {0}", d.Number), _h2, Visuals.Hex("FFE27A"), 3);
+            y += h * 0.06f;
+            string sub = Loc.L(d.Chapter.Name).ToUpperInvariant() + (d.IsHard ? "   ·   " + Loc.L(d.Tier == LevelTier.SuperHard ? "SUPER HARD" : "HARD LEVEL") : "");
+            Outlined(new Rect(card.x, y, card.width, h * 0.035f), sub, _small, d.IsHard ? Visuals.Hex("FF8FA3") : new Color(1, 1, 1, 0.8f), 1.2f);
+            y += h * 0.045f;
+            if (intro != null)
+            {
+                Outlined(new Rect(card.x, y, card.width, h * 0.03f), "NEW!", _small, Visuals.Hex("7CF8FF"), 1.2f);
+                Outlined(new Rect(card.x + w * 0.05f, y + h * 0.028f, card.width - w * 0.1f, h * 0.05f), intro, _small, Color.white, 1.2f);
+                y += h * 0.085f;
+            }
+            for (int i = 0; i < d.Goals.Length; i++, y += h * 0.042f)
+                Outlined(new Rect(card.x, y, card.width, h * 0.04f), GoalText(d.Goals[i]), _body, Color.white, 1.4f);
+            string moves = Loc.F("in {0} moves", _level.MaxMoves);
+            if (_level.ExtraMoves > 0) moves += "   " + Loc.F("(+{0} helping hand)", _level.ExtraMoves);
+            Outlined(new Rect(card.x, y, card.width, h * 0.035f), moves, _small, Visuals.Hex("FFE27A"), 1.2f);
+            if (Btn(new Rect(card.x + card.width * 0.15f, card.yMax - h * 0.085f, card.width * 0.7f, h * 0.065f), "PLAY", "4BE38A", "1FA45B")) _levelIntro = false;
+        }
+
+        private static string GoalText(LevelGoal g) => g.Kind switch
+        {
+            GoalKind.Score => Loc.F("Score {0} points", g.Target),
+            GoalKind.Lines => Loc.F("Clear {0} lines", g.Target),
+            GoalKind.Stones => g.Target == 1 ? Loc.L("Clear the stone") : Loc.F("Clear all {0} stones", g.Target),
+            _ => g.Target == 1 ? Loc.L("Collect the gem") : Loc.F("Collect all {0} gems", g.Target),
+        };
+
+        /// <summary>Short HUD form of a goal's progress.</summary>
+        private string GoalChip(int i)
+        {
+            var g = _level.Definition.Goals[i];
+            int p = Mathf.Min(_level.Progress(i), g.Target);
+            return g.Kind switch
+            {
+                GoalKind.Score => Loc.F("SCORE {0}/{1}", p, g.Target),
+                GoalKind.Lines => Loc.F("LINES {0}/{1}", p, g.Target),
+                GoalKind.Stones => Loc.F("STONES {0}/{1}", p, g.Target),
+                _ => Loc.F("GEMS {0}/{1}", p, g.Target),
+            };
+        }
 
         private IEnumerator FinishSoon()
         {
@@ -1045,7 +1206,7 @@ namespace BlockDrop.Game
                 case Screen.Menu: GUI.enabled = _welcomeReward == 0; DrawMenu(w, h); break;
                 case Screen.LevelSelect: DrawLevelSelect(w, h); break;
                 case Screen.AiSelect: DrawAiSelect(w, h); break;
-                case Screen.Playing: GUI.enabled = !_breakOpen && !_paused && !_offerRevive; DrawHud(w, h); GUI.enabled = true; break;
+                case Screen.Playing: GUI.enabled = !_breakOpen && !_paused && !_offerRevive && !_offerContinue && !_levelIntro; DrawHud(w, h); GUI.enabled = true; break;
                 case Screen.Result: DrawResult(w, h); break;
                 case Screen.Challenge: DrawChallenge(w, h); break;
                 case Screen.Leaderboard: DrawLeaderboard(w, h); break;
@@ -1058,7 +1219,7 @@ namespace BlockDrop.Game
             GUI.enabled = true;
             DrawFloaters(w);
             DrawToasts(w, h);
-            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); DrawPause(w, h); DrawSecondChance(w, h); }
+            if (_screen == Screen.Playing) { DrawStreakMeter(w, h); DrawTutorial(w, h); DrawBreak(w, h); DrawPause(w, h); DrawSecondChance(w, h); DrawLevelIntro(w, h); DrawContinue(w, h); }
             if (Time.unscaledTime < _flashUntil)
             {
                 var old = GUI.color; GUI.color = new Color(1, 1, 1, 0.55f * (_flashUntil - Time.unscaledTime) / 0.14f);
@@ -1069,7 +1230,8 @@ namespace BlockDrop.Game
 
         private void DrawStreakMeter(float w, float h)
         {
-            if (_mode == Mode.Versus || _mode == Mode.VsAi || (_tutorial < 3 && _mode == Mode.Classic)) return;
+            // levels use this strip for the star bar; their combos still get the COMBO floater
+            if (_mode == Mode.Versus || _mode == Mode.VsAi || _mode == Mode.Level || (_tutorial < 3 && _mode == Mode.Classic)) return;
             int combo = MainSeat.Board.Combo;
             if (combo < 1) return;
             float pulse = 1f + 0.06f * Mathf.Sin(Time.time * 9f);
@@ -1214,7 +1376,7 @@ namespace BlockDrop.Game
             float half = (w * 0.84f - gap) / 2f, x2 = w * 0.08f + half + gap;
             if (Btn(Row(w, y, bh * 1.2f), "PLAY", "4BE38A", "1FA45B", 1.4f)) StartMode(Mode.Classic);
             y += bh * 1.2f + gap;
-            if (Btn(new Rect(w * 0.08f, y, half, bh), Loc.F("LEVELS {0}★", _progress.TotalStars), "FFC24B", "F08A1C", 0.85f)) ShowMenu(Screen.LevelSelect);
+            if (Btn(new Rect(w * 0.08f, y, half, bh), Loc.F("LEVELS {0}★", _progress.TotalStars), "FFC24B", "F08A1C", 0.85f)) OpenLevels();
             if (Btn(new Rect(x2, y, half, bh), "DAILY", "4FD8FF", "1C8FE0", 0.85f)) StartMode(Mode.Daily);
             y += bh + gap;
             if (Btn(new Rect(w * 0.08f, y, half, bh), "VS AI", "B98CFF", "7A3FE0", 0.85f)) ShowMenu(Screen.AiSelect);
@@ -1341,54 +1503,86 @@ namespace BlockDrop.Game
             if (Btn(Row(w, h * 0.82f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
+        private void OpenLevels()
+        {
+            _chapterPage = (_progress.Frontier - 1) / LevelLibrary.PerChapter; // open where the player is
+            ShowMenu(Screen.LevelSelect);
+        }
+
+        /// <summary>One chapter per page: its picture filling in, ten levels, and the way to the next chapter.
+        /// Hard levels are marked so a tough level is expected, not a surprise.</summary>
         private void DrawLevelSelect(float w, float h)
         {
-            Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "LEVELS", _h2, Visuals.Hex("FFE27A"), 3);
-            Outlined(new Rect(0, h * 0.12f, w, h * 0.04f), $"{_progress.TotalStars} / {LevelLibrary.Count * 3} ★", _body, Color.white, 1.5f);
+            int chapters = LevelLibrary.Count / LevelLibrary.PerChapter;
+            _chapterPage = Mathf.Clamp(_chapterPage, 0, chapters - 1);
+            var chapter = LevelLibrary.Chapters[_chapterPage];
+            Outlined(new Rect(0, h * 0.04f, w, h * 0.07f), Loc.F("CHAPTER {0}", _chapterPage + 1), _h2, Visuals.Hex("FFE27A"), 3);
+            Outlined(new Rect(0, h * 0.105f, w, h * 0.04f), Loc.L(chapter.Name).ToUpperInvariant(), _body, Color.white, 1.5f);
+            Outlined(new Rect(0, h * 0.145f, w, h * 0.035f), $"{_progress.TotalStars} / {LevelLibrary.Count * 3} ★", _small, Visuals.Gold, 1.2f);
+
+            DrawPicture(_chapterPage, w * 0.5f, h * 0.19f, Mathf.Min(w * 0.5f, h * 0.2f * Collection.Width / Collection.Height));
+
             const int perRow = 5;
-            float gap = w * 0.025f, cell = (w * 0.86f - gap * (perRow - 1)) / perRow, y0 = h * 0.18f;
-            for (int n = 1; n <= LevelLibrary.Count; n++)
+            float gap = w * 0.025f, cell = (w * 0.86f - gap * (perRow - 1)) / perRow, y0 = h * 0.42f;
+            for (int k = 0; k < LevelLibrary.PerChapter; k++)
             {
-                int row = (n - 1) / perRow, col = (n - 1) % perRow;
+                int n = _chapterPage * LevelLibrary.PerChapter + k + 1;
+                int row = k / perRow, col = k % perRow;
                 var r = new Rect(w * 0.07f + col * (cell + gap), y0 + row * (cell * 1.08f + gap), cell, cell * 1.08f);
                 bool open = _progress.IsUnlocked(n);
                 int stars = _progress.StarsFor(n);
+                bool hard = LevelLibrary.TierFor(n) == LevelTier.Hard || LevelLibrary.TierFor(n) == LevelTier.SuperHard;
                 string label = open ? $"{n}\n{new string('★', stars)}{new string('☆', 3 - stars)}" : $"{n}";
                 GUI.enabled = open;
-                var (top, bottom) = !open ? ("4A4370", "2E2850") : stars == 3 ? ("FFD54A", "D99A00") : stars > 0 ? ("4BE38A", "1FA45B") : ("6E8BFF", "3A4FE0");
+                var (top, bottom) = !open ? ("4A4370", "2E2850") : stars == 3 ? ("FFD54A", "D99A00") : stars > 0 ? ("4BE38A", "1FA45B") : hard ? ("FF6B8B", "D61F4E") : ("6E8BFF", "3A4FE0");
                 if (Btn(r, label, top, bottom, 0.8f)) StartMode(Mode.Level, level: n);
                 GUI.enabled = true;
+                if (hard && stars == 0) Outlined(new Rect(r.x, r.yMax - h * 0.004f, r.width, h * 0.025f), "HARD", _small, Visuals.Hex("FF8FA3"), 1f);
             }
-            if (Btn(Row(w, h * 0.745f, h * 0.065f), Loc.F("COLLECTION  {0}/{1}", Collection.CompletedPictures(_progress), Collection.Pictures.Length), "FF8FAB", "D9466F", 0.85f)) ShowMenu(Screen.Collection);
+            float ay = h * 0.745f, aw = w * 0.2f;
+            GUI.enabled = _chapterPage > 0;
+            if (Btn(new Rect(w * 0.07f, ay, aw, h * 0.065f), "◀", "5A4FA8", "3A2F80", 0.9f)) _chapterPage--;
+            GUI.enabled = _chapterPage < chapters - 1;
+            if (Btn(new Rect(w * 0.93f - aw, ay, aw, h * 0.065f), "▶", "5A4FA8", "3A2F80", 0.9f)) _chapterPage++;
+            GUI.enabled = true;
+            if (Btn(new Rect(w * 0.3f, ay, w * 0.4f, h * 0.065f), Loc.F("PICTURES {0}/{1}", Collection.CompletedPictures(_progress), Collection.Pictures.Length), "FF8FAB", "D9466F", 0.75f)) ShowMenu(Screen.Collection);
             if (Btn(Row(w, h * 0.88f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+        }
+
+        /// <summary>A chapter's picture centred at <paramref name="cx"/>, with unrevealed tiles shown as a checker.</summary>
+        private void DrawPicture(int i, float cx, float top, float pw)
+        {
+            var pic = Collection.Pictures[i];
+            float ph = pw * Collection.Height / Collection.Width, cellPx = pw / Collection.Width, px = cx - pw / 2f;
+            Panel(new Rect(px - 6, top - 6, pw + 12, ph + 12), _cardStyle);
+            if (Event.current.type != EventType.Repaint) return;
+            var old = GUI.color;
+            for (int y = 0; y < Collection.Height; y++)
+                for (int x = 0; x < Collection.Width; x++)
+                {
+                    bool shown = Collection.Revealed(_progress, i, Collection.TileAt(x, y));
+                    GUI.color = shown ? Visuals.Hex(pic.Colors[pic.Rows[y][x]]) : (((x / Collection.TileW + y / Collection.TileH) % 2 == 0) ? new Color(1, 1, 1, 0.10f) : new Color(1, 1, 1, 0.05f));
+                    GUI.DrawTexture(new Rect(px + x * cellPx, top + y * cellPx, cellPx + 0.5f, cellPx + 0.5f), Texture2D.whiteTexture);
+                }
+            GUI.color = old;
         }
 
         private void DrawCollection(float w, float h)
         {
             Outlined(new Rect(0, h * 0.045f, w, h * 0.07f), "COLLECTION", _h2, Visuals.Hex("FF8FAB"), 3);
             Outlined(new Rect(0, h * 0.11f, w, h * 0.035f), "Beat levels to reveal each picture.", _small, Color.white, 1.2f);
-            float pw = w * 0.56f, px = (w - pw) / 2f, ph = pw * Collection.Height / Collection.Width, cellPx = pw / Collection.Width;
+            // two pictures per row, five rows: the whole journey at a glance
+            float pw = Mathf.Min(w * 0.4f, (h * 0.72f / 5f - h * 0.045f) * Collection.Width / Collection.Height);
+            float ph = pw * Collection.Height / Collection.Width, rowH = ph + h * 0.045f;
             for (int i = 0; i < Collection.Pictures.Length; i++)
             {
-                var pic = Collection.Pictures[i];
-                float top = h * 0.16f + i * (ph + h * 0.07f);
+                float cx = w * (i % 2 == 0 ? 0.27f : 0.73f), top = h * 0.16f + (i / 2) * rowH;
                 int got = Collection.RevealedCount(_progress, i);
-                Outlined(new Rect(0, top, w, h * 0.035f), Loc.F("{0}  {1}/{2}", Loc.L(pic.Name).ToUpperInvariant(), got, Collection.TilesPerPicture),
-                    new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false }, got == Collection.TilesPerPicture ? Visuals.Gold : Color.white, 1.2f);
-                var frame = new Rect(px - 6, top + h * 0.04f - 6, pw + 12, ph + 12);
-                Panel(frame, _cardStyle);
-                if (Event.current.type != EventType.Repaint) continue;
-                var old = GUI.color;
-                for (int y = 0; y < Collection.Height; y++)
-                    for (int x = 0; x < Collection.Width; x++)
-                    {
-                        bool shown = Collection.Revealed(_progress, i, Collection.TileAt(x, y));
-                        GUI.color = shown ? Visuals.Hex(pic.Colors[pic.Rows[y][x]]) : (((x / Collection.TileW + y / Collection.TileH) % 2 == 0) ? new Color(1, 1, 1, 0.10f) : new Color(1, 1, 1, 0.05f));
-                        GUI.DrawTexture(new Rect(px + x * cellPx, top + h * 0.04f + y * cellPx, cellPx + 0.5f, cellPx + 0.5f), Texture2D.whiteTexture);
-                    }
-                GUI.color = old;
+                Outlined(new Rect(cx - pw / 2, top, pw, h * 0.03f), Loc.F("{0}  {1}/{2}", Loc.L(Collection.Pictures[i].Name).ToUpperInvariant(), got, Collection.TilesPerPicture),
+                    new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, got == Collection.TilesPerPicture ? Visuals.Gold : Color.white, 1.2f);
+                DrawPicture(i, cx, top + h * 0.033f, pw);
             }
-            if (Btn(Row(w, h * 0.88f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.LevelSelect);
+            if (Btn(Row(w, h * 0.9f, h * 0.065f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu(Screen.LevelSelect);
         }
 
         private void DrawAiSelect(float w, float h)
@@ -1413,18 +1607,36 @@ namespace BlockDrop.Game
                 case Mode.Level:
                 {
                     var d = _level.Definition;
-                    Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), Loc.F("LEVEL {0}", d.Number), _body, Visuals.Hex("FFE27A"), 1.5f);
-                    Outlined(new Rect(0, h * 0.085f, w, h * 0.06f), Mathf.RoundToInt(_shownScore).ToString(), _h2, Color.white, 3);
-                    var bar = new Rect(w * 0.12f, h * 0.178f, w * 0.76f, h * 0.022f);
+                    string title = Loc.F("LEVEL {0}", d.Number) + (d.IsHard ? "  " + Loc.L("HARD") : "");
+                    Outlined(new Rect(w * 0.27f, top, w * 0.46f, bs), title, _body, d.IsHard ? Visuals.Hex("FF8FA3") : Visuals.Hex("FFE27A"), 1.5f);
+                    // moves left: big and always visible, warm when few are left
+                    int left = _level.MovesLeft;
+                    Panel(new Rect(w * 0.04f, h * 0.085f, w * 0.24f, h * 0.085f), _cardStyle);
+                    Outlined(new Rect(w * 0.04f, h * 0.085f, w * 0.24f, h * 0.055f), left.ToString(), _h2, left <= 3 ? Visuals.Hex("FF8FA3") : Color.white, 2.5f);
+                    Outlined(new Rect(w * 0.04f, h * 0.137f, w * 0.24f, h * 0.03f), "MOVES", _small, new Color(1, 1, 1, 0.75f), 1f);
+                    // goals: each chip fills as it goes and turns green when done
+                    float gx = w * 0.31f, gw = w * 0.65f, gh = h * 0.085f / d.Goals.Length;
+                    for (int i = 0; i < d.Goals.Length; i++)
+                    {
+                        var chip = new Rect(gx, h * 0.085f + i * gh, gw, gh - h * 0.006f);
+                        Panel(chip, _barBackStyle);
+                        float f = Mathf.Clamp01((float)_level.Progress(i) / Mathf.Max(1, d.Goals[i].Target));
+                        if (f > 0.04f) Panel(new Rect(chip.x, chip.y, Mathf.Max(chip.height, chip.width * f), chip.height), _barFillStyle);
+                        bool met = _level.GoalMet(i);
+                        Outlined(chip, (met ? "✓ " : "") + GoalChip(i), new GUIStyle(_small) { fontStyle = FontStyle.Bold, wordWrap = false }, met ? Visuals.Hex("2EE59D") : Color.white, 1.2f);
+                    }
+                    // score with the star marks; the bonus blast counts up on top of it
+                    float shown = _shownScore + _bonusShown;
+                    var bar = new Rect(w * 0.12f, h * 0.2f, w * 0.76f, h * 0.018f);
                     Panel(bar, _barBackStyle);
-                    float f = Mathf.Clamp01(_shownScore / Mathf.Max(1, d.ThreeStarScore));
-                    if (f > 0.04f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * f), bar.height), _barFillStyle);
-                    foreach (var s in new[] { d.TargetScore, d.TwoStarScore, d.ThreeStarScore })
+                    float sf = Mathf.Clamp01(shown / Mathf.Max(1, d.ThreeStarScore));
+                    if (sf > 0.04f) Panel(new Rect(bar.x, bar.y, Mathf.Max(bar.height, bar.width * sf), bar.height), _barFillStyle);
+                    foreach (var s in new[] { d.TwoStarScore, d.ThreeStarScore })
                     {
                         float sx = bar.x + bar.width * Mathf.Clamp01((float)s / Mathf.Max(1, d.ThreeStarScore));
-                        Outlined(new Rect(sx - 20, bar.y - h * 0.03f, 40, h * 0.03f), "★", _small, Score >= s ? Visuals.Gold : new Color(1, 1, 1, 0.5f), 1);
+                        Outlined(new Rect(sx - 20, bar.y - h * 0.026f, 40, h * 0.026f), "★", _small, shown >= s ? Visuals.Gold : new Color(1, 1, 1, 0.5f), 1);
                     }
-                    Outlined(new Rect(0, h * 0.205f, w, h * 0.04f), Loc.F("MOVES LEFT  {0}", _level.MovesLeft), _small, _level.MovesLeft <= 3 ? Visuals.Hex("FF8FA3") : Color.white, 1.5f);
+                    Outlined(new Rect(0, h * 0.218f, w, h * 0.03f), Mathf.RoundToInt(shown).ToString(), _small, Color.white, 1.2f);
                     break;
                 }
                 case Mode.Versus:
@@ -1467,6 +1679,13 @@ namespace BlockDrop.Game
                 {
                     bool won = _level.State == LevelState.Won;
                     Outlined(new Rect(0, y, w, h * 0.08f), won ? "LEVEL COMPLETE!" : "OUT OF MOVES", _h2, won ? Visuals.Hex("FFE27A") : Visuals.Hex("FF8FA3"), 3);
+                    if (!won)
+                    {
+                        string close = _level.NearMiss();
+                        if (close != null) Outlined(new Rect(w * 0.1f, y + h * 0.09f, w * 0.8f, h * 0.06f), close, _body, Color.white, 1.4f);
+                        int fails = PlayerPrefs.GetInt(FailKey(_level.Definition.Number), 0);
+                        if (fails >= HelpingHandAfter) Outlined(new Rect(w * 0.1f, y + h * 0.15f, w * 0.8f, h * 0.05f), Loc.F("Helping hand: +{0} moves on your next try!", HelpingHandMoves), _small, Visuals.Hex("7CF8FF"), 1.2f);
+                    }
                     if (won)
                     {
                         for (int i = 0; i < 3; i++)
@@ -1478,12 +1697,17 @@ namespace BlockDrop.Game
                             Outlined(new Rect(w * (0.2f + i * 0.2f) - w * 0.1f, y + h * 0.08f, w * 0.4f, h * 0.12f), earned ? "★" : "☆", st, earned ? Visuals.Gold : new Color(1, 1, 1, 0.35f), 3);
                         }
                     }
-                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), won ? Loc.F("SCORE {0}", _level.Seat.Board.Score) : Loc.F("SCORE {0} / {1}", _level.Seat.Board.Score, _level.Definition.TargetScore), _body, Color.white, 1.5f);
+                    // the final score counts up, it never jumps
+                    int final = won ? _level.FinalScore : _level.Seat.Board.Score;
+                    int counted = Mathf.RoundToInt(final * Mathf.Clamp01((t - 0.2f) / 0.9f));
+                    string scoreLine = won && _level.Bonus > 0 ? Loc.F("SCORE {0}  (BONUS +{1})", counted, _level.Bonus) : Loc.F("SCORE {0}", counted);
+                    if (won && _coinsEarned > 0) scoreLine += $"   +{_coinsEarned} ●";
+                    Outlined(new Rect(0, y + h * 0.21f, w, h * 0.06f), scoreLine, _body, Color.white, 1.5f);
                     if (_pieceMsg != "") Outlined(new Rect(0, y + h * 0.262f, w, h * 0.036f), _pieceMsg, new GUIStyle(_small) { wordWrap = false, fontStyle = FontStyle.Bold }, Visuals.Hex("7CF8FF"), 1.2f);
                     float by = y + h * 0.3f, bh = h * 0.07f, gap = h * 0.015f;
                     if (won && _level.Definition.Number < LevelLibrary.Count && Btn(Row(w, by, bh, 0.14f), "NEXT LEVEL", "4BE38A", "1FA45B")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number + 1); }
                     if (Btn(Row(w, by + bh + gap, bh, 0.14f), "RETRY", "FFC24B", "F08A1C")) { ResetStars(); StartMode(Mode.Level, level: _level.Definition.Number); }
-                    if (Btn(Row(w, by + 2 * (bh + gap), bh, 0.14f), "LEVELS", "5A4FA8", "3A2F80")) { ResetStars(); ShowMenu(Screen.LevelSelect); }
+                    if (Btn(Row(w, by + 2 * (bh + gap), bh, 0.14f), "LEVELS", "5A4FA8", "3A2F80")) { ResetStars(); OpenLevels(); }
                     return;
                 }
                 case Mode.Versus:

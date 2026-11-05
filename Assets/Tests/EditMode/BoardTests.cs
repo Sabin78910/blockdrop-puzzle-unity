@@ -65,3 +65,52 @@ public class BoardTests
         Assert.IsFalse(b.IsGameOver(new[] { Dot }));
     }
 }
+
+public class BlockerTests
+{
+    private static readonly Piece Single = new Piece(new[] { (0, 0) }, 0);
+
+    private static void FillRowExcept(Board b, int y, int gap)
+    {
+        for (int x = 0; x < b.Size; x++) if (x != gap && !b.IsFilled(x, y)) b.SetCell(x, y, 1);
+    }
+
+    [Test] public void StoneAndGemClearWithTheirLine()
+    {
+        var b = new Board(8);
+        b.SetCell(2, 4, Board.Stone);
+        b.SetCell(5, 4, Board.Gem);
+        FillRowExcept(b, 4, 0);
+        Assert.AreEqual(1, b.Place(Single, 0, 4).LinesCleared);
+        Assert.AreEqual(0, b.Count(Board.Stone));
+        Assert.AreEqual(0, b.Count(Board.Gem));
+        Assert.IsFalse(b.IsFilled(2, 4));
+    }
+
+    [Test] public void IceCracksToStoneThenClears()
+    {
+        var b = new Board(8);
+        b.SetCell(3, 2, Board.Ice);
+        FillRowExcept(b, 2, 0);
+        b.Place(Single, 0, 2);
+        Assert.AreEqual(Board.Stone, b[3, 2], "first clear cracks the ice");
+        Assert.IsFalse(b.IsFilled(0, 2));
+        FillRowExcept(b, 2, 0);
+        b.Place(Single, 0, 2);
+        Assert.IsFalse(b.IsFilled(3, 2), "second clear removes it");
+    }
+
+    [Test] public void IceWhereRowAndColumnCrossCracksOnlyOnce()
+    {
+        var b = new Board(8);
+        b.SetCell(4, 4, Board.Ice);
+        for (int k = 0; k < 8; k++)
+        {
+            if (k != 3 && k != 4) b.SetCell(k, 4, 1); // row 4 open only at x = 3
+            if (k != 3 && k != 4) b.SetCell(4, k, 1); // column 4 open only at y = 3
+        }
+        var corner = new Piece(new[] { (0, 1), (1, 0) }, 0); // fills (3,4) and (4,3) in one move
+        Assert.AreEqual(2, b.Place(corner, 3, 3).LinesCleared);
+        Assert.AreEqual(Board.Stone, b[4, 4], "one move, one crack");
+    }
+}

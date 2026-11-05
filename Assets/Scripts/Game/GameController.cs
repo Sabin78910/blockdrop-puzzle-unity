@@ -1621,31 +1621,79 @@ namespace BlockDrop.Game
             _nameMsg = err ?? Loc.F("Saved! You are {0}", OnlineService.PlayerName);
         }
 
+        private readonly Dictionary<string, GUIStyle> _rankStyles = new Dictionary<string, GUIStyle>();
+        private static readonly string[] EmblemColors = { "FF5D8F", "FFB23E", "3DDC97", "4CC9F0", "9B7BFF", "FF7A59" };
+
+        private GUIStyle RankStyle(string top, string bottom)
+        {
+            string key = top + bottom;
+            if (!_rankStyles.TryGetValue(key, out var st))
+                _rankStyles[key] = st = Sliced(Visuals.RoundedRect(64, 64, 20, Visuals.Hex(top), Visuals.Hex(bottom), 0.1f), 22);
+            return st;
+        }
+
+        private void DrawRankRow(Rect row, OnlineService.Row r)
+        {
+            int medal = Ranking.Medal(r.Rank);
+            string top = medal == 1 ? "FFD54A" : medal == 2 ? "D5DCF2" : medal == 3 ? "E09B63" : "3B2F8F";
+            string bottom = medal == 1 ? "D99A00" : medal == 2 ? "9AA6CF" : medal == 3 ? "B06A35" : "2A2070";
+            Panel(row, RankStyle(top, bottom));
+            if (r.IsMe) Panel(new Rect(row.x - 3, row.y - 3, row.width + 6, row.height + 6), RankStyle("7CF8FF", "4CC9F0"));
+            if (r.IsMe) Panel(row, RankStyle("2F4FB0", "233C8A"));
+
+            Color ink = medal > 0 && !r.IsMe ? Visuals.Hex("3A1B00") : Color.white;
+            float pad = row.height * 0.12f, d = row.height - pad * 2;
+            var rankStyle = new GUIStyle(_h2) { fontStyle = FontStyle.Bold, wordWrap = false, alignment = TextAnchor.MiddleCenter };
+            Outlined(new Rect(row.x + pad, row.y, row.height * 0.8f, row.height), r.Rank.ToString(), rankStyle, ink, 1.2f);
+
+            var emb = new Rect(row.x + pad + row.height * 0.85f, row.y + pad, d, d);
+            if (Event.current.type == EventType.Repaint)
+            {
+                var old = GUI.color; GUI.color = Visuals.Hex(EmblemColors[Ranking.Emblem(r.Name)]);
+                GUI.DrawTexture(emb, Visuals.Circle.texture); GUI.color = old;
+            }
+            var initial = new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false };
+            Outlined(emb, Ranking.Initial(r.Name), initial, Color.white, 1.2f);
+
+            var pill = new Rect(row.xMax - row.width * 0.3f - pad, row.y + row.height * 0.17f, row.width * 0.3f, row.height * 0.66f);
+            Panel(pill, RankStyle("FFFFFF", "E8E2FF"));
+            var score = new GUIStyle(_body) { fontStyle = FontStyle.Bold, wordWrap = false };
+            Outlined(pill, Ranking.FormatScore(r.Score), score, Visuals.Hex("3A1B7A"), 0.6f);
+
+            float nx = emb.xMax + pad * 1.2f, nw = pill.x - nx - pad;
+            Ranking.SplitName(r.Name, out var name, out var tag);
+            string sub = r.IsMe ? (tag.Length > 0 ? tag + " · " : "") + Loc.L("(you)") : tag;
+            var left = new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold, wordWrap = false };
+            var small = new GUIStyle(_small) { alignment = TextAnchor.MiddleLeft, wordWrap = false };
+            Outlined(new Rect(nx, row.y + (sub.Length > 0 ? 0 : row.height * 0.1f), nw, row.height * (sub.Length > 0 ? 0.62f : 0.8f)), name, left, ink, 1f);
+            if (sub.Length > 0) Outlined(new Rect(nx, row.y + row.height * 0.52f, nw, row.height * 0.4f), sub, small, ink, 0.8f);
+        }
+
         private void DrawLeaderboard(float w, float h)
         {
-            Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "LEADERBOARD", _h2, Visuals.Gold, 3);
+            Outlined(new Rect(0, h * 0.05f, w, h * 0.08f), "RANKINGS", _h2, Visuals.Gold, 3);
             float half = w * 0.4f;
             bool classic = _boardTab == OnlineService.ClassicBoard;
             if (Btn(new Rect(w * 0.08f, h * 0.14f, half, h * 0.06f), "CLASSIC", classic ? "FFD54A" : "5A4FA8", classic ? "D99A00" : "3A2F80", 0.8f)) { _boardTab = OnlineService.ClassicBoard; OnlineService.Refresh(_boardTab); }
             if (Btn(new Rect(w * 0.92f - half, h * 0.14f, half, h * 0.06f), "DAILY", !classic ? "FFD54A" : "5A4FA8", !classic ? "D99A00" : "3A2F80", 0.8f)) { _boardTab = OnlineService.DailyBoard; OnlineService.Refresh(_boardTab); }
-            var card = new Rect(w * 0.06f, h * 0.22f, w * 0.88f, h * 0.6f);
+            var card = new Rect(w * 0.04f, h * 0.22f, w * 0.92f, h * 0.62f);
             Panel(card, _cardStyle);
-            float y = card.y + h * 0.02f, rh = h * 0.052f;
+            float y = card.y + h * 0.015f, rh = h * 0.058f;
             if (OnlineService.Errors.TryGetValue(_boardTab, out var err)) Outlined(new Rect(card.x, y, card.width, rh * 3), err, _body, Color.white, 1.2f);
             else if (!OnlineService.Ready) Outlined(new Rect(card.x, y, card.width, rh * 2), OnlineService.Status, _body, Color.white, 1.2f);
             else if (!OnlineService.Top.TryGetValue(_boardTab, out var rows)) Outlined(new Rect(card.x, y, card.width, rh), "Loading…", _body, Color.white, 1.2f);
             else if (rows.Count == 0) Outlined(new Rect(card.x, y, card.width, rh * 2), "No scores yet.\nBe the first!", _body, Color.white, 1.2f);
             else
+            {
+                rh = Mathf.Min(rh, (card.height - h * 0.03f) / rows.Count);
+                float gap = rh * 0.08f;
                 foreach (var r in rows)
                 {
-                    var c = r.IsMe ? Visuals.Hex("7CF8FF") : r.Rank == 1 ? Visuals.Gold : Color.white;
-                    var left = new GUIStyle(_body) { alignment = TextAnchor.MiddleLeft };
-                    var right = new GUIStyle(_body) { alignment = TextAnchor.MiddleRight };
-                    Outlined(new Rect(card.x + w * 0.05f, y, card.width * 0.65f, rh), $"{r.Rank}.  {r.Name}{(r.IsMe ? " " + Loc.L("(you)") : "")}", left, c, 1.2f);
-                    Outlined(new Rect(card.x, y, card.width - w * 0.05f, rh), r.Score.ToString(), right, c, 1.2f);
+                    DrawRankRow(new Rect(card.x + card.width * 0.03f, y, card.width * 0.94f, rh - gap), r);
                     y += rh;
                 }
-            if (Btn(Row(w, h * 0.86f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
+            }
+            if (Btn(Row(w, h * 0.87f, h * 0.07f, 0.25f), "BACK", "5A4FA8", "3A2F80")) ShowMenu();
         }
 
         private void DrawFloaters(float w)

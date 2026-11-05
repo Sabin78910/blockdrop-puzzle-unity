@@ -259,11 +259,14 @@ namespace BlockDrop.Core
             int bot = Bot.Play(NewSeat(def), def.MaxMoves);
             double difficulty = 0.55 + 0.35 * (number - 1) / (Count - 1);
             def.TargetScore = Math.Max(1, Math.Min(bot, (int)(bot * difficulty)));
-            def.TwoStarScore = Math.Max(def.TargetScore, (def.TargetScore + bot) / 2);
-            def.ThreeStarScore = Math.Max(def.TwoStarScore, bot);
+            def.TwoStarScore = (int)Math.Ceiling(def.TargetScore * 1.25);
+            def.ThreeStarScore = (int)Math.Ceiling(def.TargetScore * 1.6);
             Cache[number] = def;
             return def;
         }
+
+        /// <summary>Trophy number (1-3) earned by winning this level, or 0 when it is not a trophy level.</summary>
+        public static int TrophyFor(int number) => number > 0 && number % 10 == 0 && number <= Count ? number / 10 : 0;
 
         public static Seat NewSeat(LevelDefinition def)
         {

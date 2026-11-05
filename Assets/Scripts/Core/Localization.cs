@@ -87,6 +87,7 @@ namespace BlockDrop.Core
             ["Beat levels to reveal each picture."] = ("Supera niveles para revelar cada imagen.", "Vença níveis para revelar cada imagem."),
             ["PICTURE PIECE!  {0} {1}/{2}"] = ("¡PIEZA DE IMAGEN!  {0} {1}/{2}", "PEÇA DA IMAGEM!  {0} {1}/{2}"),
             ["PICTURE COMPLETE!  +{0} ●"] = ("¡IMAGEN COMPLETA!  +{0} ●", "IMAGEM COMPLETA!  +{0} ●"),
+            ["TROPHY {0}/3!"] = ("¡TROFEO {0}/3!", "TROFÉU {0}/3!"),
             ["{0}  {1}/{2}"] = ("{0}  {1}/{2}", "{0}  {1}/{2}"),
             ["LANGUAGE"] = ("IDIOMA", "IDIOMA"),
             // missions, themes, trophies
